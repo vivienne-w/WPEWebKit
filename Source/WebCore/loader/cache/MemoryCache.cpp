@@ -108,8 +108,10 @@ URL MemoryCache::removeFragmentIdentifierIfNeeded(const URL& originalURL)
 
 bool MemoryCache::add(CachedResource& resource)
 {
-    if (disabled())
+    if (disabled()) {
+        printf("MEMDBG: not adding resource '%s', memory cache is disabled\n", resource.url().string().utf8().data()); fflush(stdout);
         return false;
+    }
 
     ASSERT(WTF::isMainThread());
 
@@ -121,6 +123,7 @@ bool MemoryCache::add(CachedResource& resource)
     resourceAccessed(resource);
     
     LOG(ResourceLoading, "MemoryCache::add Added '%s', resource %p\n", resource.url().string().latin1().data(), &resource);
+    printf ("MEMDBG: added resource '%s'\n", resource.url().string().utf8().data()); fflush(stdout);
     return true;
 }
 
@@ -687,6 +690,7 @@ MemoryCache::Statistics MemoryCache::getStatistics()
 
 void MemoryCache::setDisabled(bool disabled)
 {
+    printf ("MEMDBG: MemoryCache::setDisabled: %s\n", disabled ? "yes" : "no"); fflush(stdout);
     m_disabled = disabled;
     if (!m_disabled)
         return;
@@ -740,7 +744,6 @@ void MemoryCache::pruneSoon()
     m_pruneTimer.startOneShot(0_s);
 }
 
-#ifndef NDEBUG
 void MemoryCache::dumpStats()
 {
     Statistics s = getStatistics();
@@ -769,6 +772,5 @@ void MemoryCache::dumpLRULists(bool includeLive) const
         }
     }
 }
-#endif
 
 } // namespace WebCore

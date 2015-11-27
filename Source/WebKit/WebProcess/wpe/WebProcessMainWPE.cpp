@@ -28,15 +28,53 @@
 #include "WebProcessMainUnix.h"
 
 #include "ChildProcessMain.h"
+#include "CommonVM.h"
+#include "VM.h"
 #include "WebProcess.h"
 #include <WebCore/PlatformDisplayWPE.h>
 #include <glib.h>
 #include <iostream>
 #include <libsoup/soup.h>
+#include <WebCore/GCController.h>
+#include <WebCore/MemoryCache.h>
+#include <JavaScriptCore/JSLock.h>
 
+using namespace JSC;
 using namespace WebCore;
 
 namespace WebKit {
+
+static gboolean dumpMemoryStats(gpointer)
+{
+    WebCore::MemoryCache::singleton().dumpStats();
+    GCController::singleton().garbageCollectNow();
+    JSLockHolder lock(commonVM());
+    printf ("MEMDBG: DUMPSTART\n");
+    printf ("JavaScriptObjectsCount: %zu\n", commonVM().heap.objectCount());
+    printf ("JavaScriptGlobalObjectsCount: %zu\n", commonVM().heap.globalObjectCount());
+    printf ("JavaScriptProtectedObjectsCount: %zu\n", commonVM().heap.protectedObjectCount());
+    printf ("JavaScriptProtectedGlobalObjectsCount: %zu\n", commonVM().heap.protectedGlobalObjectCount());
+
+    printf ("JavaScriptPotectedObjectTypes\n");
+    std::unique_ptr<TypeCountSet> protectedObjectTypeCounts(commonVM().heap.protectedObjectTypeCounts());
+    TypeCountSet::const_iterator end = protectedObjectTypeCounts->end();
+    for (TypeCountSet::const_iterator it = protectedObjectTypeCounts->begin(); it != end; ++it)
+        printf ("\t%s: %d\n", it->key, it->value);
+
+    printf ("JavaScriptObjectTypes\n");
+    std::unique_ptr<TypeCountSet> objectTypeCounts(commonVM().heap.objectTypeCounts());
+    end = objectTypeCounts->end();
+    for (TypeCountSet::const_iterator it = objectTypeCounts->begin(); it != end; ++it)
+        printf ("\t%s: %d\n", it->key, it->value);
+
+    size_t javaScriptHeapSize = commonVM().heap.size();
+    printf ("JavaScriptHeapSize: %zu\n", javaScriptHeapSize);
+    printf ("JavaScriptFreeSize: %zu\n", commonVM().heap.capacity() - javaScriptHeapSize);
+    printf ("MEMDBG: DUMPEND\n");
+    fflush(stdout);
+
+    return G_SOURCE_CONTINUE;
+}
 
 class WebProcessMain final: public ChildProcessMainBase {
 public:
@@ -46,6 +84,8 @@ public:
         if (g_getenv("WEBKIT2_PAUSE_WEB_PROCESS_ON_LAUNCH"))
             WTF::sleep(30);
 #endif
+
+        g_timeout_add(10 * 1000, dumpMemoryStats, nullptr);
 
         return true;
     }
