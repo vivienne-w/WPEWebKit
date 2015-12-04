@@ -614,6 +614,9 @@ ExceptionOr<void> XMLHttpRequest::createRequest()
     options.filteringPolicy = ResponseFilteringPolicy::Enable;
     options.sniffContentEncoding = ContentEncodingSniffingPolicy::DoNotSniff;
 
+    if (responseType() == ResponseType::ArrayBuffer)
+        options.dataBufferingPolicy = DataBufferingPolicy::DoNotBufferData;
+
     if (m_timeoutMilliseconds) {
         if (!m_async)
             request.setTimeoutInterval(m_timeoutMilliseconds / 1000.0);
