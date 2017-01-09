@@ -58,12 +58,22 @@
 #include <limits>
 #include <wtf/CheckedArithmetic.h>
 
+// ### DEBUG ###
+#undef LOG_DISABLED
+#define LOG_DISABLED 0
+#undef LOG
+#define LOG(channel, msg, ...) do { printf("%s: ", #channel); printf(msg, ## __VA_ARGS__); printf("\n"); fflush(stdout); } while (false)
+
+#if !LOG_DISABLED
+#include <wtf/text/StringBuilder.h>
+#endif
+
 namespace WebCore {
 
 static inline bool mediaSourceLogEnabled()
 {
 #if !LOG_DISABLED
-    return LOG_CHANNEL(MediaSource).state == WTFLogChannelOn;
+    return true;
 #else
     return false;
 #endif
