@@ -55,7 +55,7 @@ struct TunerData {
     std::vector<long> frequency;
 };
 
-namespace BCMRPi {
+namespace LinuxDVB {
 class TvControlBackend;
 
 class SourceBackend {
@@ -114,5 +114,5 @@ private:
     std::condition_variable_any m_channelChangeCondition;
 };
 
-} // namespace BCMRPi
+} // namespace LinuxDVB
 #endif // SOURCE_BACKEND_H_

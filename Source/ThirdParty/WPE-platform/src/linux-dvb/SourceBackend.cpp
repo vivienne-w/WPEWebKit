@@ -28,7 +28,7 @@
 #include "SourceBackend.h"
 #include "tv-log.h"
 
-namespace BCMRPi {
+namespace LinuxDVB {
 
 #define TVControlPushEvent(eventId, tunerId, evtState /*optional*/, channelInfo /*optional*/)                                      \
 {                                                                                                                                  \
@@ -686,4 +686,4 @@ uint32_t SourceBackend::getBits(const uint8_t* buf, int startbit, int bitlen)
     return tmpLong & mask;
 }
 
-} // namespace BCMRPi
+} // namespace LinuxDVB

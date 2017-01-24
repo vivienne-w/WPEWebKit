@@ -96,8 +96,8 @@ private:
 
 #ifdef TVCONTROL_BACKEND_LINUX_DVB
     Country m_country;
-    std::vector<TvTunerBackend*> m_tunerList;
-    void getTunner(const char*, TvTunerBackend**);
+    std::vector<LinuxDVB::TvTunerBackend*> m_tunerList;
+    void getTunner(const char*, LinuxDVB::TvTunerBackend**);
 #endif
 };
 
@@ -191,7 +191,7 @@ void TvControlBackend::initializeTuners()
 #endif
             tunerData->tunerId.assign(tunerIdStr);
             dvbfe_close(feHandleTmp);
-            TvTunerBackend* tInfo = (TvTunerBackend*)new TvTunerBackend(&m_eventQueue, m_tunerCount, tunerData);
+            LinuxDVB::TvTunerBackend* tInfo = (LinuxDVB::TvTunerBackend*)new LinuDVB::TvTunerBackend(&m_eventQueue, m_tunerCount, tunerData);
             /*Update the  private tuner list*/
             m_tunerList.push_back(tInfo);
             m_tunerCount++;
@@ -207,7 +207,7 @@ tvcontrol_return TvControlBackend::getChannels(const char* tunerId, SourceType t
     tvcontrol_return ret = TVControlFailed;
     printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
 #ifdef TVCONTROL_BACKEND_LINUX_DVB
-    TvTunerBackend* tuner;
+    LinuxDVB::TvTunerBackend* tuner;
     // getTuner from the Tuner List
     getTunner(tunerId, &tuner);
     ret = tuner->getChannels(type, channelVector);
@@ -305,7 +305,7 @@ void TvControlBackend::getSupportedSourceTypesList(const char* tunerId,
     TvLogTrace();
 #ifdef TVCONTROL_BACKEND_LINUX_DVB
     /* Get the tuner instance*/
-    TvTunerBackend* curTuner;
+    LinuxDVB::TvTunerBackend* curTuner;
     getTunner(tunerId, &curTuner);
     /* Invoke get supported type list of the particular tuner instance and get the data*/
     curTuner->getSupportedSrcTypeList(outSourceTypesList);
@@ -314,7 +314,7 @@ void TvControlBackend::getSupportedSourceTypesList(const char* tunerId,
 }
 
 #ifdef TVCONTROL_BACKEND_LINUX_DVB
-void TvControlBackend::getTunner(const char* tunerId, TvTunerBackend** tuner)
+void TvControlBackend::getTunner(const char* tunerId, LinuxDVB::TvTunerBackend** tuner)
 {
 
     TvLogTrace();
@@ -336,7 +336,7 @@ tvcontrol_return TvControlBackend::getSourceList(const char* tunerId, struct wpe
     TvLogTrace();
 /* Get the tuner instance*/
 #ifdef TVCONTROL_BACKEND_LINUX_DVB
-    TvTunerBackend* curTuner;
+    LinuxDVB::TvTunerBackend* curTuner;
     getTunner(tunerId, &curTuner);
     /* Invoke get available source type list of the particular tuner and get the data */
     ret = curTuner->getSupportedSrcTypeList(outSourceList);
@@ -349,7 +349,7 @@ void TvControlBackend::getSignalStrength(const char* tunerId, double* signalStre
 {
     TvLogTrace();
 #ifdef TVCONTROL_BACKEND_LINUX_DVB
-    TvTunerBackend* tuner;
+    LiunxDVB::TvTunerBackend* tuner;
     // getTuner from the Tuner List
     getTunner(tunerId, &tuner);
     tuner->getSignalStrength(signalStrength);
@@ -362,7 +362,7 @@ tvcontrol_return TvControlBackend::startScanning(const char* tunerId, SourceType
     tvcontrol_return ret = TVControlFailed;
     TvLogTrace();
 #ifdef TVCONTROL_BACKEND_LINUX_DVB
-    TvTunerBackend* tuner;
+    LinuxDVB::TvTunerBackend* tuner;
     // getTuner from the Tuner List
     getTunner(tunerId, &tuner);
     tuner->setSrcType(type);
@@ -377,7 +377,7 @@ tvcontrol_return TvControlBackend::stopScanning(const char* tunerId)
     tvcontrol_return ret = TVControlFailed;
     TvLogTrace();
 #ifdef TVCONTROL_BACKEND_LINUX_DVB
-    TvTunerBackend* tuner;
+    LinuxDVB::TvTunerBackend* tuner;
     // getTuner from the Tuner List
     getTunner(tunerId, &tuner);
     ret = tuner->stopScanning();
@@ -391,7 +391,7 @@ tvcontrol_return TvControlBackend::setCurrentChannel(const char* tunerId, Source
     tvcontrol_return ret = TVControlFailed;
     TvLogTrace();
 #ifdef TVCONTROL_BACKEND_LINUX_DVB
-    TvTunerBackend* tuner;
+    LinuxDVB::TvTunerBackend* tuner;
     // getTuner from the Tuner List
     getTunner(tunerId, &tuner);
     ret = tuner->setCurrentChannel(type, channelNumber);
@@ -405,7 +405,7 @@ tvcontrol_return TvControlBackend::setCurrentSource(const char* tunerId, SourceT
     tvcontrol_return ret = TVControlFailed;
     TvLogTrace();
 #ifdef TVCONTROL_BACKEND_LINUX_DVB
-    TvTunerBackend* tuner;
+    LinuxDVB::TvTunerBackend* tuner;
     // getTuner from the Tuner List
     getTunner(tunerId, &tuner);
     ret = tuner->setCurrentSource(sType);
@@ -507,7 +507,7 @@ void TvControlBackend::updateTunerList(const char* tunerId, tuner_changed_operat
     if (operation == Added) {
         TunerData* tunerData = new TunerData;
         tunerData->tunerId.assign(tunerId);
-        TvTunerBackend* tInfo = (TvTunerBackend*)new TvTunerBackend(&m_eventQueue, m_tunerCount, tunerData);
+        LinuxDVB::TvTunerBackend* tInfo = (LinuxDVB::TvTunerBackend*)new LinuxDVB::TvTunerBackend(&m_eventQueue, m_tunerCount, tunerData);
         m_tunerList.push_back(tInfo);
         TvLogTrace();
         TvLogInfo("Found and Added the Tuner:-)");

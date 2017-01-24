@@ -41,7 +41,7 @@
 #define CONFIGFILE "TVConfig.txt"
 typedef std::map<std::string, std::string> ConfigInfo;
 
-namespace BCMRPi {
+namespace LinuxDVB {
 class TvTunerBackend {
 public:
     TvTunerBackend(EventQueue<wpe_tvcontrol_event*>*, int, TunerData*);
@@ -86,6 +86,6 @@ private:
     void clearSourceList();
 };
 
-} // namespace BCMRPi
+} // namespace LinuxDVB
 
 #endif // TUNER_BACKEND_H_

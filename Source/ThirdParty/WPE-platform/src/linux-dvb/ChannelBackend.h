@@ -31,7 +31,7 @@
 #include <string>
 #include <wpe/tvcontrol-backend.h>
 
-namespace BCMRPi {
+namespace LinuxDVB {
 
 class ChannelBackend {
 
@@ -69,6 +69,6 @@ private:
     bool m_isParentalLocked;
 };
 
-} // namespace BCMRPi
+} // namespace LinuxDVB
 
 #endif // CHANNEL_BACKEND_H_

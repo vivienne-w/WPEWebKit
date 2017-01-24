@@ -28,7 +28,7 @@
 #include "TunerBackend.h"
 #include "tv-log.h"
 
-namespace BCMRPi {
+namespace LinuxDVB {
 
 TvTunerBackend::TvTunerBackend(EventQueue<wpe_tvcontrol_event*>* eventQueue, int tunerCnt, TunerData* tunerPtr)
     : m_tunerData(tunerPtr)
@@ -662,4 +662,4 @@ void TvTunerBackend::getConfiguration()
 #endif
 }
 
-} // namespace BCMRPi
+} // namespace LinuxDVB

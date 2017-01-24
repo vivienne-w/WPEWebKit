@@ -28,6 +28,6 @@
 #include "ChannelBackend.h"
 #define TV_DEBUG 1
 
-namespace BCMRPi {
+namespace LinuxDVB {
 
-} // namespace BCMRPi
+} // namespace LinuxDVB
