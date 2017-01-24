@@ -1,4 +1,3 @@
-
 /*
  * Copyright (C) 2017 TATA ELXSI
  * Copyright (C) 2017 Metrological
@@ -26,8 +25,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef TVTuner_h
-#define TVTuner_h
+#pragma once
 
 #if ENABLE(TV_CONTROL)
 
@@ -42,9 +40,9 @@
 
 namespace WebCore {
 
-class TVTuner : public RefCounted<TVTuner>, public PlatformTVTunerClient, public ContextDestructionObserver, public EventTargetWithInlineData {
+class TVTuner : public RefCounted<TVTuner>, public ContextDestructionObserver, public EventTargetWithInlineData {
 public:
-    static Ref<TVTuner> create(ScriptExecutionContext*, RefPtr<PlatformTVTuner> platformTVTuner);
+    static Ref<TVTuner> create(ScriptExecutionContext*, RefPtr<PlatformTVTuner>);
     virtual ~TVTuner();
 
     enum class SourceType {
@@ -74,7 +72,7 @@ public:
 
     const Vector<SourceType>& getSupportedSourceTypes();
     void getSources(TVSourcePromise&&);
-    void setCurrentSource(SourceType sourceType, TVPromise&&);
+    void setCurrentSource(SourceType, TVPromise&&);
 
     const String& id() const { return m_platformTVTuner->id(); }
     RefPtr<TVSource> currentSource() const { return m_currentSource; }
@@ -85,9 +83,9 @@ public:
     using RefCounted<TVTuner>::deref;
 
 private:
-    TVTuner(ScriptExecutionContext*, RefPtr<PlatformTVTuner> platformTVTuner);
+    TVTuner(ScriptExecutionContext*, RefPtr<PlatformTVTuner>);
     RefPtr<PlatformTVTuner> m_platformTVTuner;
-    Vector<RefPtr<TVSource> > m_sourceList;
+    Vector<RefPtr<TVSource>> m_sourceList;
     Vector<SourceType> m_sourceTypeList;
     RefPtr<TVSource> m_currentSource;
 
@@ -98,10 +96,9 @@ private:
     EventTargetInterface eventTargetInterface() const override { return TVTunerEventTargetInterfaceType; }
     ScriptExecutionContext* scriptExecutionContext() const override;
 };
-typedef Vector<RefPtr<TVTuner> > TVTunerVector;
+
+typedef Vector<RefPtr<TVTuner>> TVTunerVector;
 
 } // namespace WebCore
 
 #endif // ENABLE(TV_CONTROL)
-
-#endif // TVTuner_h

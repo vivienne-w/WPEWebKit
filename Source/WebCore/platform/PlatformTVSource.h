@@ -25,8 +25,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef PlatformTVSource_h
-#define PlatformTVSource_h
+#pragma once
 
 #if ENABLE(TV_CONTROL)
 
@@ -36,15 +35,9 @@ namespace WebCore {
 
 class PlatformTVControlBackend;
 
-class PlatformTVSourceClient {
-public:
-protected:
-    virtual ~PlatformTVSourceClient() {}
-};
-
 class PlatformTVSource : public RefCounted<PlatformTVSource> {
 public:
-    enum class Type {
+    enum Type {
         DvbT,
         DvbT2,
         DvbC,
@@ -64,16 +57,16 @@ public:
         Cmmb,
         TDmb,
         SDmb,
-        Undefined };
+        Undefined
+    };
 
     static RefPtr<PlatformTVSource> create(PlatformTVControlBackend*, String, Type);
     virtual ~PlatformTVSource();
 
-    bool setCurrentChannel(const String& channelNumber);
-    bool startScanning(bool scanningOption);
+    bool setCurrentChannel(const String&);
+    bool startScanning(bool);
     bool stopScanning();
-    void setSourceClient(PlatformTVSourceClient* client);
-    bool getChannels(Vector<RefPtr<PlatformTVChannel>>& channelVector);
+    bool getChannels(Vector<RefPtr<PlatformTVChannel>>&);
 
     Type type() const { return m_type; }
 
@@ -82,11 +75,8 @@ private:
     String m_tunerId;
     Type m_type;
     PlatformTVControlBackend* m_tvBackend;
-    PlatformTVSourceClient* m_platformTVSourceClient;
 };
 
 } // namespace WebCore
 
 #endif // ENABLE(TV_CONTROL)
-
-#endif // PlatformTVSource_h

@@ -25,8 +25,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef PlatformTVManager_h
-#define PlatformTVManager_h
+#pragma once
 
 #if ENABLE(TV_CONTROL)
 
@@ -39,12 +38,12 @@ class PlatformTVControlBackend;
 
 class PlatformTVManagerClient {
 public:
-    virtual void didTunerOperationChanged(String tunerId, uint16_t event) = 0;
-    virtual void didCurrentSourceChanged(String tunerId) = 0;
-    virtual void didCurrentChannelChanged(String tunerId) = 0;
-    virtual void didScanningStateChanged(String tunerId, RefPtr<PlatformTVChannel> platformTVChannel, uint16_t state) = 0;
+    virtual void didTunerOperationChanged(String, uint16_t) = 0;
+    virtual void didCurrentSourceChanged(String) = 0;
+    virtual void didCurrentChannelChanged(String) = 0;
+    virtual void didScanningStateChanged(String, RefPtr<PlatformTVChannel>, uint16_t) = 0;
 protected:
-    virtual ~PlatformTVManagerClient() { }
+    virtual ~PlatformTVManagerClient() = default;
 };
 
 
@@ -65,5 +64,3 @@ private:
 } // namespace WebCore
 
 #endif // ENABLE(TV_CONTROL)
-
-#endif // PlatformTVManager_h

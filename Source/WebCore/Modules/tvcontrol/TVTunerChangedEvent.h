@@ -25,8 +25,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef TVTunerChangedEvent_h
-#define TVTunerChangedEvent_h
+#pragma once
 
 #if ENABLE(TV_CONTROL)
 
@@ -58,5 +57,3 @@ private:
 } // namespace WebCore
 
 #endif // ENABLE(TV_CONTROL)
-
-#endif // TVTunerChangedEvent_h

@@ -25,8 +25,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef PlatformTVControl_h
-#define PlatformTVControl_h
+#pragma once
 
 #if ENABLE(TV_CONTROL)
 
@@ -44,5 +43,3 @@ public:
 } // namespace WebCore
 
 #endif // ENABLE(TV_CONTROL)
-
-#endif // PlatformTVControl_h

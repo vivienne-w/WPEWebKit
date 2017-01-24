@@ -44,18 +44,12 @@ PlatformTVSource::PlatformTVSource(PlatformTVControlBackend* tvBackend, String t
     : m_tunerId(tunerId)
     , m_type(type)
     , m_tvBackend(tvBackend)
-    , m_platformTVSourceClient(nullptr)
 {
     printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
 }
 
 PlatformTVSource::~PlatformTVSource()
 {
-}
-
-void PlatformTVSource::setSourceClient(PlatformTVSourceClient* client)
-{
-    m_platformTVSourceClient = client;
 }
 
 bool PlatformTVSource::getChannels(Vector<RefPtr<PlatformTVChannel>>& channelVector)
@@ -66,6 +60,7 @@ bool PlatformTVSource::getChannels(Vector<RefPtr<PlatformTVChannel>>& channelVec
     ret = wpe_tvcontrol_backend_get_channel_list(m_tvBackend->m_backend, m_tunerId.utf8().data(), (SourceType)m_type, &channelList);
     if (ret == TVControlFailed || ret == TVControlNotImplemented)
         return false;
+
     if (channelList) {
         if (channelList->length) {
             for (uint64_t i = 0; i < channelList->length; i++) {

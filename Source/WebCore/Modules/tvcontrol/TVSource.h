@@ -25,8 +25,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef TVSource_h
-#define TVSource_h
+#pragma once
 
 #if ENABLE(TV_CONTROL)
 
@@ -37,14 +36,14 @@
 #include "PlatformTVSource.h"
 #include "ScriptExecutionContext.h"
 #include "TVChannel.h"
-#include "TVScanningStateChangedEvent.h"
 #include "TVCurrentChannelChangedEvent.h"
+#include "TVScanningStateChangedEvent.h"
 
 namespace WebCore {
 
 class TVTuner;
 
-class TVSource : public RefCounted<TVSource>, public PlatformTVSourceClient, public ContextDestructionObserver, public EventTargetWithInlineData {
+class TVSource : public RefCounted<TVSource>, public ContextDestructionObserver, public EventTargetWithInlineData {
 public:
     struct StartScanningOptions {
         bool isRescanned;
@@ -79,11 +78,11 @@ public:
     typedef DOMPromise<std::nullptr_t> TVPromise;
 
     void getChannels(TVChannelPromise&&);
-    void setCurrentChannel(const String& channelNumber, TVPromise&&);
+    void setCurrentChannel(const String&, TVPromise&&);
     RefPtr<TVChannel> currentChannel() const { return m_currentChannel; }
     void startScanning(const StartScanningOptions&, TVPromise&&);
     void stopScanning(TVPromise&&);
-    void dispatchScanningStateChangedEvent(RefPtr<PlatformTVChannel> platformTVChannel, uint16_t state);
+    void dispatchScanningStateChangedEvent(RefPtr<PlatformTVChannel>, uint16_t);
     void dispatchChannelChangedEvent();
     TVTuner* tuner() const { return m_parentTVTuner; }
     Type type() const { return ((Type)m_platformTVSource->type()); }
@@ -97,13 +96,13 @@ private:
     RefPtr<PlatformTVSource> m_platformTVSource;
     TVTuner* m_parentTVTuner;
 
-    Vector<RefPtr<TVChannel> > m_channelList;
+    Vector<RefPtr<TVChannel>> m_channelList;
     RefPtr<TVChannel> m_currentChannel;
 
     enum ScanningState {
-        SCANNING_NOT_INITIALISED,
-        SCANNING_STARTED,
-        SCANNING_COMPLETED
+        ScanningNotInitialised,
+        ScanningStarted,
+        ScanningCompleted
     };
     ScanningState m_scanState;
     bool m_isScanning;
@@ -115,10 +114,9 @@ private:
     EventTargetInterface eventTargetInterface() const override { return TVSourceEventTargetInterfaceType; }
     ScriptExecutionContext* scriptExecutionContext() const override;
 };
-typedef Vector<RefPtr<TVSource> > TVSourceVector;
+
+typedef Vector<RefPtr<TVSource>> TVSourceVector;
 
 } // namespace WebCore
 
 #endif // ENABLE(TV_CONTROL)
-
-#endif // TVSource_h

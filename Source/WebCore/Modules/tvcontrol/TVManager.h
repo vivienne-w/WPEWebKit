@@ -25,8 +25,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef TVManager_h
-#define TVManager_h
+#pragma once
 
 #if ENABLE(TV_CONTROL)
 
@@ -64,12 +63,12 @@ public:
 private:
     TVManager(ScriptExecutionContext*);
     std::unique_ptr<PlatformTVManager> m_platformTVManager;
-    Vector<RefPtr<TVTuner> > m_tunerList;
+    Vector<RefPtr<TVTuner>> m_tunerList;
 
     void refEventTarget() override { ref(); }
     void derefEventTarget() override { deref(); }
-    virtual const char* activeDOMObjectName() const override { return "TVManager"; }
-    virtual bool canSuspendForDocumentSuspension() const override { return false; }
+    const char* activeDOMObjectName() const override { return "TVManager"; }
+    bool canSuspendForDocumentSuspension() const override { return false; }
     ScriptExecutionContext* scriptExecutionContext() const override;
     EventTargetInterface eventTargetInterface() const override { return TVManagerEventTargetInterfaceType; }
 };
@@ -77,5 +76,3 @@ private:
 } // namespace WebCore
 
 #endif // ENABLE(TV_CONTROL)
-
-#endif // TVManager_h

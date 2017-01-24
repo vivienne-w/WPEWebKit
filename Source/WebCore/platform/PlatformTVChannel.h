@@ -25,37 +25,31 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef PlatformTVChannel_h
-#define PlatformTVChannel_h
+#pragma once
 
 #if ENABLE(TV_CONTROL)
 
-#include <wtf/text/WTFString.h>
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
 #include <wtf/Vector.h>
+#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
 class PlatformTVControlBackend;
 class PlatformTVSource;
 
-class PlatformTVChannelClient {
-public:
-protected:
-    virtual ~PlatformTVChannelClient() {}
-};
-
 class PlatformTVChannel : public RefCounted<PlatformTVChannel> {
 public:
     static RefPtr<PlatformTVChannel> create(PlatformTVControlBackend*, String);
 
-    /*virtual*/ ~PlatformTVChannel();
+    ~PlatformTVChannel();
 
-    enum class Type {
-	    Tv,
+    enum Type {
+        Tv,
         Radio,
-        Data };
+        Data
+    };
 
     const String& networkId() const { return m_networkId; }
     const String transportStreamId() const { return m_transportStreamId; }
@@ -65,7 +59,6 @@ public:
 
     Type type() const { return m_type; }
     bool isEmergency() const { return m_isEmergency; }
-    void setChannelClient(PlatformTVChannelClient* client);
 
 private:
     PlatformTVChannel(PlatformTVControlBackend*, String);
@@ -78,12 +71,9 @@ private:
     String m_name;
     String m_number;
     bool m_isEmergency;
-    PlatformTVChannelClient* m_PlatformTVChannelClient;
     PlatformTVControlBackend* m_tvBackend;
 };
 
 } // namespace WebCore
 
 #endif // ENABLE(TV_CONTROL)
-
-#endif // PlatformTVChannel_h

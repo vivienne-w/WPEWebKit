@@ -25,8 +25,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef TVScanningStateChangedEvent_h
-#define TVScanningStateChangedEvent_h
+#pragma once
 
 #if ENABLE(TV_CONTROL)
 
@@ -63,5 +62,3 @@ private:
 } // namespace WebCore
 
 #endif // ENABLE(TV_CONTROL)
-
-#endif // TVScanningStateChangedEvent_h

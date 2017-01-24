@@ -29,13 +29,10 @@
 #ifndef TUNER_BACKEND_H_
 #define TUNER_BACKEND_H_
 
+#include "SourceBackend.h"
 #include <fstream>
 #include <math.h>
 #include <sstream>
-#include "TVConfig.h"
-#include "SourceBackend.h"
-
-using namespace std;
 
 #define DVB_ADAPTER_SCAN 6
 #define DVB_FE_SCAN 6
@@ -53,12 +50,12 @@ public:
     SourceType getSrcType() { return m_sType; };
     void setSrcType(SourceType sType) { m_sType = sType; };
     void getSignalStrength(double*);
-    tvcontrol_return startScanning(bool isRescanned);
+    tvcontrol_return startScanning(bool);
     tvcontrol_return stopScanning();
     tvcontrol_return setCurrentChannel(SourceType, uint64_t);
-    tvcontrol_return setCurrentSource(SourceType sType);
+    tvcontrol_return setCurrentSource(SourceType);
     tvcontrol_return getChannels(SourceType, struct wpe_tvcontrol_channel_vector**);
-    tvcontrol_return getSupportedSrcTypeList(wpe_tvcontrol_src_types_vector* out_source_types_list);
+    tvcontrol_return getSupportedSrcTypeList(wpe_tvcontrol_src_types_vector*);
 
     struct TunerData* m_tunerData;
     std::vector<SourceBackend*> m_sourceList; // List of source objects
@@ -72,18 +69,17 @@ private:
     ConfigInfo m_configValues;
     EventQueue<wpe_tvcontrol_event*>* m_eventQueue;
 
-    int baseOffset(int channel, int channelList);
-    int freqStep(int channel, int channelList);
+    int baseOffset(int, int);
+    int freqStep(int, int);
     int getSupportedSourcesTypeList(wpe_tvcontrol_src_types_vector*);
-
     void getAvailableSrcList(wpe_tvcontrol_src_types_vector*);
     void initializeSourceList();
     void getSources();
     void getSource(SourceType, SourceBackend**);
-    void getSourceType(SourceType sType, fe_delivery_system*);
-    void configureTuner(std::string& modulation);
-    void setModulation(std::string& modulation);
-    void configureTuner(int tunerCnt);
+    void getSourceType(SourceType, fe_delivery_system*);
+    void configureTuner(std::string&);
+    void setModulation(std::string&);
+    void configureTuner(int);
     void getConfiguration();
     void getCapabilities();
     void populateFreq();

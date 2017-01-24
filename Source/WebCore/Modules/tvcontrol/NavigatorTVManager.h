@@ -25,8 +25,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef NavigatorTVManager_h
-#define NavigatorTVManager_h
+#pragma once
 
 #if ENABLE(TV_CONTROL)
 
@@ -58,5 +57,3 @@ private:
 } // namespace WebCore
 
 #endif // ENABLE(TV_CONTROL)
-
-#endif // NavigatorTVManager_h

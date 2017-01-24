@@ -25,8 +25,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef TVChannel_h
-#define TVChannel_h
+#pragma once
 
 #if ENABLE(TV_CONTROL)
 
@@ -37,10 +36,10 @@ namespace WebCore {
 
 class TVSource;
 
-class TVChannel final : public RefCounted<TVChannel>, public PlatformTVChannelClient, public EventTargetWithInlineData {
+class TVChannel final : public RefCounted<TVChannel>, public EventTargetWithInlineData {
 public:
     static Ref<TVChannel> create(RefPtr<PlatformTVChannel>, TVSource*);
-    ~TVChannel() {}
+    ~TVChannel() = default;
 
     enum class Type {
         Tv,
@@ -79,5 +78,3 @@ typedef Vector<RefPtr<TVChannel> > TVChannelVector;
 } // namespace WebCore
 
 #endif // ENABLE(TV_CONTROL)
-
-#endif // TVChannel_h

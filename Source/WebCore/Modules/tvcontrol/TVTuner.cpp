@@ -59,17 +59,15 @@ const Vector<TVTuner::SourceType>& TVTuner::getSupportedSourceTypes()
 
     if (m_platformTVTuner) {
         Vector<PlatformTVSource::Type> platformSourceTypeList;
-        if (!m_platformTVTuner->getSupportedSourceTypes(platformSourceTypeList)) {
+        if (!m_platformTVTuner->getSupportedSourceTypes(platformSourceTypeList))
             return m_sourceTypeList;
-        }
+
         if (platformSourceTypeList.size()) {
-            printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
-            for (auto& type : platformSourceTypeList) {
-                printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
+            for (auto& type : platformSourceTypeList)
                 m_sourceTypeList.append((SourceType)(type));
-            }
         }
     }
+
     return m_sourceTypeList;
 }
 
@@ -82,15 +80,15 @@ void TVTuner::getSources(TVSourcePromise&& promise)
     }
     printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
     if (m_platformTVTuner) {
-        Vector<RefPtr<PlatformTVSource> > platformSourceList;
+        Vector<RefPtr<PlatformTVSource>> platformSourceList;
         if (!m_platformTVTuner->getSources(platformSourceList)) {
             promise.reject(nullptr);
             return;
         }
         if (platformSourceList.size()) {
-            for (auto& source : platformSourceList) {
+            for (auto& source : platformSourceList)
                 m_sourceList.append(TVSource::create(scriptExecutionContext(), source, this));
-            }
+
             promise.resolve(m_sourceList);
             return;
         }
@@ -106,7 +104,7 @@ void TVTuner::setCurrentSource(TVTuner::SourceType sourceType, TVPromise&& promi
         m_currentSource = nullptr;
         if (m_sourceList.isEmpty()) {
             /* Get the list first */
-            Vector<RefPtr<PlatformTVSource> > platformSourceList;
+            Vector<RefPtr<PlatformTVSource>> platformSourceList;
             if (!m_platformTVTuner->getSources(platformSourceList)) {
                 promise.reject(nullptr);
                 return;

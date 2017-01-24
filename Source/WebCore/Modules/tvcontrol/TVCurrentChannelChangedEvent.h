@@ -25,8 +25,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef TVCurrentChannelChangedEvent_h
-#define TVCurrentChannelChangedEvent_h
+#pragma once
 
 #if ENABLE(TV_CONTROL)
 
@@ -53,5 +52,3 @@ private:
 } // namespace WebCore
 
 #endif // ENABLE(TV_CONTROL)
-
-#endif // TVCurrentChannelChangedEvent_h

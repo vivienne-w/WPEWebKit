@@ -28,21 +28,19 @@
 #ifndef TV_CONFIG_H_
 #define TV_CONFIG_H_
 
-#include <map>
-#include <vector>
-#include <string>
-#include <iostream>
 #include <fcntl.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <stdlib.h>
 #include <inttypes.h>
-#include <sys/ioctl.h>
+#include <iostream>
 #include <libdvbapi/dvbfe.h>
 #include <linux/dvb/frontend.h>
+#include <map>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string>
+#include <sys/ioctl.h>
+#include <unistd.h>
+#include <vector>
 #include <wpe/tvcontrol-backend.h>
-
-using namespace std;
 
 #define TUNER_ID_LEN 3
 #define TV_CONFIG_FILE "TVConfig.txt"

@@ -42,7 +42,6 @@ RefPtr<PlatformTVChannel> PlatformTVChannel::create(PlatformTVControlBackend* tv
 
 PlatformTVChannel::PlatformTVChannel(PlatformTVControlBackend* tvBackend, String tunerId)
     : m_tunerId(tunerId)
-    , m_PlatformTVChannelClient(nullptr)
     , m_tvBackend(tvBackend)
 {
     m_networkId = (std::to_string(tvBackend->m_channel->networkId)).c_str();
@@ -55,11 +54,6 @@ PlatformTVChannel::PlatformTVChannel(PlatformTVControlBackend* tvBackend, String
 
 PlatformTVChannel::~PlatformTVChannel()
 {
-}
-
-void PlatformTVChannel::setChannelClient(PlatformTVChannelClient* client)
-{
-    m_PlatformTVChannelClient = client;
 }
 
 } // namespace WebCore

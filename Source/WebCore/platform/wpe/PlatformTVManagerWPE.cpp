@@ -27,12 +27,12 @@
 
 #include "config.h"
 #include "PlatformTVManager.h"
-#include <wtf/MainThread.h>
 
 #if ENABLE(TV_CONTROL)
 
 #include "PlatformTVControl.h"
 #include <wpe/tvcontrol-backend.h>
+#include <wtf/MainThread.h>
 
 namespace WebCore {
 
@@ -122,6 +122,7 @@ bool PlatformTVManager::getTuners(Vector<RefPtr<PlatformTVTuner>>& tunerVector)
     ret = wpe_tvcontrol_backend_get_tuner_list(m_tvBackend->m_backend, &tunerList);
     if (ret == TVControlFailed || ret == TVControlNotImplemented)
         return false;
+
     if (tunerList.length) {
         for (uint64_t i = 0; i < tunerList.length; i++) {
             String tunerId(tunerList.strings[i].data, tunerList.strings[i].length);

@@ -28,32 +28,31 @@
 #ifndef SOURCE_BACKEND_H_
 #define SOURCE_BACKEND_H_
 
-#include <poll.h>
-#include <linux/dvb/dmx.h>
-#include <libdvbapi/dvbfe.h>
-#include <libdvbapi/dvbdemux.h>
-#include <libucsi/dvb/section.h>
-#include <libucsi/atsc/section.h>
-#include <libucsi/atsc/types.h>
-#include <libucsi/atsc/extended_channel_name_descriptor.h>
-#include <signal.h>
-#include <thread>
-#include <mutex>
-#include <condition_variable>
-#include <fstream>
-#include <unistd.h>
-
+#include "ChannelBackend.h"
 #include "TVConfig.h"
 #include "event-queue.h"
-#include "ChannelBackend.h"
 
-using namespace std;
-#define TV_DEBUG 1 //TODO remove
+#include <condition_variable>
+#include <fstream>
+#include <libdvbapi/dvbdemux.h>
+#include <libdvbapi/dvbfe.h>
+#include <libucsi/atsc/extended_channel_name_descriptor.h>
+#include <libucsi/atsc/section.h>
+#include <libucsi/atsc/types.h>
+#include <libucsi/dvb/section.h>
+#include <linux/dvb/dmx.h>
+#include <mutex>
+#include <poll.h>
+#include <signal.h>
+#include <thread>
+#include <unistd.h>
+
+#define TV_DEBUG 1
 
 struct TunerData {
     std::string tunerId;
     uint64_t modulation;
-    vector<long> frequency;
+    std::vector<long> frequency;
 };
 
 namespace BCMRPi {
@@ -64,28 +63,28 @@ public:
     SourceBackend(EventQueue<wpe_tvcontrol_event*>*, SourceType, TunerData*);
     ~SourceBackend();
 
-    tvcontrol_return startScanning(bool isRescanned);
+    tvcontrol_return startScanning(bool);
     tvcontrol_return stopScanning();
-    tvcontrol_return setCurrentChannel(uint64_t channelNo);
+    tvcontrol_return setCurrentChannel(uint64_t);
     SourceType srcType() { return m_sType; }
-    tvcontrol_return getChannels(wpe_tvcontrol_channel_vector** channelVector);
+    tvcontrol_return getChannels(wpe_tvcontrol_channel_vector**);
 
     wpe_tvcontrol_channel_vector m_channelVector;
 
 private:
-    void parseAtscExtendedChannelNameDescriptor(char** name, const unsigned char* buf);
-    void startPlayBack(int frequency, uint64_t modulation, int pmtPid, int videoPid, int audioPid);
+    void parseAtscExtendedChannelNameDescriptor(char**, const unsigned char*);
+    void startPlayBack(int, uint64_t, int, int, int);
     void stopPlayBack();
-    ChannelBackend* getChannelByLCN(uint64_t channelNo);
-    bool tuneToFrequency(int frequency, uint64_t modulation, struct dvbfe_handle* feHandle);
-    uint32_t getBits(const uint8_t* buf, int startbit, int bitlen);
-    void atscScan(int frequency, uint64_t modulation);
-    void mpegScan(int programNumber, std::map<int, int>& streamInfo);
+    ChannelBackend* getChannelByLCN(uint64_t);
+    bool tuneToFrequency(int, uint64_t, struct dvbfe_handle*);
+    uint32_t getBits(const uint8_t*, int, int);
+    void atscScan(int, uint64_t);
+    void mpegScan(int, std::map<int, int>&);
     void dvbScan();
-    bool processTVCT(int dmxfd, int frequency);
-    bool processPAT(int patFd, int programNumber, struct pollfd* pollfd, std::map<int, int>& streamInfo);
-    void processPMT(int pmtFd, std::map<int, int>& streamInfo);
-    int createSectionFilter(uint16_t pid, uint8_t tableId);
+    bool processTVCT(int, int);
+    bool processPAT(int, int, struct pollfd*, std::map<int, int>&);
+    void processPMT(int, std::map<int, int>&);
+    int createSectionFilter(uint16_t, uint8_t);
     void clearChannelList();
     void clearChannelVector();
     void scanningThread();
@@ -96,8 +95,8 @@ private:
 
     SourceType m_sType;
     TunerData* m_tunerData;
-    thread m_scanningThread;
-    thread m_setCurrentChannelThread;
+    std::thread m_scanningThread;
+    std::thread m_setCurrentChannelThread;
     int m_adapter;
     int m_demux;
 
@@ -106,13 +105,13 @@ private:
     bool m_isScanStopped;
     bool m_isRunning;
     bool m_isScanInProgress;
-    mutex m_scanMutex;
-    condition_variable_any m_scanCondition;
+    std::mutex m_scanMutex;
+    std::condition_variable_any m_scanCondition;
     pid_t m_pid;
 
     uint64_t m_channelNo;
-    mutex m_channelChangeMutex;
-    condition_variable_any m_channelChangeCondition;
+    std::mutex m_channelChangeMutex;
+    std::condition_variable_any m_channelChangeCondition;
 };
 
 } // namespace BCMRPi

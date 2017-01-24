@@ -28,9 +28,9 @@
 #ifndef bcm_rpi_event_queue_h
 #define bcm_rpi_event_queue_h
 
-#include <mutex>
 #include <condition_variable>
 #include <deque>
+#include <mutex>
 
 template <typename T>
 class EventQueue {
@@ -65,9 +65,8 @@ public:
     T getEvents()
     {
         pthread_mutex_lock(&m_mutex);
-        while (m_queue.empty()) {
+        while (m_queue.empty())
             pthread_cond_wait(&m_condition, &m_mutex);
-        }
         T ret = m_queue.front();
         m_queue.pop_front();
         pthread_mutex_unlock(&m_mutex);

@@ -73,10 +73,9 @@ TVManager* NavigatorTVManager::tv(Navigator& navigator)
 TVManager* NavigatorTVManager::tv() const
 {
     printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
-    if (!m_tvManager && frame()) {
-        printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
+    if (!m_tvManager && frame())
         m_tvManager = TVManager::create(frame()->document());
-    }
+
     printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
     return m_tvManager.get();
 }
