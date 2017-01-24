@@ -29,11 +29,19 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-// See: https://dvcs.w3.org/hg/webperf/raw-file/tip/specs/NavigationTiming/Overview.html
+// https://w3c.github.io/hr-time/
+
+typedef double DOMHighResTimeStamp;
+
 [
     Conditional=WEB_TIMING,
     GenerateIsReachable=ImplFrame,
 ] interface Performance : EventTarget {
+
+    // See http://www.w3.org/TR/hr-time/ for details.
+    DOMHighResTimeStamp now();
+
+    // https://w3c.github.io/navigation-timing/
     readonly attribute PerformanceNavigation navigation;
     readonly attribute PerformanceTiming timing;
 
@@ -41,6 +49,7 @@
     [EnabledAtRuntime=ResourceTiming] PerformanceEntryList getEntriesByType(DOMString entryType);
     [EnabledAtRuntime=ResourceTiming] PerformanceEntryList getEntriesByName(DOMString name, optional DOMString entryType);
 
+    // https://w3c.github.io/resource-timing/
     [EnabledAtRuntime=ResourceTiming] void clearResourceTimings();
     [EnabledAtRuntime=ResourceTiming] void setResourceTimingBufferSize(unsigned long maxSize);
 
@@ -52,9 +61,6 @@
 
     [MayThrowException] void measure(DOMString measureName, optional DOMString startMark, optional DOMString endMark);
     void clearMeasures(optional DOMString measureName);
-
-    // See http://www.w3.org/TR/hr-time/ for details.
-    unrestricted double now();
 };
 
 typedef sequence<PerformanceEntry> PerformanceEntryList;
