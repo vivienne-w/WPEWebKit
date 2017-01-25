@@ -24,6 +24,7 @@
  */
 
 [
-    Conditional=USER_TIMING,
+    Conditional=WEB_TIMING,
+    EnabledAtRuntime=UserTiming,
 ] interface PerformanceMeasure : PerformanceEntry {
 };

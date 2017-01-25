@@ -180,6 +180,9 @@ public:
     void setResourceTimingEnabled(bool isEnabled) { m_isResourceTimingEnabled = isEnabled; }
     bool resourceTimingEnabled() const { return m_isResourceTimingEnabled; }
 
+    void setUserTimingEnabled(bool isEnabled) { m_isUserTimingEnabled = isEnabled; }
+    bool userTimingEnabled() const { return m_isUserTimingEnabled; }
+
 #if ENABLE(GAMEPAD)
     void setGamepadsEnabled(bool areEnabled) { m_areGamepadsEnabled = areEnabled; }
     bool gamepadsEnabled() const { return m_areGamepadsEnabled; }
@@ -252,6 +255,7 @@ private:
     bool m_isLinkPreloadEnabled;
     bool m_isLangAttributeAwareFormControlUIEnabled;
     bool m_isResourceTimingEnabled;
+    bool m_isUserTimingEnabled { false };
 
 #if ENABLE(INDEXED_DATABASE)
     bool m_isIndexedDBEnabled;
