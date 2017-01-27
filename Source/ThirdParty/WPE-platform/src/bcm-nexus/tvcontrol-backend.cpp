@@ -14,29 +14,32 @@
 namespace BCMNexus {
 
 // XXX: cleanup after wpe_tvcontrol_string is replaced with std::string & wpe_tvcontrol_XXX_vector with std::vector
-class TvControlBackend {
+class TvControlBackend  : public BcmScanHandler {
     public:
     TvControlBackend(struct wpe_tvcontrol_backend* backend);
     ~TvControlBackend();
-    void getTuners(struct wpe_tvcontrol_string_vector*);
-    void getSupportedSourceTypes(const char* tunerId, struct wpe_tvcontrol_src_types_vector*);
-    void getSources(const char* tunerId, struct wpe_tvcontrol_src_types_vector*);
+    void getTuners(struct wpe_tvcontrol_string_vector* outTunerList);
+    void getSupportedSourceTypes(const char* tunerId, struct wpe_tvcontrol_src_types_vector* out_source_types_list);
+    void getSources(const char* tunerId, struct wpe_tvcontrol_src_types_vector* out_source_types_list);
     void getSignalStrength(const char* tunerId, double* signalStrength);
-    void startScanning(const char* tunerId, SourceType);
+    void startScanning(const char* tunerId, SourceType, bool isRescanned);
     void stopScanning(const char* tunerId);
-    void setCurrentChannel(const char* tunerId, SourceType sType, uint64_t);
-    void getChannels(const char* tunerId, SourceType sType, struct wpe_tvcontrol_channel_vector*);
+    void setCurrentChannel(const char* tunerId, SourceType sType, uint64_t id);
+    void getChannels(const char* tunerId, SourceType sType, struct wpe_tvcontrol_channel_vector** ppChannelVector);
     void setCurrentSource(const char* tunerId, SourceType sType);
 
     private:
     void dispatchScanStateEvent(scanning_state scanState, wpe_tvcontrol_channel *pChan = nullptr);
-    void scanThread(int n);
+    void dispatchTuneEvent();
+    void channelFound(int freq, int progNum);
+    void scanComplete();
 
     private:
     struct wpe_tvcontrol_backend* m_backend;
-    wpe_tvcontrol_string* m_strPtr;
+    int tunerCount;
+    wpe_tvcontrol_string* m_tunerListPtr;
     SourceType* m_srcTypeListPtr;
-    wpe_tvcontrol_channel* m_channels;
+    wpe_tvcontrol_channel_vector m_channels;
     BcmTVManager tvm;
     ChannelMap chanMap;
     std::string currentTunerId;
@@ -46,13 +49,14 @@ class TvControlBackend {
 
 TvControlBackend::TvControlBackend(struct wpe_tvcontrol_backend* backend)
     : m_backend(backend)
-    , m_strPtr(nullptr)
+    , m_tunerListPtr(nullptr)
     , m_srcTypeListPtr(nullptr)
-    , m_channels(nullptr)
     , tvm(true)
     , bScanInprogress (false)
 {
     mytrace();
+    m_channels.channels = nullptr;
+    m_channels.length = 0;
     int rc = tvm.init();
 }
 
@@ -65,19 +69,19 @@ TvControlBackend::~TvControlBackend()
 void TvControlBackend::getTuners(struct wpe_tvcontrol_string_vector* outTunerList)
 {
     mytrace();
-    int count = 4;                      // XXX: get it thru nexus API
-    if (!m_strPtr) {
-        m_strPtr = (wpe_tvcontrol_string *) new wpe_tvcontrol_string[count];
-        for (int i = 0; i < count; ++i) {
+    tunerCount = 4;                     // XXX: get it thru nexus API
+    if (!m_tunerListPtr) {
+        m_tunerListPtr = (wpe_tvcontrol_string *) new wpe_tvcontrol_string[tunerCount];
+        for (int i = 0; i < tunerCount; ++i) {
             std::stringstream ss;
             ss << "tuner" << i;
             myprintf("%s: %d. %s\n", __FUNCTION__, i, ss.str().c_str());
-            m_strPtr[i].data = strdup(ss.str().c_str());
-            m_strPtr[i].length = strlen(m_strPtr[i].data);
+            m_tunerListPtr[i].data = strdup(ss.str().c_str());
+            m_tunerListPtr[i].length = strlen(m_tunerListPtr[i].data);
         }
     }
-    outTunerList->length = count;
-    outTunerList->strings = m_strPtr;
+    outTunerList->length = tunerCount;
+    outTunerList->strings = m_tunerListPtr;
     myprintf("%s: tuner count=%d\n", __FUNCTION__, outTunerList->length);
 }
 
@@ -107,32 +111,35 @@ void TvControlBackend::getSignalStrength(const char*, double* signalStrength)
     mytrace();
 }
 
-void TvControlBackend::scanThread(int n)
+void TvControlBackend::channelFound(int freq, int progNum)
 {
-    int rc = 0;
-    int freq[2] = {156, 362};           // XXX: Pass freq list from JS or read from config file.
-    
-    myprintf("%s: starting\n", __FUNCTION__);
-    for (int i = 0; i < 2; ++i) {
-        rc = tvm.scan(freq[i]);
-        if (rc == 0) {
-            wpe_tvcontrol_channel *pChan = nullptr;    // XXX: fill-in chan info
-            dispatchScanStateEvent(Scanned, pChan);
-        }
-        myprintf("%s: completed for freq %d rc=%d\n", __FUNCTION__, freq[i], rc);
-    }
-
-    dispatchScanStateEvent(Completed);
-    bScanInprogress = false;
+    myprintf("%s: Found freq=%d progNum=%d\n", __FUNCTION__, freq, progNum);
 }
 
-void TvControlBackend::startScanning(const char* tuner_id, SourceType srcType)
+void TvControlBackend::scanComplete()
 {
-    if (!bScanInprogress) {
-        bScanInprogress = true;
-        std::thread t(&TvControlBackend::scanThread, this, 0);
-        t.detach();
+    myprintf("%s: -----> Scan completed <-----\n", __FUNCTION__);
+    dispatchScanStateEvent(Completed);
+}
+
+void TvControlBackend::startScanning(const char* tuner_id, SourceType srcType, bool isRescanned)
+{
+    int rc = 0;
+    // The isRescanned option in the options parameter specifies whether or not
+    // the process of scanning the TV channels has to clear the
+    // currently scanned TV channels before scanning
+    if ((isRescanned) && (m_channels.channels)) {
+        tvm.clearCache();
+        free (m_channels.channels);
+        m_channels.channels = nullptr;
+        m_channels.length = 0;
     }
+
+    std::string strFreq;
+    const char* freq = getenv("TVC_FREQUENCY_LIST");
+    if (freq)
+        strFreq  = freq;
+    rc = tvm.scan(strFreq, *this);
 }
 
 void TvControlBackend::stopScanning(const char* tuner_id)
@@ -146,48 +153,43 @@ void TvControlBackend::setCurrentChannel(const char* tuner_id, SourceType sType,
     Channel chan = chanMap.at(id-1);
     tvm.disconnect();
     int rc = tvm.tune(chan.frequency, chan.programNumber);
+    dispatchTuneEvent();
 }
 
-void TvControlBackend::getChannels(const char* tuner_id, SourceType, struct wpe_tvcontrol_channel_vector* chan_list)
+void TvControlBackend::getChannels(const char* tuner_id, SourceType, struct wpe_tvcontrol_channel_vector** ppChannelVector)
 {
     mytrace();
     int rc = tvm.getChannelMap(chanMap);
-    if ((rc == 0) && (!m_channels)) {
-        m_channels = new wpe_tvcontrol_channel[chanMap.size()];
+    if ((rc == 0) && (!m_channels.channels)) {
+        wpe_tvcontrol_channel *pChannels = new wpe_tvcontrol_channel[chanMap.size()];
         int index = 0;
         for (auto it = std::begin(chanMap); it!=std::end(chanMap); ++it) {
             Channel &chan = *it;
-            std::stringstream ss;
-            
-            ss << chan.frequency;
-            m_channels[index].transportSId = strdup(ss.str().c_str());
-            
-            ss.clear();
-            ss << chan.programNumber;
-            m_channels[index].serviceId = strdup(ss.str().c_str());
-            m_channels[index].number = index+1;
+            pChannels[index].name = nullptr;
+            pChannels[index].networkId = 0;
+            pChannels[index].transportSId = chan.frequency;
+            pChannels[index].serviceId = chan.programNumber;
+            pChannels[index].number = index+1;
             switch (chan.type) {
             case Channel::Normal: 
-                m_channels[index].type = Tv;
+                pChannels[index].type = Tv;
                 break;
             case Channel::Radio: 
-                m_channels[index].type = Radio;
+                pChannels[index].type = Radio;
                 break;
             default:
-                m_channels[index].type = Data;
+                pChannels[index].type = Data;
                 break;
             };
-
-            m_channels[index].networkId = nullptr; 
-            m_channels[index].name = nullptr; 
 
             ++index;
             printf("\t%5d. %6d MHz %8d %6d %d %d\n", index, chan.frequency, chan.programNumber, chan.modulation, chan.symbolRate,
                 chan.type);
         }
+        m_channels.length = chanMap.size();
+        m_channels.channels = pChannels;
     }
-    chan_list->length = chanMap.size();
-    chan_list->channels = m_channels;
+    *ppChannelVector = &m_channels;
     mytrace();
 }
 
@@ -207,6 +209,18 @@ void TvControlBackend::dispatchScanStateEvent(scanning_state scanState, wpe_tvco
     event.tuner_id.length = currentTunerId.size();
     event.channel_info = pChan;
     wpe_tvcontrol_backend_dispatch_scanning_state_event(m_backend, &event);
+}
+
+void TvControlBackend::dispatchTuneEvent()
+{
+    myprintf("%s: Entering\n", __FUNCTION__);
+    wpe_tvcontrol_event event;
+    event.eventID = ChannelChanged;
+    event.tuner_id.data = (char *)currentTunerId.c_str();
+    event.tuner_id.length = currentTunerId.size();
+    event.channel_info = nullptr;
+    wpe_tvcontrol_backend_dispatch_channel_event(m_backend, &event);
+    myprintf("%s: Exiting\n", __FUNCTION__);
 }
 
 } // namespace BCMNexus
@@ -258,7 +272,7 @@ struct wpe_tvcontrol_backend_interface bcm_tvcontrol_backend_interface = {
     {
         tvcontrol_return rc = TVControlSuccess;
         auto& backend = *static_cast<BCMNexus::TvControlBackend*>(data);
-        backend.startScanning(tuner_id, type);
+        backend.startScanning(tuner_id, type, isRescanned);
         return rc;
     },
     // stop_scanning
@@ -286,7 +300,7 @@ struct wpe_tvcontrol_backend_interface bcm_tvcontrol_backend_interface = {
         return rc;
     },
     // get_channel_list
-    [](void* data, const char* tuner_id, SourceType type, struct wpe_tvcontrol_channel_vector* out_channel_list) -> tvcontrol_return
+    [](void* data, const char* tuner_id, SourceType type, struct wpe_tvcontrol_channel_vector** out_channel_list) -> tvcontrol_return
     {
         tvcontrol_return rc = TVControlSuccess;
         auto& backend = *static_cast<BCMNexus::TvControlBackend*>(data);

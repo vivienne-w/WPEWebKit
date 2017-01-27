@@ -3,14 +3,17 @@
 #include <sys/time.h>
 
 #include <iostream>
+#include <thread>
+
 #include "BcmTVManager.h"
 #include <refsw/ts_psi.h>
 
+// XXX: Replace with common logging mechanism
 #define myprintf(...)   printf(__VA_ARGS__)
 #define err_msg         myprintf
 #define dbg_msg         myprintf
-#define log_msg         //myprintf
-#define mytrace()       log_msg("%s: %s:%d\n", __FUNCTION__, __FILE__, __LINE__)
+#define log_msg         myprintf
+#define mytrace()       log_msg("%s: %s:%d\n", __PRETTY_FUNCTION__, __FILE__, __LINE__)
 
 #define TUNE_TIMEOUT 2000
 #define DATA_TIMEOUT 5000
@@ -54,7 +57,7 @@ bool TS_PAT_validate(const uint8_t *buf, unsigned bfrSize)
     return (buf[0] == 0x00);
 }
 
-BERR_Code TS_PAT_getProgram( const uint8_t *buf, unsigned bfrSize, int programNum, int  *progNum, int *pid )
+BERR_Code TS_PAT_getProgram(const uint8_t *buf, unsigned bfrSize, int programNum, int  *progNum, int *pid )
 {
     int byteOffset = TS_PSI_LAST_SECTION_NUMBER_OFFSET+1;
 
@@ -71,9 +74,14 @@ BERR_Code TS_PAT_getProgram( const uint8_t *buf, unsigned bfrSize, int programNu
     return BERR_SUCCESS;
 }
 
-uint8_t TS_PAT_getNumPrograms( const uint8_t *buf)
+uint8_t TS_PAT_getNumPrograms(const uint8_t *buf)
 {
     return (TS_PSI_MAX_BYTE_OFFSET(buf)-(TS_PSI_LAST_SECTION_NUMBER_OFFSET+1))/4;
+}
+
+uint16_t getTSId(const uint8_t *buf)
+{
+    return (uint16_t)(TS_READ_16(&(buf)[TS_PSI_TABLE_ID_EXT_OFFSET] ) & 0xFFFF);
 }
 
 // PMT -------------------------------------------------------------------------
@@ -148,6 +156,31 @@ BERR_Code TS_PMT_getStream( const uint8_t *buf, unsigned bfrSize, int streamNum,
 }
 // -----------------------------------------------------------------------------
 
+void parse(const string &str, vector<int>& tokens)
+{
+    if (str.empty())
+        return;
+
+    size_t prev = 0, pos = 0;
+    do {
+        pos = str.find(',', prev);
+        if (pos == string::npos)
+            pos = str.length();
+        string token = str.substr(prev, pos - prev);
+
+        int pos2 = token.find('-');
+        if (pos2 != string::npos) {
+            int start = atoi(token.substr(0, pos2).c_str());
+            int end  = atoi(token.substr(pos2+1).c_str());
+            for (int i = start; i <= end; ++i)
+                tokens.push_back(i);
+        } else {
+            tokens.push_back(atoi(token.c_str()));
+        }
+        prev = pos + 1;
+    } while (pos < str.length());
+}
+
 static void lock_callback(void *context, int param)
 {
     BKNI_EventHandle statusEvent = (BKNI_EventHandle)context;
@@ -185,18 +218,27 @@ NexusClient::NexusClient()
 {
     mytrace();
     NEXUS_Error rc;
+#ifdef NO_NXCLIENT
+    rc = NEXUS_Platform_Join();
+#else
     rc = NxClient_Join(NULL);
+#endif
     BDBG_ASSERT(!rc);
 }
 
 NexusClient::~NexusClient()
 {
     mytrace();
+#ifdef NO_NXCLIENT
+    NEXUS_Platform_Uninit();
+#else
     NxClient_Uninit();
+#endif
 }
 
 BcmVideoDecoder::BcmVideoDecoder()
     : m_videoDecoder(NULL)
+    , m_pidChannel(NULL)
     , pStcChannel(NULL)
     , pParserBand(NULL)
 {
@@ -207,7 +249,7 @@ BcmVideoDecoder::BcmVideoDecoder()
     allocSettings.simpleVideoDecoder = 1;
     rc = NxClient_Alloc(&allocSettings, &m_allocResults);
     BDBG_ASSERT(!rc);
-    
+
     m_videoDecoder = NEXUS_SimpleVideoDecoder_Acquire(m_allocResults.simpleVideoDecoder[0].id);
     BDBG_ASSERT(m_videoDecoder);
  }
@@ -225,15 +267,15 @@ unsigned BcmVideoDecoder::getId()
     return m_allocResults.simpleVideoDecoder[0].id;
 }
 
-int BcmVideoDecoder::start(const ES_Info &ESVideo)
+int BcmVideoDecoder::start(const ES_Info &esVideo)
 {
     NEXUS_Error rc = 0;
     NEXUS_SimpleVideoDecoderStartSettings videoProgram;
 
-    m_pidChannel = NEXUS_PidChannel_Open(*pParserBand, ESVideo.pid, NULL);
+    m_pidChannel = NEXUS_PidChannel_Open(*pParserBand, esVideo.pid, NULL);
     NEXUS_SimpleVideoDecoder_GetDefaultStartSettings(&videoProgram);
     if (m_pidChannel) {
-        switch(ESVideo.streamType) {
+        switch(esVideo.streamType) {
             case TS_PSI_ST_11172_2_Video:
             case TS_PSI_ST_13818_2_Video:
                 videoProgram.settings.codec = NEXUS_VideoCodec_eMpeg2;
@@ -242,14 +284,14 @@ int BcmVideoDecoder::start(const ES_Info &ESVideo)
                 videoProgram.settings.codec = NEXUS_VideoCodec_eH264;
                 break;
             default:
-                dbg_msg("%s: Unknown stream type %d pid=%d  (Using default Mpeg2)\n", ESVideo.streamType, ESVideo.pid);
+                dbg_msg("%s: Unknown stream type %d pid=%d  (Using default Mpeg2)\n", esVideo.streamType, esVideo.pid);
                 videoProgram.settings.codec = NEXUS_VideoCodec_eMpeg2;
         }
         videoProgram.settings.pidChannel = m_pidChannel;
         if (*pStcChannel)
             NEXUS_SimpleVideoDecoder_SetStcChannel(m_videoDecoder, *pStcChannel);
         rc = NEXUS_SimpleVideoDecoder_Start(m_videoDecoder, &videoProgram);
-        dbg_msg ("%s: Stream type=%d pid=%d NEXUS_SimpleVideoDecoder_Start rc=%d\n", __FUNCTION__, ESVideo.streamType, ESVideo.pid, rc);
+        dbg_msg ("%s: Stream type=%d pid=%d NEXUS_SimpleVideoDecoder_Start rc=%d\n", __FUNCTION__, esVideo.streamType, esVideo.pid, rc);
     } else {
         err_msg("%s: Unable to open pid channel\n", __FUNCTION__);
     }
@@ -259,9 +301,11 @@ int BcmVideoDecoder::start(const ES_Info &ESVideo)
 int BcmVideoDecoder::stop()
 {
     NEXUS_Error rc = 0;
-
-    if (m_pidChannel)
+    mytrace();
+    if (m_pidChannel) {
         NEXUS_PidChannel_Close(m_pidChannel);
+        m_pidChannel = nullptr;
+    }
     if (m_videoDecoder)
         NEXUS_SimpleVideoDecoder_Stop(m_videoDecoder);
 
@@ -270,6 +314,7 @@ int BcmVideoDecoder::stop()
 
 BcmAudioDecoder::BcmAudioDecoder()
     : m_audioDecoder(NULL)
+    , m_pidChannel(NULL)
     , pStcChannel(NULL)
     , pParserBand(NULL)
 {
@@ -298,31 +343,31 @@ unsigned BcmAudioDecoder::getId()
     return m_allocResults.simpleAudioDecoder.id;
 }
 
-int BcmAudioDecoder::start(const ES_Info &ESAudio)
+int BcmAudioDecoder::start(const ES_Info &esAudio)
 {
     NEXUS_Error rc = 0;
     NEXUS_SimpleAudioDecoderStartSettings audioProgram;
 
     NEXUS_SimpleAudioDecoder_GetDefaultStartSettings(&audioProgram);
-    m_pidChannel = NEXUS_PidChannel_Open(*pParserBand, ESAudio.pid, NULL);
+    m_pidChannel = NEXUS_PidChannel_Open(*pParserBand, esAudio.pid, NULL);
     if (m_pidChannel) {
-        switch(ESAudio.streamType) {
+        switch(esAudio.streamType) {
             case TS_PSI_ST_11172_3_Audio:
             case TS_PSI_ST_13818_3_Audio:
                 audioProgram.primary.codec = NEXUS_AudioCodec_eMpeg;
                 break;
             case TS_PSI_ST_13818_7_AAC:
                 audioProgram.primary.codec = NEXUS_AudioCodec_eAac;
-                break;            
+                break;
             default:
-                dbg_msg("%s: Unknown stream type %d pid=%d (Using default AC3)\n", __FUNCTION__, ESAudio.streamType, ESAudio.pid);
+                dbg_msg("%s: Unknown stream type %d pid=%d (Using default AC3)\n", __FUNCTION__, esAudio.streamType, esAudio.pid);
                 audioProgram.primary.codec = NEXUS_AudioCodec_eAc3;
         }
-        audioProgram.primary.pidChannel = m_pidChannel; 
+        audioProgram.primary.pidChannel = m_pidChannel;
         if (*pStcChannel)
             NEXUS_SimpleAudioDecoder_SetStcChannel(m_audioDecoder, *pStcChannel);
         rc = NEXUS_SimpleAudioDecoder_Start(m_audioDecoder, &audioProgram);
-        dbg_msg ("%s: Stream type=%d pid=%d NEXUS_SimpleAudioDecoder_Start rc=%d\n", __FUNCTION__, ESAudio.streamType, ESAudio.pid, rc);
+        dbg_msg ("%s: Stream type=%d pid=%d NEXUS_SimpleAudioDecoder_Start rc=%d\n", __FUNCTION__, esAudio.streamType, esAudio.pid, rc);
     } else {
         err_msg("%s: Unable to open pid channel\n", __FUNCTION__);
     }
@@ -333,9 +378,10 @@ int BcmAudioDecoder::start(const ES_Info &ESAudio)
 int BcmAudioDecoder::stop()
 {
     NEXUS_Error rc = 0;
-
-    if (m_pidChannel)
+    if (m_pidChannel) {
         NEXUS_PidChannel_Close(m_pidChannel);
+        m_pidChannel = nullptr;
+    }
     if (m_audioDecoder)
         NEXUS_SimpleAudioDecoder_Stop(m_audioDecoder);
 
@@ -364,7 +410,7 @@ BcmTuner::BcmTuner(bool dvb)
 
 BcmTuner::~BcmTuner()
 {
-    if (statusEvent) 
+    if (statusEvent)
         BKNI_DestroyEvent(statusEvent);
     if (frontend)
         NEXUS_Frontend_Release(frontend);
@@ -380,11 +426,11 @@ int BcmTuner::tune(int freq)
     NEXUS_FrontendQamSettings qamSettings;
     NEXUS_FrontendUserParameters userParams;
     long long tuneStart = getMS();
-    
+
     NEXUS_Frontend_GetDefaultQamSettings(&qamSettings);
     qamSettings.frequency = freq * 1000000;
     qamSettings.mode = NEXUS_FrontendQamMode_e256;
-    
+
     if (bDvb) {
         qamSettings.annex = NEXUS_FrontendQamAnnex_eA;
         qamSettings.bandwidth = NEXUS_FrontendQamBandwidth_e8Mhz;
@@ -426,7 +472,8 @@ int BcmTuner::tune(int freq)
     BDBG_ASSERT(!rc);
 
     rc = NEXUS_Frontend_TuneQam(frontend, &qamSettings);
-    err_msg ("\n%s: NEXUS_Frontend_TuneQam rc=%d\n", __FUNCTION__, rc);
+    if (rc)
+        err_msg ("\n%s: NEXUS_Frontend_TuneQam rc=%d\n", __FUNCTION__, rc);
     BDBG_ASSERT(!rc);
 
     NEXUS_FrontendFastStatus status;
@@ -438,7 +485,7 @@ int BcmTuner::tune(int freq)
             break;
         }
         NEXUS_Frontend_GetFastStatus(frontend, &status);
-        log_msg("\t%d Mhz lockStatus=%d frontend=%p\n", freq, status.lockStatus, (void*)frontend);        
+        log_msg("\t%d Mhz lockStatus=%d frontend=%p\n", freq, status.lockStatus, (void*)frontend);
     } while ((status.lockStatus != NEXUS_FrontendLockStatus_eLocked) &&  (status.lockStatus != NEXUS_FrontendLockStatus_eNoSignal));
 
     if (status.lockStatus == NEXUS_FrontendLockStatus_eLocked) {
@@ -448,13 +495,15 @@ int BcmTuner::tune(int freq)
             err_msg("NEXUS_Frontend_GetQamScanStatus FAILED\n");
         } else {
             long long tuneEnd = getMS();
-            dbg_msg("%d Mhz SymbolRate: %d Mode: %d Annex: %d Interleaver: %d Spectrum inverted: %s status: %d tuneTime=%d\n", 
+            dbg_msg("%d Mhz SymbolRate: %d Mode: %d Annex: %d Interleaver: %d Spectrum inverted: %s status: %d tuneTime=%d\n",
                 freq, scanStatus.symbolRate, scanStatus.mode, scanStatus.annex, scanStatus.interleaver,
                 scanStatus.spectrumInverted?"True":"False", scanStatus.acquisitionStatus,
                 (tuneEnd - tuneStart));
         }
+    } else {
+        rc = -1;
     }
-    
+
     return rc;
 }
 
@@ -462,6 +511,7 @@ BcmTVManager::BcmTVManager(bool bDvb)
     : m_pidChanCount(0)
     , m_parserBand(0)
     , m_tuner(bDvb)
+    , m_pcrPidChannel(NULL)
     , m_msgEvent(NULL)
 {
     BKNI_CreateEvent(&m_msgEvent);
@@ -469,7 +519,7 @@ BcmTVManager::BcmTVManager(bool bDvb)
 
 BcmTVManager::~BcmTVManager()
 {
-    if (m_msgEvent) 
+    if (m_msgEvent)
         BKNI_DestroyEvent(m_msgEvent);
 }
 
@@ -506,28 +556,28 @@ int BcmTVManager::tune(int freq, int progNum)
     //rc = scan(freq);
     rc = tune(freq);
     if (rc == 0) {
-        ES_Info ESVideo, ESAudio;
-        if (getStreamInfo(freq, progNum, ESVideo, ESAudio))
-            rc = decode(ESVideo, ESAudio);
+        ES_Info esVideo, esAudio;
+        if (getStreamInfo(freq, progNum, esVideo, esAudio))
+            rc = decode(esVideo, esAudio);
     }
     return rc;
 }
 
-int BcmTVManager::decode(const ES_Info &ESVideo, const ES_Info &ESAudio)
+int BcmTVManager::decode(const ES_Info &esVideo, const ES_Info &esAudio)
 {
     NEXUS_Error rc;
     NxClient_ConnectSettings connectSettings;
     long long start = getMS();
 
     NxClient_GetDefaultConnectSettings(&connectSettings);
-    if (ESVideo.pid)
+    if (esVideo.pid)
         connectSettings.simpleVideoDecoder[0].id = m_videoDecoder.getId();
     connectSettings.simpleAudioDecoder.id = m_audioDecoder.getId();
-    
-    log_msg ("%s: simpleVideoDecoder[0].id=%d simpleAudioDecoder.id=%d\n", __FUNCTION__, 
+
+    log_msg ("%s: simpleVideoDecoder[0].id=%d simpleAudioDecoder.id=%d\n", __FUNCTION__,
         connectSettings.simpleVideoDecoder[0].id, connectSettings.simpleAudioDecoder.id);
 
-    int pcrPid = ESVideo.pcrPid;
+    int pcrPid = esVideo.pcrPid;
     m_pcrPidChannel = NEXUS_PidChannel_Open(m_parserBand, pcrPid, NULL);
 
     NEXUS_SimpleStcChannelSettings stcSettings;
@@ -538,33 +588,35 @@ int BcmTVManager::decode(const ES_Info &ESVideo, const ES_Info &ESAudio)
     NEXUS_SimpleStcChannel_SetSettings(m_stcChannel, &stcSettings);
 
     rc = NxClient_Connect(&connectSettings, &m_connectId);
-    if (rc) 
+    if (rc)
         return BERR_TRACE(rc);
-    dbg_msg ("%s: NxClient_Connect SUCCESS\n", __FUNCTION__);    
+    dbg_msg ("%s: NxClient_Connect SUCCESS\n", __FUNCTION__);
 
-    if (ESVideo.pid) {
+    if (esVideo.pid) {
         m_videoDecoder.setStcChannel(&m_stcChannel);
         m_videoDecoder.setParserBand(&m_parserBand);
-        m_videoDecoder.start(ESVideo);
+        m_videoDecoder.start(esVideo);
     }
-    if (ESAudio.pid) {
+    if (esAudio.pid) {
         m_audioDecoder.setStcChannel(&m_stcChannel);
         m_audioDecoder.setParserBand(&m_parserBand);
-        m_audioDecoder.start(ESAudio);
+        m_audioDecoder.start(esAudio);
     }
-    
+
     dbg_msg ("%s: decode Time=%d\n", __FUNCTION__, (getMS() - start));
-    
+
     return rc;
 }
 
 int BcmTVManager::stop()
 {
     NEXUS_Error rc = 0;
-    m_audioDecoder.stop();
     m_videoDecoder.stop();
-    if (m_pcrPidChannel)
+    m_audioDecoder.stop();
+    if (m_pcrPidChannel) {
         NEXUS_PidChannel_Close(m_pcrPidChannel);
+        m_pcrPidChannel = nullptr;
+    }
     return rc;
 }
 
@@ -594,17 +646,16 @@ int BcmTVManager::startFilter(int pid, const uint8_t **pBuffer, size_t *pSize)
             if (rc)
                 err_msg ("%s: NEXUS_Message_Start FAILED rc=%d\n", __FUNCTION__, rc);
             log_msg ("%s: hMsg=%u hPidChannel=%u\n", __FUNCTION__, hMsg[index], hPidChannel);
-      
+
             do {
                 rc = NEXUS_Message_GetBuffer(hMsg[index], (const void**)pBuffer, pSize);
                 if (*pSize == 0) {
                     rc = BKNI_WaitForEvent(m_msgEvent, DATA_TIMEOUT);
                     if (rc) {
-                        rc = BERR_TRACE(rc);
                         break;
                     }
                 }
-            } while (*pSize == 0);            
+            } while (*pSize == 0);
         } else {
             err_msg ("%s: NEXUS_PidChannel_Open FAILED\n", __FUNCTION__);
         }
@@ -617,6 +668,7 @@ int BcmTVManager::startFilter(int pid, const uint8_t **pBuffer, size_t *pSize)
 
 int BcmTVManager::stopFilter()
 {
+    mytrace();
     NEXUS_Error rc = 0;
     for (int i = 0; i < m_pidChanCount; ++i ) {
         if (hMsg[i]) {
@@ -634,6 +686,7 @@ int BcmTVManager::stopFilter()
 
 int BcmTVManager::disconnect()
 {
+    mytrace();
     NEXUS_Error rc = 0;
     stop();
     NxClient_Disconnect(m_connectId);
@@ -641,16 +694,26 @@ int BcmTVManager::disconnect()
     return rc;
 }
 
-int BcmTVManager::scan(int startFreq, int endFreq)
+void BcmTVManager::scanComplete()
+{
+}
+
+void BcmTVManager::scanThread(const std::string &strFreq, BcmScanHandler &scanHandler)
 {
     NEXUS_Error rc = 0;
     int found = 0;
-    unsigned long begin = time(NULL);
+    TsArray aTs;
+    vector<int> vec;
+    parse(strFreq, vec);
 
-    if (endFreq == 0)
-        endFreq = startFreq;
+    if (strFreq.empty() || vec.size() == 0) {
+        err_msg ("%s: Frequency list is empty doing full scan.\n", __FUNCTION__);
+        parse("60-800", vec);
+    }
 
-    for (int freq = startFreq; freq <= endFreq; ++freq) {
+    for (auto it = std::begin(vec); it!=std::end(vec); ++it) {
+        int freq = *it;
+        dbg_msg ("%s: Tuning to %d. Found %d TS\n", __FUNCTION__, freq, aTs.size());
         rc = tune(freq);
 
         if (rc == 0) {
@@ -660,27 +723,46 @@ int BcmTVManager::scan(int startFreq, int endFreq)
             rc = startFilter(0, &buffer, &size);
             if (rc == 0) {
                 DVB_TS dvbTs;
-                parsePAT(buffer, size, dvbTs.pat);                    
+                parsePAT(buffer, size, dvbTs.pat);
                 dbg_msg("\t%s: Found %d PMT PIDs in PAT freq=%d\n", __FUNCTION__, dvbTs.pat.size(), freq);
 
                 for (auto it = std::begin(dvbTs.pat); it!=std::end(dvbTs.pat); ++it) {
-                    int progNum = it->first;
-                    int pid = it->second;
+                    int progNum = it->programNum;
+                    int pid = it->pmtPid;
                     startFilter(pid, &buffer, &size);
                     ElementaryStrems streams;
                     log_msg("\t%s: Prgram Number %d PMT Pid=%d\n", __FUNCTION__, progNum, pid);
                     parsePMT(buffer, size, streams);
                     dvbTs.pmt[progNum] = streams;
                 }
-                m_network.aTs.insert(std::pair<int,DVB_TS>(freq, dvbTs));
+                aTs.insert(std::pair<int,DVB_TS>(freq, dvbTs));
+                log_msg("\t%s: aTs.size=%d -----------------------\n", __FUNCTION__, aTs.size());
             }
+            stopFilter();
         }
-        stopFilter();
+
+        if (m_stopScanning)
+            break;
     }
-    unsigned long end = time(NULL);
-    log_msg("found=%d elapsed_secs=%d\n", found, (int)(end-begin));
-    
-    return rc;
+    m_network.aTs.swap(aTs);
+    scanHandler.scanComplete();
+    log_msg ("%s: Exting \n", __FUNCTION__);
+}
+
+int BcmTVManager::scan(const std::string &strFreq, BcmScanHandler &scanHandler)
+{
+    m_stopScanning = false;
+    m_scanInprogress = true;
+
+    log_msg ("%s: Entering \n", __FUNCTION__);
+    std::thread th(&BcmTVManager::scanThread, this, strFreq, std::ref(scanHandler));
+    th.detach();
+    log_msg ("%s: Exiting \n", __FUNCTION__);
+}
+
+int BcmTVManager::clearCache()
+{
+    m_network.aTs.clear();
 }
 
 int BcmTVManager::parsePAT(const uint8_t *buffer, unsigned size, DVB_PAT &pat)
@@ -688,13 +770,14 @@ int BcmTVManager::parsePAT(const uint8_t *buffer, unsigned size, DVB_PAT &pat)
     int rc = 0;
     int pmt_count = TS_PAT_getNumPrograms(buffer);
     log_msg ("%s: pmt_count=%d PAT valid=%d\n", __FUNCTION__, pmt_count, TS_PAT_validate(buffer, size));
-    
+
     int progNum = 0, pid = 0;
     for(int i=0; i < pmt_count; i++ )	{
         TS_PAT_getProgram(buffer, size, i, &progNum, &pid);
-        log_msg("\tprogram_number: %d, PID: 0x%04X\n", progNum, pid);
+        int tsid = getTSId(buffer);
+        log_msg("\tprogram_number: %d, PID: 0x%04X tsid=%d\n", progNum, pid, tsid);
         if (progNum)    // skip progNum == 0
-            pat.push_back(std::pair<int,int>(progNum, pid));
+            pat.push_back(PAT_Info(progNum, pid, tsid));
     }
     log_msg ("%s: pat.size=%d\n", __FUNCTION__, pat.size());
     return rc;
@@ -716,7 +799,7 @@ int BcmTVManager::parsePMT(const uint8_t *buffer, unsigned size, ElementaryStrem
     }
     log_msg ("%s: streams.size=%d\n", __FUNCTION__, streams.size());
     return rc;
-}    
+}
 
 int BcmTVManager::getChannelMap(ChannelMap &chanMap)
 {
@@ -728,16 +811,16 @@ int BcmTVManager::getChannelMap(ChannelMap &chanMap)
         chan.modulation = ts.modulation;
         chan.symbolRate = ts.symbolRate;
         for (auto itPAT = std::begin(ts.pat); itPAT != std::end(ts.pat); ++itPAT) {
-            chan.programNumber = itPAT->first;
-            ES_Info ESVideo, ESAudio;
-            getStreamInfo(chan.frequency, chan.programNumber, ESVideo, ESAudio);
-            if (ESVideo.pid)
+            chan.programNumber = itPAT->programNum;
+            ES_Info esVideo, esAudio;
+            getStreamInfo(chan.frequency, chan.programNumber, esVideo, esAudio);
+            if (esVideo.pid)
                 chan.type = Channel::Normal;
-            else if (ESAudio.pid)
+            else if (esAudio.pid)
                 chan.type = Channel::Radio;
-            else 
+            else
                 chan.type = Channel::Data;
-            log_msg("%s: type=%d Video pid=%d Audio pid=%d\n", __FUNCTION__, chan.type, ESVideo.pid, ESAudio.pid);
+            log_msg("%s: type=%d Video pid=%d Audio pid=%d\n", __FUNCTION__, chan.type, esVideo.pid, esAudio.pid);
             if (chan.type != Channel::Data)
                 chanMap.push_back(chan);
         }
@@ -745,7 +828,7 @@ int BcmTVManager::getChannelMap(ChannelMap &chanMap)
     return rc;
 }
 
-bool BcmTVManager::getStreamInfo(int freq, int progNum, ES_Info &ESVideo, ES_Info &ESAudio)
+bool BcmTVManager::getStreamInfo(int freq, int progNum, ES_Info &esVideo, ES_Info &esAudio)
 {
     int bFound = false;
     auto it = m_network.aTs.find(freq);
@@ -758,14 +841,14 @@ bool BcmTVManager::getStreamInfo(int freq, int progNum, ES_Info &ESVideo, ES_Inf
             for (auto itStreams = std::begin(streams); itStreams != std::end(streams); ++itStreams) {
                 int streamType = itStreams->streamType;
                 // first available video & audio
-                if ((ESVideo.pid == 0) && 
+                if ((esVideo.pid == 0) &&
                     ((streamType == TS_PSI_ST_13818_2_Video) || (streamType == TS_PSI_ST_14496_10_Video))) {  // 2: Mpeg 2, 27: H.264
-                    ESVideo = *itStreams;
+                    esVideo = *itStreams;
                     bFound = true;
                 }
-                if ((ESAudio.pid == 0) && 
+                if ((esAudio.pid == 0) &&
                     ((streamType == TS_PSI_ST_11172_3_Audio) || (streamType == TS_PSI_ST_13818_3_Audio) || (streamType == TS_PSI_ST_13818_7_AAC))) {
-                    ESAudio = *itStreams;
+                    esAudio = *itStreams;
                     bFound = true;
                 }
             }

@@ -1,25 +1,40 @@
 #ifndef TUNER_H
 #define TUNER_H
 
-#include <mutex>
 #include <condition_variable>
+#include <map>
+#include <mutex>
 #include <queue>
 #include <vector>
-#include <map>
 
 #include <refsw/nexus_config.h>
-#include <refsw/nxclient.h>
-#include <refsw/nexus_platform.h>
 #include <refsw/nexus_frontend.h>
+#include <refsw/nexus_message.h>
+#include <refsw/nexus_platform.h>
 #include <refsw/nexus_parser_band.h>
 #include <refsw/nexus_simple_video_decoder.h>
 #include <refsw/nexus_simple_audio_decoder.h>
-#include <refsw/nexus_message.h>
+#ifndef NO_NXCLIENT
+#include <refsw/nxclient.h>
+#endif
 
 #define MAX_MSG 64
 #define MAX_PID_CHANNELS MAX_MSG + 1
 
-typedef std::vector<std::pair<int,int>> DVB_PAT;            // progNum,pmtPid
+class PAT_Info {
+    public:
+    PAT_Info(int pn, int pid, int ts = 0)
+        : programNum(pn)
+        , pmtPid(pid)
+        , tsid(ts)
+    {
+    }
+    int programNum;
+    int pmtPid;
+    int tsid;
+};
+
+typedef std::vector<PAT_Info> DVB_PAT;
 
 class ES_Info {
     public:
@@ -132,7 +147,13 @@ class BcmAudioDecoder {
     NxClient_AllocResults m_allocResults;
 };
 
-class BcmTVManager {
+class BcmScanHandler {
+    public:
+    virtual void scanComplete() = 0;
+    void channelFound(int freq, int progNum) {}
+};
+
+class BcmTVManager : public BcmScanHandler {
     public:
     BcmTVManager(bool bDvb = false);
     ~BcmTVManager();
@@ -140,14 +161,16 @@ class BcmTVManager {
     int deinit();
     int tune(int freq);
     int tune(int freq, int progNum);
-    int scan(int startFreq, int endFreq = 0);
+    int scan(const std::string &strFreq, BcmScanHandler &scanHandler);
     int startFilter(int pid, const uint8_t **pBuffer, size_t *pSize);
     int stopFilter();
     int decode(const ES_Info &ESVideo, const ES_Info &ESAudio);
     int stop();
     int disconnect();
     int getChannelMap(ChannelMap &chanMap);
-
+    int clearCache();
+    void scanComplete();
+    
     NEXUS_MessageHandle hMsg[MAX_PID_CHANNELS];
     NEXUS_PidChannelHandle hPidChannel[MAX_PID_CHANNELS];
 
@@ -155,6 +178,7 @@ class BcmTVManager {
     int parsePAT(const uint8_t *buffer, unsigned size, DVB_PAT &pat);
     int parsePMT(const uint8_t *buffer, unsigned size, ElementaryStrems &streams);
     bool getStreamInfo(int freq, int progNum, ES_Info &ESVideo, ES_Info &ESAudio);
+    void scanThread(const std::string &strFreq, BcmScanHandler &scanHandler);
 
     private:
     NexusClient m_nexus;
@@ -168,6 +192,8 @@ class BcmTVManager {
     NEXUS_PidChannelHandle m_pcrPidChannel;
     BKNI_EventHandle m_msgEvent;
     DVB_NETWORK m_network;
+    bool m_stopScanning;
+    bool m_scanInprogress;
     //std::mutex mtx;
     //std::condition_variable cv;
 };
