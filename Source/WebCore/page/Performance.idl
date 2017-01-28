@@ -45,15 +45,16 @@ typedef double DOMHighResTimeStamp;
     readonly attribute PerformanceNavigation navigation;
     readonly attribute PerformanceTiming timing;
 
-    [EnabledAtRuntime=ResourceTiming] PerformanceEntryList getEntries();
-    [EnabledAtRuntime=ResourceTiming] PerformanceEntryList getEntriesByType(DOMString entryType);
-    [EnabledAtRuntime=ResourceTiming] PerformanceEntryList getEntriesByName(DOMString name, optional DOMString entryType);
+    // https://w3c.github.io/performance-timeline/
+    PerformanceEntryList getEntries();
+    PerformanceEntryList getEntriesByType(DOMString entryType);
+    PerformanceEntryList getEntriesByName(DOMString name, optional DOMString entryType);
 
     // https://w3c.github.io/resource-timing/
-    [EnabledAtRuntime=ResourceTiming] void clearResourceTimings();
-    [EnabledAtRuntime=ResourceTiming] void setResourceTimingBufferSize(unsigned long maxSize);
+    void clearResourceTimings();
+    void setResourceTimingBufferSize(unsigned long maxSize);
 
-    [EnabledAtRuntime=ResourceTiming] attribute EventHandler onresourcetimingbufferfull;
+    attribute EventHandler onresourcetimingbufferfull;
 
     // See http://www.w3.org/TR/2012/CR-user-timing-20120726/
     [MayThrowException] void mark(DOMString markName);

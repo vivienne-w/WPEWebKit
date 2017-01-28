@@ -3248,6 +3248,8 @@ void WebPage::updatePreferences(const WebPreferencesStore& store)
 
     settings.setAllowScriptsToCloseWindows(store.getBoolValueForKey(WebPreferencesKey::allowScriptsToCloseWindowsKey()));
 
+    RuntimeEnabledFeatures::sharedFeatures().setUserTimingEnabled(store.getBoolValueForKey(WebPreferencesKey::userTimingEnabledKey()));
+
     platformPreferencesDidChange(store);
 
     if (m_drawingArea)

@@ -183,6 +183,8 @@ public:
     void setUserTimingEnabled(bool isEnabled) { m_isUserTimingEnabled = isEnabled; }
     bool userTimingEnabled() const { return m_isUserTimingEnabled; }
 
+    bool performanceTimelineEnabled() const { return resourceTimingEnabled() || userTimingEnabled(); }
+
 #if ENABLE(GAMEPAD)
     void setGamepadsEnabled(bool areEnabled) { m_areGamepadsEnabled = areEnabled; }
     bool gamepadsEnabled() const { return m_areGamepadsEnabled; }
