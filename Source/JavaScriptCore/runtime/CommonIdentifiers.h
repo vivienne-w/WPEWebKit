@@ -79,6 +79,8 @@
     macro(PerformanceEntryList) \
     macro(PerformanceMark) \
     macro(PerformanceMeasure) \
+    macro(PerformanceObserver) \
+    macro(PerformanceObserverEntryList) \
     macro(PerformanceResourceTiming) \
     macro(Promise) \
     macro(Proxy) \
