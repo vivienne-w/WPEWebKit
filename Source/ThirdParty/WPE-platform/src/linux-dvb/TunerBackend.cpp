@@ -30,7 +30,7 @@
 
 namespace LinuxDVB {
 
-TvTunerBackend::TvTunerBackend(EventQueue<wpe_tvcontrol_event*>* eventQueue, int tunerCnt, TunerData* tunerPtr)
+TvTunerBackend::TvTunerBackend(EventQueue<wpe_tvcontrol_event*>* eventQueue, int tunerCnt, std::unique_ptr<TunerData> tunerPtr)
     : m_tunerData(std::move(tunerPtr))
     , m_srcTypeListPtr(nullptr)
     , m_supportedSysCount(0)

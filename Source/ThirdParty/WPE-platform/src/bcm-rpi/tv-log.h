@@ -50,4 +50,3 @@
 
 #endif // DEBUG_LOG
 
-#endif // bcm_rpi_tv_log_h
