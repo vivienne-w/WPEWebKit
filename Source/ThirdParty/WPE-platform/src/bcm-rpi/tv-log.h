@@ -25,8 +25,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef bcm_rpi_tv_log_h
-#define bcm_rpi_tv_log_h
+#pragma once
 
 #define DEBUG_LOG 1
 

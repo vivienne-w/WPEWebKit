@@ -85,10 +85,8 @@ void SourceBackend::clearChannelVector()
 void SourceBackend::clearChannelList()
 {
     if (!m_channelList.empty()) {
-        for (auto& channel : m_channelList)
-            delete (channel.second);
+        m_channelList.clear();
     }
-    m_channelList.clear();
 }
 
 tvcontrol_return SourceBackend::startScanning(bool isRescanned)
@@ -209,7 +207,7 @@ ChannelBackend* SourceBackend::getChannelByLCN(uint64_t channelNo)
 {
     for (auto& channel : m_channelList) {
         if (channelNo == channel.second->getLCN())
-            return channel.second;
+            return channel.second.get();
     }
     return nullptr;
 }
@@ -241,9 +239,9 @@ tvcontrol_return SourceBackend::getChannels(wpe_tvcontrol_channel_vector** chann
 {
     /*Populate channel list */
     tvcontrol_return ret = TVControlFailed;
-    printf("%s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+    TvLogTrace();
     if (!m_channelList.empty()) {
-        printf("%s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+        TvLogTrace();
         if (!m_channelVector.length
             || (m_channelVector.length != m_channelList.size())) {
             clearChannelVector();
@@ -264,7 +262,7 @@ tvcontrol_return SourceBackend::getChannels(wpe_tvcontrol_channel_vector** chann
         ret = TVControlSuccess;
     } else {
         channelVector = nullptr;
-        printf("Channel list is empty .Scanning is incomplete \n");
+        TvLogInfo("Channel list is empty .Scanning is incomplete \n");
     }
     return ret;
 }
@@ -330,12 +328,11 @@ void SourceBackend::setCurrentChannelThread()
             }
         }
     } // While
-    TvLogInfo("%s:%s:%d \n", __FILE__, __func__, __LINE__);
+    TvLogTrace();
 }
 
 void SourceBackend::dvbScan()
 {
-    /* */
 }
 
 bool SourceBackend::tuneToFrequency(int frequency, uint64_t modulation, struct dvbfe_handle* feHandle)
@@ -453,11 +450,11 @@ int SourceBackend::createSectionFilter(uint16_t pid, uint8_t tableId)
 {
     int demuxFd = -1;
 
-    // open the demuxer
+    // Open the demuxer
     if ((demuxFd = dvbdemux_open_demux(m_adapter, m_demux, 0)) < 0)
         return -1;
 
-    // create a section filter
+    // Create a section filter
     uint8_t filter[18];
     memset(filter, 0, sizeof(filter));
     uint8_t mask[18];
@@ -468,8 +465,6 @@ int SourceBackend::createSectionFilter(uint16_t pid, uint8_t tableId)
         close(demuxFd);
         return -1;
     }
-
-    // done
     return demuxFd;
 }
 
@@ -477,24 +472,24 @@ bool SourceBackend::processPAT(int patFd, int programNumber, struct pollfd* poll
 {
     int size;
     uint8_t siBuf[4096];
-    // read the section
+    // Read the section
     if ((size = read(patFd, siBuf, sizeof(siBuf))) < 0)
         return false;
 
-    // parse section
+    // Parse section
     struct section* section = section_codec(siBuf, size);
     if (!section)
         return false;
-    // parse sectionExt
+    // Parse sectionExt
     struct section_ext* sectionExt = section_ext_decode(section, 0);
     if (!sectionExt)
         return false;
-    // parse PAT
+    // Parse PAT
     struct mpeg_pat_section* pat = mpeg_pat_section_codec(sectionExt);
     if (!pat)
         return false;
 
-    // try and find the requested program
+    // Try and find the requested program
     struct mpeg_pat_program* curProgram;
     mpeg_pat_section_programs_for_each(pat, curProgram)
     {
@@ -510,7 +505,7 @@ bool SourceBackend::processPAT(int patFd, int programNumber, struct pollfd* poll
         }
     }
 
-    // remember the PAT version
+    // Remember the PAT version
     // pat_version = sectionExt->version_number;
     return true;
 }
@@ -580,7 +575,7 @@ bool SourceBackend::processTVCT(int dmxfd, int frequency)
         {
             /* initialize the currInfo structure */
             /* each EIT covers 3 hours */
-            ChannelBackend* currInfo = new ChannelBackend();
+            std::unique_ptr<ChannelBackend> currInfo = std::make_unique<ChannelBackend>();
             char* serviceName = reinterpret_cast<char*>(malloc(sizeof(char) * 8));
             for (int k = 0; k < 7; k++) {
                 serviceName[k] = getBits((const uint8_t*)ch->short_name,
@@ -619,7 +614,7 @@ bool SourceBackend::processTVCT(int dmxfd, int frequency)
             TvLogInfo("Extended name : %s\n", name.c_str());
             currInfo->setName(name);
             if (m_channelList.empty() || (!m_channelList.count(logicalChannelNumber))) {
-                m_channelList.insert(std::pair<uint64_t, ChannelBackend*>(logicalChannelNumber, currInfo));
+                m_channelList.insert(std::pair<uint64_t, std::unique_ptr<ChannelBackend>>(logicalChannelNumber, std::move(currInfo)));
                 TvLogInfo("Sending channel Info\n");
                 wpe_tvcontrol_channel* channelInfo = reinterpret_cast<struct wpe_tvcontrol_channel*>(malloc(sizeof(struct wpe_tvcontrol_channel)));
                 channelInfo->networkId = 0;

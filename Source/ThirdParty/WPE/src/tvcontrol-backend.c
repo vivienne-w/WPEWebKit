@@ -29,11 +29,10 @@
 #define _GNU_SOURCE 1
 #endif
 
-#include <wpe/tvcontrol-backend.h>
-
 #include "loader-private.h"
 #include "tvcontrol-backend-private.h"
 #include <stdlib.h>
+#include <wpe/tvcontrol-backend.h>
 
 __attribute__((visibility("default")))
 struct wpe_tvcontrol_backend*

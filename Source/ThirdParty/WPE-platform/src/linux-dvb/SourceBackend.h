@@ -32,24 +32,18 @@
 #include "TVConfig.h"
 #include "event-queue.h"
 
-#include <condition_variable>
 #include <fstream>
 #include <libdvbapi/dvbdemux.h>
-#include <libdvbapi/dvbfe.h>
-#include <libucsi/atsc/extended_channel_name_descriptor.h>
 #include <libucsi/atsc/section.h>
-#include <libucsi/atsc/types.h>
 #include <libucsi/dvb/section.h>
-#include <linux/dvb/dmx.h>
-#include <mutex>
 #include <poll.h>
-#include <signal.h>
 #include <thread>
-#include <unistd.h>
 
 #define TV_DEBUG 1
 
 struct TunerData {
+    TunerData() = default;
+    ~TunerData() = default;
     std::string tunerId;
     uint64_t modulation;
     std::vector<long> frequency;
@@ -90,7 +84,7 @@ private:
     void scanningThread();
     void setCurrentChannelThread();
 
-    std::map<uint64_t, ChannelBackend*> m_channelList;
+    std::map<uint64_t, std::unique_ptr<ChannelBackend>> m_channelList;
     EventQueue<wpe_tvcontrol_event*>* m_eventQueue;
 
     SourceType m_sType;

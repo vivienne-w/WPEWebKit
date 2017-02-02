@@ -31,7 +31,7 @@
 namespace LinuxDVB {
 
 TvTunerBackend::TvTunerBackend(EventQueue<wpe_tvcontrol_event*>* eventQueue, int tunerCnt, TunerData* tunerPtr)
-    : m_tunerData(tunerPtr)
+    : m_tunerData(std::move(tunerPtr))
     , m_srcTypeListPtr(nullptr)
     , m_supportedSysCount(0)
     , m_eventQueue(eventQueue)
@@ -45,8 +45,6 @@ TvTunerBackend::TvTunerBackend(EventQueue<wpe_tvcontrol_event*>* eventQueue, int
 TvTunerBackend::~TvTunerBackend()
 {
     TvLogTrace();
-    if (m_tunerData)
-        delete m_tunerData;
     m_tunerData = nullptr;
     if (m_srcTypeListPtr)
         delete m_srcTypeListPtr;
@@ -57,7 +55,6 @@ TvTunerBackend::~TvTunerBackend()
 void TvTunerBackend::clearSourceList()
 {
     while (!m_sourceList.empty()) {
-        delete (m_sourceList.back());
         m_sourceList.pop_back();
     }
 }
@@ -106,7 +103,7 @@ void TvTunerBackend::setModulation(std::string& modulation)
         /* Set modulation */
         if (!modulation.compare("8VSB")) {
             if (feHandle->type == DVBFE_TYPE_ATSC && (feInfo.caps & FE_CAN_8VSB)) {
-                m_channel = ATSC_VSB; // TODO  check and remove
+                m_channel = ATSC_VSB; // FIXME:  check and remove
 
                 /* Set the modulation */
                 struct dtv_property p[] = { {.cmd = DTV_MODULATION } };
@@ -316,8 +313,8 @@ void TvTunerBackend::getSources()
         /* Read supported type list from the private list
                        and create list of source objects */
         for (int i = 0; i < m_supportedSysCount; i++) {
-            SourceBackend* sInfo = (SourceBackend*)new SourceBackend(m_eventQueue, m_srcTypeListPtr[i], m_tunerData);
-            m_sourceList.push_back(sInfo);
+            std::unique_ptr<SourceBackend> sInfo = std::make_unique<SourceBackend>(m_eventQueue, m_srcTypeListPtr[i], m_tunerData.get());
+            m_sourceList.push_back(std::move(sInfo));
             TvLogTrace();
         }
     } else
@@ -353,7 +350,7 @@ int TvTunerBackend::getSupportedSourcesTypeList(wpe_tvcontrol_src_types_vector* 
                 switch (cmdName.props->u.buffer.data[i]) {
                 case SYS_DVBC_ANNEX_A:
                     TvLogInfo("STP: CASE = %d \t", cmdName.props->u.buffer.data[i]);
-                    // TODO m_srcTypeListPtr[i] = ;
+                    // FIXME: m_srcTypeListPtr[i] = ;
                     break;
                 case SYS_DVBC_ANNEX_B:
                     TvLogInfo("STP: CASE = %d \t", cmdName.props->u.buffer.data[i]);
@@ -365,7 +362,7 @@ int TvTunerBackend::getSupportedSourcesTypeList(wpe_tvcontrol_src_types_vector* 
                     break;
                 case SYS_DSS:
                     TvLogInfo("STP: CASE = %d \t", cmdName.props->u.buffer.data[i]);
-                    // TODO m_srcTypeListPtr[i] = ;
+                    // FIXME: m_srcTypeListPtr[i] = ;
                     break;
                 case SYS_DVBS:
                     TvLogInfo("STP: CASE = %d \t", cmdName.props->u.buffer.data[i]);
@@ -409,7 +406,7 @@ int TvTunerBackend::getSupportedSourcesTypeList(wpe_tvcontrol_src_types_vector* 
                     break;
                 case SYS_DAB:
                     TvLogInfo("STP: CASE = %d \t", cmdName.props->u.buffer.data[i]);
-                    // TODO m_srcTypeListPtr[i] = ;
+                    // FIXME: m_srcTypeListPtr[i] = ;
                     break;
                 case SYS_DVBT2:
                     TvLogInfo("STP: CASE = %d \t", cmdName.props->u.buffer.data[i]);
@@ -417,11 +414,11 @@ int TvTunerBackend::getSupportedSourcesTypeList(wpe_tvcontrol_src_types_vector* 
                     break;
                 case SYS_TURBO:
                     TvLogInfo("STP: CASE = %d \t", cmdName.props->u.buffer.data[i]);
-                    // TODO m_srcTypeListPtr[i] = ;
+                    // FIXME m_srcTypeListPtr[i] = ;
                     break;
                 case SYS_DVBC_ANNEX_C:
                     TvLogInfo("STP: CASE = %d \t", cmdName.props->u.buffer.data[i]);
-                    // TODO m_srcTypeListPtr[i] = ;
+                    // FIXME m_srcTypeListPtr[i] = ;
                     break;
                 case SYS_UNDEFINED:
                     TvLogInfo("STP: CASE = %d \t", cmdName.props->u.buffer.data[i]);
@@ -451,7 +448,7 @@ int TvTunerBackend::getSupportedSourcesTypeList(wpe_tvcontrol_src_types_vector* 
 
     /* Update the number of supported Sources*/
     outSourceTypesList->length = m_supportedSysCount;
-    /* update source type  ptr */
+    /* Update source type ptr */
     outSourceTypesList->types = m_srcTypeListPtr;
     TvLogTrace();
     return m_supportedSysCount;
@@ -473,7 +470,7 @@ void TvTunerBackend::getSource(SourceType sType, SourceBackend** source)
     for (auto& src : m_sourceList) {
         TvLogInfo("SRC type from list =  %d from param = %d", src->srcType(), sType);
         if (src->srcType() == sType)
-            *source = src;
+            *source = src.get();
     }
 }
 
@@ -497,7 +494,7 @@ tvcontrol_return TvTunerBackend::setCurrentChannel(SourceType sType, uint64_t ch
 
 tvcontrol_return TvTunerBackend::getChannels(SourceType sType, struct wpe_tvcontrol_channel_vector** channelVector)
 {
-    printf("%s:%s:%d \n", __FILE__, __func__, __LINE__);
+    TvLogTrace();
     /* Get source corresponds to this type  */
     SourceBackend* source;
     getSource(sType, &source);
@@ -522,9 +519,9 @@ tvcontrol_return TvTunerBackend::setCurrentSource(SourceType sType)
             getSourceType(sType, &platSrcType);
             struct dtv_property* propPtr = p;
             propPtr->u.data = platSrcType;
-            if (ioctl(feHandle->fd, FE_SET_PROPERTY, &cmdseq) == -1) {
+            if (ioctl(feHandle->fd, FE_SET_PROPERTY, &cmdseq) == -1)
                 TvLogInfo("Failed to set  Srource %d at plarform \n ", platSrcType);
-            } else
+            else
                 setSrcType(sType);
             TvLogTrace();
             propPtr->u.data = SYS_UNDEFINED; // RESET
@@ -544,7 +541,7 @@ void TvTunerBackend::getSourceType(SourceType sType, fe_delivery_system* platSrc
     TvLogTrace();
     switch (sType) {
 #if 0
-    case anexa: // TODO
+    case anexa: // FIXME
         TvLogInfo("STP: CASE = %d \t", sType);
         *platSrcType = SYS_DVBC_ANNEX_B;
         break;
@@ -557,7 +554,7 @@ void TvTunerBackend::getSourceType(SourceType sType, fe_delivery_system* platSrc
         TvLogInfo("STP: CASE = %d \t", sType);
         *platSrcType = SYS_DVBT;
         break;
-#if 0 // TODO
+#if 0 // FIXME
     case dss:
         TvLogInfo("STP: CASE = %d \t", sType);
         *platSrcType = SYS_DSS;

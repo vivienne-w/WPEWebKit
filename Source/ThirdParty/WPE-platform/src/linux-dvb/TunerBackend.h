@@ -30,7 +30,7 @@
 #define TUNER_BACKEND_H_
 
 #include "SourceBackend.h"
-#include <fstream>
+
 #include <math.h>
 #include <sstream>
 
@@ -44,7 +44,7 @@ typedef std::map<std::string, std::string> ConfigInfo;
 namespace LinuxDVB {
 class TvTunerBackend {
 public:
-    TvTunerBackend(EventQueue<wpe_tvcontrol_event*>*, int, TunerData*);
+    TvTunerBackend(EventQueue<wpe_tvcontrol_event*>*, int, std::unique_ptr<TunerData>);
     virtual ~TvTunerBackend();
 
     SourceType getSrcType() { return m_sType; };
@@ -57,8 +57,8 @@ public:
     tvcontrol_return getChannels(SourceType, struct wpe_tvcontrol_channel_vector**);
     tvcontrol_return getSupportedSrcTypeList(wpe_tvcontrol_src_types_vector*);
 
-    struct TunerData* m_tunerData;
-    std::vector<SourceBackend*> m_sourceList; // List of source objects
+    std::unique_ptr<struct TunerData> m_tunerData;
+    std::vector<std::unique_ptr<SourceBackend>> m_sourceList; // List of source objects
 
 private:
     ChannelList m_channel;

@@ -160,7 +160,7 @@ void TVSource::dispatchChannelChangedEvent()
 void TVSource::dispatchScanningStateChangedEvent(RefPtr<PlatformTVChannel> platformTVChannel, uint16_t state)
 {
     printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
-    RefPtr<TVChannel> channel = nullptr;
+    RefPtr<TVChannel> protector = nullptr;
     switch (static_cast<TVScanningStateChangedEvent::State>(state)) {
     case TVScanningStateChangedEvent::State::Completed:
     case TVScanningStateChangedEvent::State::Stopped:
@@ -170,13 +170,13 @@ void TVSource::dispatchScanningStateChangedEvent(RefPtr<PlatformTVChannel> platf
         break;
     }
     if (m_platformTVSource && platformTVChannel) {
-        channel = TVChannel::create(platformTVChannel, this);
-        m_channelList.append(channel);
+        protector = TVChannel::create(platformTVChannel, this);
+        m_channelList.append(protector);
     }
     printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
     scriptExecutionContext()->postTask([=](ScriptExecutionContext&) {
         dispatchEvent(TVScanningStateChangedEvent::create(eventNames().scanningstatechangedEvent,
-            (TVScanningStateChangedEvent::State)state, channel));
+            (TVScanningStateChangedEvent::State)state, protector));
     });
     printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
 }
