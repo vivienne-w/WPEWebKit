@@ -18,8 +18,6 @@ option(USE_WPEWEBKIT_BACKEND_WAYLAND "Whether to enable support for the Wayland 
 
 option(USE_WPEWEBKIT_INPUT_LIBINPUT "Whether to enable support for the libinput input backend" ON)
 option(USE_WPEWEBKIT_INPUT_UDEV "Whether to enable support for the libinput input udev lib" ON)
-option(USE_WPEWEBKIT_TVCONTROL_BACKEND_LINUX_DVB "Whether to enable support for the linux dvb tv backend" ON)
-option(USE_WPEWEBKIT_TVCONTROL_BACKEND_BCM "Whether to enable support for the bcm tv backend" OFF)
 set(USE_KEY_INPUT_HANDLING_LINUX_INPUT OFF CACHE BOOL "Whether to use <linux/input.h> event codes for keyboard event handling")
 
 find_package(GLIB 2.38.0 REQUIRED COMPONENTS gio gio-unix)
@@ -55,6 +53,9 @@ set(WPE_PLATFORM_LIBRARIES
     ${GLIB_GOBJECT_LIBRARIES}
     ${GLIB_LIBRARIES}
 )
+if (ENABLE_TV_CONTROL)
+    list(APPEND WPE_PLATFORM_LIBRARIES WPE-tvcontrol)
+endif ()
 
 if (NOT USE_KEY_INPUT_HANDLING_LINUX_INPUT)
     list(APPEND WPE_PLATFORM_INCLUDE_DIRECTORIES
@@ -107,37 +108,7 @@ if (USE_WPEWEBKIT_INPUT_LIBINPUT)
     )
 endif()
 
-if (ENABLE_TV_CONTROL)
-    add_definitions(-DENABLE_TV_CONTROL)
-endif()
-
-if (USE_WPEWEBKIT_TVCONTROL_BACKEND_LINUX_DVB)
-    find_package(LinuxDVB REQUIRED)
-    list(APPEND WPE_PLATFORM_INCLUDE_DIRECTORIES
-        "${WPE_PLATFORM_SOURCE_DIR}/src/linux-dvb"
-        ${LINUX_DVB_INCLUDE_DIRS}
-    )
-    if (USE_WPE_BACKEND_BCM_RPI)
-        list(APPEND WPE_PLATFORM_INCLUDE_DIRECTORIES
-             "${WPE_PLATFORM_SOURCE_DIR}/src/bcm-rpi"
-        )
-    endif()
-    list(APPEND WPE_PLATFORM_LIBRARIES
-        ${LINUX_DVB_LIBRARIES}
-    )
-    list(APPEND WPE_PLATFORM_SOURCES
-        src/linux-dvb/SourceBackend.cpp
-        src/linux-dvb/TunerBackend.cpp
-        src/linux-dvb/ChannelBackend.cpp
-    )
-    add_definitions(-DTVCONTROL_BACKEND_LINUX_DVB=1)
-endif()
-
 if (USE_WPEWEBKIT_BACKEND_BCM_NEXUS)
-if (USE_WPEWEBKIT_TVCONTROL_BACKEND_BCM)
-    add_definitions(-DTVCONTROL_BACKEND_BCM=1)
-endif()
-
     include(src/bcm-nexus/CMakeLists.txt)
 endif ()
 

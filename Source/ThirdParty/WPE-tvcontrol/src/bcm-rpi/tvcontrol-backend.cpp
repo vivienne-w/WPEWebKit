@@ -519,6 +519,7 @@ void TvControlBackend::updateTunerList(const char* tunerId, tuner_changed_operat
 
 extern "C" {
 
+__attribute__((visibility("default")))
 struct wpe_tvcontrol_backend_interface bcm_rpi_tvcontrol_backend_interface = {
     // create
     [](struct wpe_tvcontrol_backend* backend) -> void*

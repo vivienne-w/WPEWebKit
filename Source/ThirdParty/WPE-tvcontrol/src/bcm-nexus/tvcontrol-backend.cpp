@@ -227,6 +227,7 @@ void TvControlBackend::dispatchTuneEvent()
 
 extern "C" {
 
+__attribute__((visibility("default")))
 struct wpe_tvcontrol_backend_interface bcm_tvcontrol_backend_interface = {
     // create
     [](struct wpe_tvcontrol_backend* backend) -> void*
