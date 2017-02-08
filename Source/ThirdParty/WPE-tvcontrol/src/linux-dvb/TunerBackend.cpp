@@ -519,10 +519,11 @@ tvcontrol_return TvTunerBackend::setCurrentSource(SourceType sType)
             getSourceType(sType, &platSrcType);
             struct dtv_property* propPtr = p;
             propPtr->u.data = platSrcType;
-            if (ioctl(feHandle->fd, FE_SET_PROPERTY, &cmdseq) == -1)
+            if (ioctl(feHandle->fd, FE_SET_PROPERTY, &cmdseq) == -1) {
                 TvLogInfo("Failed to set  Srource %d at plarform \n ", platSrcType);
-            else
+            } else {
                 setSrcType(sType);
+            }
             TvLogTrace();
             propPtr->u.data = SYS_UNDEFINED; // RESET
             /*Get the delivery system*/

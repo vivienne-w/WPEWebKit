@@ -38,6 +38,10 @@ if (USE_WPE_BACKEND_BCM_NEXUS)
     include(src/bcm-nexus/CMakeLists.txt)
 endif ()
 
+if (USE_WPE_BACKEND_BCM_RPI)
+    include(src/bcm-rpi/CMakeLists.txt)
+endif ()
+
 add_library(WPE-tvcontrol SHARED ${WPE_TVCONTROL_SOURCES})
 target_include_directories(WPE-tvcontrol PRIVATE ${WPE_TVCONTROL_INCLUDE_DIRECTORIES})
 target_link_libraries(WPE-tvcontrol ${WPE_TVCONTROL_LIBRARIES})
