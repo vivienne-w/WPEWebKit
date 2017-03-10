@@ -56,6 +56,8 @@ public:
     tvcontrol_return setCurrentSource(SourceType);
     tvcontrol_return getChannels(SourceType, struct wpe_tvcontrol_channel_vector**);
     tvcontrol_return getSupportedSrcTypeList(wpe_tvcontrol_src_types_vector*);
+    void isParentalLocked(uint64_t, bool*);
+    tvcontrol_return setParentalLock(uint64_t, bool*);
 
     std::unique_ptr<struct TunerData> m_tunerData;
     std::vector<std::unique_ptr<SourceBackend>> m_sourceList; // List of source objects

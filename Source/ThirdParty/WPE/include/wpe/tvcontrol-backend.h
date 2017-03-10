@@ -36,29 +36,51 @@ extern "C" {
 #define __GBM__
 #endif
 
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 typedef enum { Added, Removed } tuner_changed_operation;
 typedef enum { Cleared, Scanned, Completed, Stopped } scanning_state;
+typedef enum { ParentalControlOff, ParentalControlOn } parental_control_state;
+typedef enum { ParentalLockOff, ParentalLockOn } parental_lock_state;
+
 typedef enum { TVControlFailed, TVControlSuccess, TVControlNotImplemented } tvcontrol_return;
 
 struct wpe_tvcontrol_string {
-    char*    data;
+    char* data;
     uint64_t length;
 };
 
 struct wpe_tvcontrol_string_vector {
     struct wpe_tvcontrol_string* strings;
-    uint64_t                     length;
+    uint64_t length;
 };
 
-typedef enum {TunerChanged, SourceChanged, ChannelChanged, ScanningChanged} tvcontrol_events;
+typedef enum {TunerChanged, SourceChanged, ChannelChanged, ScanningChanged, ParentalControlChanged, ParentalLockChanged} tvcontrol_events;
+
+
+typedef enum { DvbT, DvbT2, DvbC, DvbC2, DvbS, DvbS2, DvbH, DvbSh, Atsc, AtscMH, IsdbT, IsdbTb, IsdbS, IsdbC, _1seg, Dtmb, Cmmb, TDmb, SDmb, Undifined } SourceType;
+struct wpe_tvcontrol_src_types_vector {
+    SourceType* types;
+    uint64_t length;
+};
+
+typedef enum { Tv, Radio, Data } ChannelType;
+struct wpe_tvcontrol_channel {
+    uint64_t networkId;
+    uint64_t transportSId;
+    uint64_t serviceId;
+    char* name;
+    uint64_t number;
+    ChannelType type;
+};
 
 struct wpe_tvcontrol_event {
-    tvcontrol_events            eventID;
-    tuner_changed_operation     operation;
-    scanning_state              state;
+    tvcontrol_events eventID;
+    tuner_changed_operation operation;
+    scanning_state state;
+    parental_control_state parentalControl;
+    parental_lock_state parentalLock;
     struct wpe_tvcontrol_string tuner_id;
     struct wpe_tvcontrol_channel* channel_info;
 };
@@ -68,27 +90,13 @@ struct wpe_tvcontrol_backend_manager_event_client {
     void (*handle_source_changed_event)(void*, struct wpe_tvcontrol_event*);
     void (*handle_channel_changed_event)(void*, struct wpe_tvcontrol_event*);
     void (*handle_scanning_state_changed_event)(void*, struct wpe_tvcontrol_event*);
-};
-
-typedef enum { DvbT, DvbT2, DvbC, DvbC2, DvbS, DvbS2, DvbH, DvbSh, Atsc, AtscMH, IsdbT, IsdbTb, IsdbS, IsdbC, _1seg, Dtmb, Cmmb, TDmb, SDmb, Undifined } SourceType;
-struct wpe_tvcontrol_src_types_vector {
-    SourceType* types;
-    uint64_t    length;
-};
-
-typedef enum { Tv, Radio, Data } ChannelType;
-struct wpe_tvcontrol_channel {
-    uint64_t    networkId;
-    uint64_t    transportSId;
-    uint64_t    serviceId;
-    char*       name;
-    uint64_t    number;
-    ChannelType type;
+    void (*handle_parental_control_changed_event)(void*, struct wpe_tvcontrol_event*);
+    void (*handle_parental_lock_changed_event)(void*, struct wpe_tvcontrol_event*);
 };
 
 struct wpe_tvcontrol_channel_vector {
     struct wpe_tvcontrol_channel* channels;
-    uint64_t                      length;
+    uint64_t length;
 };
 
 struct wpe_tvcontrol_backend_interface {
@@ -103,6 +111,11 @@ struct wpe_tvcontrol_backend_interface {
     tvcontrol_return    (*set_current_channel)(void*, const char*, SourceType, uint64_t);
     tvcontrol_return    (*set_current_source)(void*, const char*, SourceType);
     tvcontrol_return    (*get_channel_list)(void*, const char*, SourceType, struct wpe_tvcontrol_channel_vector**);
+    void                (*is_parental_controlled)(void*, bool*);
+    tvcontrol_return    (*set_parental_control)(void*, const char*, bool*);
+    tvcontrol_return    (*set_parental_control_pin)(void*i, const char*, const char*);
+    tvcontrol_return    (*set_parental_lock)(void*, const char*, uint64_t, const char*, bool*);
+    void                (*is_parental_locked)(void*, const char*, uint64_t, bool*);
 };
 
 struct wpe_tvcontrol_backend*
@@ -125,6 +138,12 @@ wpe_tvcontrol_backend_dispatch_channel_event(struct wpe_tvcontrol_backend*, stru
 
 void
 wpe_tvcontrol_backend_dispatch_scanning_state_event(struct wpe_tvcontrol_backend*, struct wpe_tvcontrol_event*);
+
+void
+wpe_tvcontrol_backend_dispatch_parental_control_event(struct wpe_tvcontrol_backend*, struct wpe_tvcontrol_event*);
+
+void
+wpe_tvcontrol_backend_dispatch_parental_lock_event(struct wpe_tvcontrol_backend*, struct wpe_tvcontrol_event*);
 
 tvcontrol_return
 wpe_tvcontrol_backend_get_tuner_list(struct wpe_tvcontrol_backend* backend, struct wpe_tvcontrol_string_vector* out_tuner_list);
@@ -153,6 +172,20 @@ wpe_tvcontrol_backend_set_current_channel(struct wpe_tvcontrol_backend*, const c
 tvcontrol_return
 wpe_tvcontrol_backend_get_channel_list(struct wpe_tvcontrol_backend*, const char* tuner_id, SourceType type, struct wpe_tvcontrol_channel_vector** out_channel_list);
 
+void
+wpe_tvcontrol_backend_is_parental_controlled(struct wpe_tvcontrol_backend*, bool* is_parental_controlled);
+
+tvcontrol_return
+wpe_tvcontrol_backend_set_parental_control(struct wpe_tvcontrol_backend*, const char* pin, bool* is_locked);
+
+tvcontrol_return
+wpe_tvcontrol_backend_set_parental_control_pin(struct wpe_tvcontrol_backend*, const char* old_pin, const char* new_pin);
+
+tvcontrol_return
+wpe_tvcontrol_backend_set_parental_lock(struct wpe_tvcontrol_backend*, const char* tuner_id, uint64_t channel_number, const char* pin, bool* is_locked);
+
+void
+wpe_tvcontrol_backend_is_parental_locked(struct wpe_tvcontrol_backend*, const char* tuner_id, uint64_t channel_number, bool* is_parental_locked);
 #ifdef __cplusplus
 }
 #endif

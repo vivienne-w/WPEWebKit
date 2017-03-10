@@ -42,6 +42,8 @@ public:
     virtual void didCurrentSourceChanged(String) = 0;
     virtual void didCurrentChannelChanged(String) = 0;
     virtual void didScanningStateChanged(String, RefPtr<PlatformTVChannel>, uint16_t) = 0;
+    virtual void didParentalControlChanged(uint16_t) = 0;
+    virtual void didParentalLockChanged(String, uint16_t) = 0;
 protected:
     virtual ~PlatformTVManagerClient() = default;
 };
@@ -54,9 +56,12 @@ public:
 
     bool getTuners(Vector<RefPtr<PlatformTVTuner>>&);
     void updateTunerList(String, uint16_t);
-
+    bool isParentalControlled();
+    bool setParentalControl(const String&, bool);
+    bool setParentalControlPin(const String&, const String&);
     PlatformTVControlBackend *m_tvBackend;
 private:
+    bool m_isParentalControlled;
     bool m_tunerListIsInitialized;
     PlatformTVManagerClient* m_platformTVManagerClient;
 };

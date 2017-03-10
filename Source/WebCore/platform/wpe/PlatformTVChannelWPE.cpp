@@ -42,6 +42,7 @@ RefPtr<PlatformTVChannel> PlatformTVChannel::create(PlatformTVControlBackend* tv
 
 PlatformTVChannel::PlatformTVChannel(PlatformTVControlBackend* tvBackend, String tunerId)
     : m_tunerId(tunerId)
+    , m_isParentalLocked(false)
     , m_tvBackend(tvBackend)
 {
     m_networkId = (std::to_string(tvBackend->m_channel->networkId)).c_str();
@@ -50,10 +51,22 @@ PlatformTVChannel::PlatformTVChannel(PlatformTVControlBackend* tvBackend, String
     m_name = tvBackend->m_channel->name;
     m_number = (std::to_string(tvBackend->m_channel->number)).c_str();
     m_type = (PlatformTVChannel::Type)tvBackend->m_channel->type;
+    m_isParentalLocked = false;
 }
 
 PlatformTVChannel::~PlatformTVChannel()
 {
+}
+
+bool PlatformTVChannel::setParentalLock(const String& pin, bool isLocked)
+{
+    return wpe_tvcontrol_backend_set_parental_lock(m_tvBackend->m_backend, m_tunerId.utf8().data(), atoi(m_number.utf8().data()), pin.utf8().data(), &isLocked);
+}
+
+bool PlatformTVChannel::isParentalLocked()
+{
+    wpe_tvcontrol_backend_is_parental_locked(m_tvBackend->m_backend, m_tunerId.utf8().data(), atoi((m_number.utf8().data())), &m_isParentalLocked);
+    return m_isParentalLocked;
 }
 
 } // namespace WebCore

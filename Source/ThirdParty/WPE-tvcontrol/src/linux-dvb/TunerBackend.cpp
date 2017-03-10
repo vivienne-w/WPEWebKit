@@ -54,9 +54,8 @@ TvTunerBackend::~TvTunerBackend()
 
 void TvTunerBackend::clearSourceList()
 {
-    while (!m_sourceList.empty()) {
+    while (!m_sourceList.empty())
         m_sourceList.pop_back();
-    }
 }
 
 void TvTunerBackend::initializeSourceList()
@@ -103,7 +102,7 @@ void TvTunerBackend::setModulation(std::string& modulation)
         /* Set modulation */
         if (!modulation.compare("8VSB")) {
             if (feHandle->type == DVBFE_TYPE_ATSC && (feInfo.caps & FE_CAN_8VSB)) {
-                m_channel = ATSC_VSB; // FIXME:  check and remove
+                m_channel = ATSC_VSB; // FIXME: check and remove
 
                 /* Set the modulation */
                 struct dtv_property p[] = { {.cmd = DTV_MODULATION } };
@@ -469,8 +468,10 @@ void TvTunerBackend::getSource(SourceType sType, SourceBackend** source)
     /* Iterate list and get the source matching the list*/
     for (auto& src : m_sourceList) {
         TvLogInfo("SRC type from list =  %d from param = %d", src->srcType(), sType);
-        if (src->srcType() == sType)
+        if (src->srcType() == sType) {
             *source = src.get();
+            break;
+        }
     }
 }
 
@@ -521,9 +522,8 @@ tvcontrol_return TvTunerBackend::setCurrentSource(SourceType sType)
             propPtr->u.data = platSrcType;
             if (ioctl(feHandle->fd, FE_SET_PROPERTY, &cmdseq) == -1) {
                 TvLogInfo("Failed to set  Srource %d at plarform \n ", platSrcType);
-            } else {
+            } else
                 setSrcType(sType);
-            }
             TvLogTrace();
             propPtr->u.data = SYS_UNDEFINED; // RESET
             /*Get the delivery system*/
@@ -660,4 +660,21 @@ void TvTunerBackend::getConfiguration()
 #endif
 }
 
+void TvTunerBackend::isParentalLocked(uint64_t channelNumber, bool* isLocked)
+{
+    TvLogTrace();
+    SourceBackend* source;
+    getSource(m_sType, &source);
+    source->isParentalLocked(channelNumber, isLocked);
+    return;
+
+}
+
+tvcontrol_return TvTunerBackend::setParentalLock(uint64_t channelNumber, bool* isLocked)
+{
+    TvLogTrace();
+    SourceBackend* source;
+    getSource(m_sType, &source);
+    return source->setParentalLock(channelNumber, isLocked);
+}
 } // namespace LinuxDVB

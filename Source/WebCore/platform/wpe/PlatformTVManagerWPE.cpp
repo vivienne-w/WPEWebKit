@@ -37,7 +37,8 @@
 namespace WebCore {
 
 PlatformTVManager::PlatformTVManager(PlatformTVManagerClient* client)
-    : m_tunerListIsInitialized(false)
+    : m_isParentalControlled(false)
+    , m_tunerListIsInitialized(false)
     , m_platformTVManagerClient(client)
 {
     printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
@@ -73,7 +74,7 @@ PlatformTVManager::PlatformTVManager(PlatformTVManagerClient* client)
         {
             String tunerId(event->tuner_id.data, event->tuner_id.length);
             PlatformTVManager* tvManager = reinterpret_cast<PlatformTVManager*>(data);
-            RefPtr<PlatformTVChannel> channel = nullptr;
+            RefPtr<PlatformTVChannel> protector = nullptr;
 
             printf("\n%s:%s:%d Tuner ID  = %s\n", __FILE__, __func__, __LINE__, event->tuner_id.data);
             callOnMainThread([tvManager, tunerId] {
@@ -88,19 +89,41 @@ PlatformTVManager::PlatformTVManager(PlatformTVManagerClient* client)
             uint16_t state = (uint16_t)event->state;
             String tunerId(event->tuner_id.data, event->tuner_id.length);
             PlatformTVManager* tvManager = reinterpret_cast<PlatformTVManager*>(data);
-            RefPtr<PlatformTVChannel> channel = nullptr;
+            RefPtr<PlatformTVChannel> protector = nullptr;
 
             if (event->channel_info) {
                 tvManager->m_tvBackend->m_channel = event->channel_info;
-                channel = PlatformTVChannel::create(tvManager->m_tvBackend, tunerId);
+                protector = PlatformTVChannel::create(tvManager->m_tvBackend, tunerId);
             }
             printf("\n%s:%s:%d Tuner ID  = %s\n", __FILE__, __func__, __LINE__, event->tuner_id.data);
-            callOnMainThread([tvManager, tunerId, state, channel] {
+            callOnMainThread([tvManager, tunerId, state, protector] {
                 printf("\n%s:%s:%d Tuner ID  = %s\n", __FILE__, __func__, __LINE__, tunerId.utf8().data());
-                tvManager->m_platformTVManagerClient->didScanningStateChanged(tunerId, channel, state);
+                tvManager->m_platformTVManagerClient->didScanningStateChanged(tunerId, protector, state);
             });
         },
-
+        // handle parental control changed event
+        [](void* data, wpe_tvcontrol_event* event)
+        {
+            printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
+            uint16_t state = (uint16_t)event->parentalControl;
+            PlatformTVManager* tvManager = reinterpret_cast<PlatformTVManager*>(data);
+            callOnMainThread([tvManager, state ] {
+                printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
+                tvManager->m_platformTVManagerClient->didParentalControlChanged(state);
+            });
+        },
+        // handle parental lock changed event
+        [](void* data, wpe_tvcontrol_event* event)
+        {
+            printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
+            String tunerId(event->tuner_id.data, event->tuner_id.length);
+            uint16_t state = (uint16_t)event->parentalLock;
+            PlatformTVManager* tvManager = reinterpret_cast<PlatformTVManager*>(data);
+            callOnMainThread([tvManager, tunerId, state ] {
+                printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
+                tvManager->m_platformTVManagerClient->didParentalLockChanged(tunerId, state);
+            });
+        },
     };
     wpe_tvcontrol_backend_set_manager_event_client(m_tvBackend->m_backend, &s_eventClient, this);
 }
@@ -131,6 +154,22 @@ bool PlatformTVManager::getTuners(Vector<RefPtr<PlatformTVTuner>>& tunerVector)
     }
     printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
     return true;
+}
+
+bool PlatformTVManager::setParentalControl(const String& pin, bool isLocked)
+{
+    return wpe_tvcontrol_backend_set_parental_control(m_tvBackend->m_backend, pin.utf8().data(), &isLocked);
+}
+
+bool PlatformTVManager::isParentalControlled()
+{
+    wpe_tvcontrol_backend_is_parental_controlled(m_tvBackend->m_backend, &m_isParentalControlled);
+    return m_isParentalControlled;
+}
+
+bool PlatformTVManager::setParentalControlPin(const String& oldPin, const String& newPin)
+{
+    return wpe_tvcontrol_backend_set_parental_control_pin(m_tvBackend->m_backend, oldPin.utf8().data(), newPin.utf8().data());
 }
 
 } // namespace WebCore

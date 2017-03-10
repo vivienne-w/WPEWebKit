@@ -62,6 +62,8 @@ public:
     tvcontrol_return setCurrentChannel(uint64_t);
     SourceType srcType() { return m_sType; }
     tvcontrol_return getChannels(wpe_tvcontrol_channel_vector**);
+    void isParentalLocked(uint64_t, bool*);
+    tvcontrol_return setParentalLock(uint64_t, bool*);
 
     wpe_tvcontrol_channel_vector m_channelVector;
 
@@ -104,6 +106,7 @@ private:
     pid_t m_pid;
 
     uint64_t m_channelNo;
+    ChannelBackend* m_currentChannel;
     std::mutex m_channelChangeMutex;
     std::condition_variable_any m_channelChangeCondition;
 };

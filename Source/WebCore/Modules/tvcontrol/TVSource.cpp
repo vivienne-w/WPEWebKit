@@ -77,7 +77,7 @@ void TVSource::getChannels(TVChannelPromise&& promise)
         }
         if (channelVector.size()) {
             for (auto& channel : channelVector)
-                m_channelList.append(TVChannel::create(channel, this));
+                m_channelList.append(TVChannel::create(scriptExecutionContext(), channel, this));
             promise.resolve(m_channelList);
             return;
         }
@@ -100,6 +100,11 @@ void TVSource::setCurrentChannel(const String& channelNumber, TVPromise&& promis
                 printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
                 if (m_platformTVSource->setCurrentChannel(channelNumber)) {
                     promise.resolve(nullptr);
+                    return;
+                }
+                if (channel->isParentalLocked()) {
+                    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
+                    promise.reject(INVALID_ACCESS_ERR, "Cannot Access a parental locked channel");
                     return;
                 }
             }
@@ -170,7 +175,7 @@ void TVSource::dispatchScanningStateChangedEvent(RefPtr<PlatformTVChannel> platf
         break;
     }
     if (m_platformTVSource && platformTVChannel) {
-        protector = TVChannel::create(platformTVChannel, this);
+        protector = TVChannel::create(scriptExecutionContext(), platformTVChannel, this);
         m_channelList.append(protector);
     }
     printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);

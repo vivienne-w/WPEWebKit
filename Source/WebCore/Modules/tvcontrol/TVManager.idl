@@ -32,4 +32,8 @@
 ] interface TVManager : EventTarget {
     Promise<sequence<TVTuner>>   getTuners();
     attribute EventHandler       ontunerchanged;
+    readonly  attribute boolean  isParentalControlled;
+    Promise<void>                setParentalControl(DOMString pin,boolean isLocked);
+    Promise<void>                setParentalControlPin (DOMString oldPin, DOMString newPin);
+    attribute EventHandler       onparentalcontrolchanged;
 };

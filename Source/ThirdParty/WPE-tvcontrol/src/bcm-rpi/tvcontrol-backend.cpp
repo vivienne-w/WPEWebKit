@@ -34,16 +34,18 @@
 
 #define TUNER_ID_LEN 3
 #define TV_DEBUG 1
+#define PARENTAL_LOCK_FILE "/root/TVParentLock.txt"
 
-#define TVControlPushEvent(eventId, tunerId, evtOperation /*optional*/)                                                                \
+#define TVControlPushEvent(eventId, tunerId, evtOperation /*optional*/, pcState /*optional*/)                                              \
     \
 {                                                                                                                               \
     struct wpe_tvcontrol_event* event = reinterpret_cast<struct wpe_tvcontrol_event*>(malloc(sizeof(struct wpe_tvcontrol_event))); \
     event->eventID = eventId;                                                                                                      \
     event->tuner_id.data = strndup(tunerId, TUNER_ID_LEN);                                                                         \
-    TvLogInfo("Tuner id platform  =  %s \n", event->tuner_id.data);                                                                \
     event->tuner_id.length = strlen(tunerId);                                                                                      \
+    TvLogInfo("Tuner id platform  =  %s \n", event->tuner_id.data);                                                                \
     event->operation = evtOperation;                                                                                               \
+    event->parentalControl = pcState;                                                                                              \
     m_eventQueue.pushEvent(event);                                                                                                 \
     \
 }
@@ -66,6 +68,11 @@ public:
     tvcontrol_return setCurrentSource(const char*, SourceType);
     tvcontrol_return getChannels(const char*, SourceType, struct wpe_tvcontrol_channel_vector**);
     void updateTunerList(const char*, tuner_changed_operation);
+    void isParentalControlled(bool*);
+    tvcontrol_return setParentalControl(const char*, bool*);
+    tvcontrol_return setParentalControlPin(const char*, const char*);
+    tvcontrol_return setParentalLock(const char*, uint64_t, const char*, bool*);
+    void isParentalLocked(const char*, uint64_t, bool*);
 
 private:
     struct wpe_tvcontrol_backend* m_backend;
@@ -75,6 +82,8 @@ private:
     std::thread m_tunerThread;
     bool m_isRunning;
     bool m_isEventProcessing;
+    bool m_isParentalControlled;
+    std::string m_parentalControlPin;
 
     void eventProcessor();
     void tunerChangedListener();
@@ -84,7 +93,9 @@ private:
     void handleTunerChangedEvent(struct wpe_tvcontrol_event*);
     void handleSourceChangedEvent(struct wpe_tvcontrol_event*);
     void handleChannelChangedEvent(struct wpe_tvcontrol_event*);
+    void handleParentalControlChangedEvent(struct wpe_tvcontrol_event*);
     void handleScanningStateChangedEvent(struct wpe_tvcontrol_event*);
+    void handleParentalLockChangedEvent(struct wpe_tvcontrol_event*);
 
 #ifdef TVCONTROL_BACKEND_LINUX_DVB
     Country m_country;
@@ -97,6 +108,7 @@ TvControlBackend::TvControlBackend(struct wpe_tvcontrol_backend* backend)
     : m_backend(backend)
     , m_strPtr(nullptr)
     , m_tunerCount(0)
+    , m_isParentalControlled(false)
 {
     TvLogTrace();
     m_isEventProcessing = true;
@@ -106,6 +118,17 @@ TvControlBackend::TvControlBackend(struct wpe_tvcontrol_backend* backend)
     TvLogTrace();
     m_eventThread = std::thread(&TvControlBackend::eventProcessor, this);
     m_tunerThread = std::thread(&TvControlBackend::tunerChangedListener, this);
+
+    char passKey[10];
+    std::ifstream infile;
+    infile.open(PARENTAL_LOCK_FILE);
+    TvLogTrace();
+    if (infile) {
+        infile >> passKey;
+        m_parentalControlPin = passKey; // Set the pin as the one previously saved by the user.
+        infile.close();
+    } else
+        m_parentalControlPin = "Metro123#"; // Set the pin to it's default value if the key file is now found.
 }
 
 TvControlBackend::~TvControlBackend()
@@ -149,6 +172,12 @@ void TvControlBackend::eventProcessor()
             break;
         case ScanningChanged:
             handleScanningStateChangedEvent(event);
+            break;
+        case ParentalControlChanged:
+            handleParentalControlChangedEvent(event);
+            break;
+        case ParentalLockChanged:
+            handleParentalLockChangedEvent(event);
             break;
         default:
             TvLogInfo("Unknown Event\n");
@@ -251,6 +280,20 @@ void TvControlBackend::handleScanningStateChangedEvent(struct wpe_tvcontrol_even
     }
 }
 
+void TvControlBackend::handleParentalControlChangedEvent(struct wpe_tvcontrol_event* event)
+{
+    wpe_tvcontrol_backend_dispatch_parental_control_event(m_backend, event);
+    if (event->tuner_id.data)
+        free(event->tuner_id.data);
+}
+
+void TvControlBackend::handleParentalLockChangedEvent(struct wpe_tvcontrol_event* event)
+{
+    wpe_tvcontrol_backend_dispatch_parental_lock_event(m_backend, event);
+    if (event->tuner_id.data)
+        free(event->tuner_id.data);
+}
+
 tvcontrol_return TvControlBackend::getTuners(struct wpe_tvcontrol_string_vector* outTunerList)
 {
     TvLogTrace();
@@ -314,8 +357,10 @@ void TvControlBackend::getTunner(const char* tunerId, LinuxDVB::TvTunerBackend**
         TvLogInfo("Id of this tuner %s \n", element->m_tunerData->tunerId.c_str());
         TvLogInfo("Id of required tuner %s \n", tunerId);
 #endif
-        if (!strncmp(element->m_tunerData->tunerId.c_str(), tunerId, 3))
+        if (!strncmp(element->m_tunerData->tunerId.c_str(), tunerId, 3)) {
             *tuner = element.get();
+            TvLogInfo("Got Tuner");
+        }
     }
 }
 #endif
@@ -395,7 +440,7 @@ tvcontrol_return TvControlBackend::setCurrentSource(const char* tunerId, SourceT
     getTunner(tunerId, &tuner);
     ret = tuner->setCurrentSource(sType);
 
-    TVControlPushEvent(SourceChanged, tunerId, (tuner_changed_operation)0 /*Not relevant*/);
+    TVControlPushEvent(SourceChanged, tunerId, (tuner_changed_operation)0 /*Not relevant*/, (parental_control_state)0 /*Not Relevant*/);
     TvLogTrace();
 
 #endif
@@ -470,7 +515,7 @@ void TvControlBackend::tunerChangedListener()
                     else if (!strcmp("remove", udev_device_get_action(dev)))
                         operation = Removed;
                     updateTunerList(tunerId.c_str(), operation);
-                    TVControlPushEvent(TunerChanged, tunerId.c_str(), operation);
+                    TVControlPushEvent(TunerChanged, tunerId.c_str(), operation, (parental_control_state)0 /*Not Relevant*/);
                     TvLogTrace();
                 }
                 TvLogInfo("***Tuner***\n");
@@ -513,6 +558,61 @@ void TvControlBackend::updateTunerList(const char* tunerId, tuner_changed_operat
         }
     }
 #endif
+}
+
+void TvControlBackend::isParentalControlled(bool* lockStatus)
+{
+    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
+    fflush(stdout);
+    *lockStatus = m_isParentalControlled ? true : false;
+}
+
+tvcontrol_return TvControlBackend::setParentalControl(const char* pin, bool* isLocked)
+{
+    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
+    if (!strcmp(pin, m_parentalControlPin.c_str())) {
+        if (*isLocked != m_isParentalControlled) {
+            m_isParentalControlled = *isLocked;
+            TVControlPushEvent(ParentalControlChanged, ""/*Not relevant*/, (tuner_changed_operation)0,  ((parental_control_state)((int)m_isParentalControlled)));
+        }
+        return TVControlSuccess;
+    }
+    return TVControlFailed;
+}
+
+tvcontrol_return TvControlBackend::setParentalControlPin(const char* oldPin, const char* newPin)
+{
+    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
+    if (!strcmp(oldPin, m_parentalControlPin.c_str())) {
+        m_parentalControlPin = newPin;
+        std::ofstream outfile;
+        outfile.open(PARENTAL_LOCK_FILE, std::ios::trunc);
+        outfile << newPin;
+        outfile.close();
+        return TVControlSuccess;
+    }
+    return TVControlFailed;
+}
+
+tvcontrol_return TvControlBackend::setParentalLock(const char* tunerId, uint64_t channelNumber, const char* pin, bool* isParentalLocked)
+{
+    tvcontrol_return ret = TVControlFailed;
+    if ((m_isParentalControlled) && (!strcmp(pin, m_parentalControlPin.c_str()))) {
+        printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
+        LinuxDVB::TvTunerBackend* tuner;
+        getTunner(tunerId, &tuner);
+        ret = tuner->setParentalLock(channelNumber, isParentalLocked);
+    }
+    return ret;
+}
+
+void TvControlBackend::isParentalLocked(const char* tunerId, uint64_t channelNumber, bool* isParentalLocked)
+{
+    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
+    LinuxDVB::TvTunerBackend* tuner;
+    getTunner(tunerId, &tuner);
+    tuner->isParentalLocked(channelNumber, isParentalLocked);
+    return;
 }
 
 } // namespace BCMRPi
@@ -597,6 +697,42 @@ struct wpe_tvcontrol_backend_interface bcm_rpi_tvcontrol_backend_interface = {
         TvLogTrace();
         auto& backend = *static_cast<BCMRPi::TvControlBackend*>(data);
         return backend.getChannels(tuner_id, type, out_channel_list);
+    },
+    // is_parental_controlled
+    [](void* data, bool* is_parental_controlled)
+    {
+        TvLogTrace();
+        fflush(stdout);
+        auto& backend = *static_cast<BCMRPi::TvControlBackend*>(data);
+        backend.isParentalControlled(is_parental_controlled);
+    },
+    // set_parental_control
+    [](void* data, const char* pin, bool* is_locked) -> tvcontrol_return
+    {
+        TvLogTrace();
+        auto& backend = *static_cast<BCMRPi::TvControlBackend*>(data);
+        return backend.setParentalControl(pin, is_locked);
+    },
+    // set_parental_control_pin
+    [](void* data, const char* old_pin, const char* new_pin) -> tvcontrol_return
+    {
+        TvLogTrace();
+        auto& backend = *static_cast<BCMRPi::TvControlBackend*>(data);
+        return backend.setParentalControlPin(old_pin, new_pin);
+    },
+    // set_parental_lock
+    [](void* data, const char* tuner_id, uint64_t channel_number, const char* pin, bool* is_locked) -> tvcontrol_return
+    {
+        TvLogTrace();
+        auto& backend = *static_cast<BCMRPi::TvControlBackend*>(data);
+        return backend.setParentalLock(tuner_id, channel_number, pin, is_locked);
+    },
+    // is_parental_locked
+    [](void* data, const char* tuner_id, uint64_t channel_number, bool* is_parental_locked)
+    {
+        TvLogTrace();
+        auto& backend = *static_cast<BCMRPi::TvControlBackend*>(data);
+        backend.isParentalLocked(tuner_id, channel_number, is_parental_locked);
     },
 };
 }

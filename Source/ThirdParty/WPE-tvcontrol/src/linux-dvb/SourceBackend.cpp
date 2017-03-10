@@ -30,7 +30,7 @@
 
 namespace LinuxDVB {
 
-#define TVControlPushEvent(eventId, tunerId, evtState /*optional*/, channelInfo /*optional*/)                                      \
+#define TVControlPushEvent(eventId, tunerId, evtState /*optional*/, channelInfo /*optional*/, parentalLockState /*optional*/)           \
 {                                                                                                                                  \
     struct wpe_tvcontrol_event* event = reinterpret_cast<struct wpe_tvcontrol_event*>(malloc(sizeof(struct wpe_tvcontrol_event))); \
     event->eventID = eventId;                                                                                                      \
@@ -38,7 +38,10 @@ namespace LinuxDVB {
     TvLogInfo("Tuner ID =  %s \n", event->tuner_id.data);                                                                          \
     event->tuner_id.length = strlen(tunerId);                                                                                      \
     event->state = evtState;                                                                                                       \
+    event->parentalLock = parentalLockState;                                                                                       \
     event->channel_info = channelInfo;                                                                                             \
+    TvLogTrace();                                                                                                                  \
+    fflush(stdout);                                                                                                                \
     m_eventQueue->pushEvent(event);                                                                                                \
 }
 
@@ -84,9 +87,8 @@ void SourceBackend::clearChannelVector()
 
 void SourceBackend::clearChannelList()
 {
-    if (!m_channelList.empty()) {
+    if (!m_channelList.empty())
         m_channelList.clear();
-    }
 }
 
 tvcontrol_return SourceBackend::startScanning(bool isRescanned)
@@ -120,13 +122,14 @@ void SourceBackend::scanningThread()
         struct dvbfe_handle* feHandle = openFE(m_tunerData->tunerId);
         if (m_isRescanned) {
             clearChannelList();
-            TVControlPushEvent(ScanningChanged, m_tunerData->tunerId.c_str(), Cleared, nullptr);
+            TVControlPushEvent(ScanningChanged, m_tunerData->tunerId.c_str(), Cleared, nullptr, (parental_lock_state)0);
             m_scanIndex = 0;
         }
         if (feHandle) {
             int i;
+            length = 1;
             for (i = m_scanIndex; i < length; i++) {
-                int frequency = m_tunerData->frequency[i];
+                int frequency = 575000000/* m_tunerData->frequency[i]*/;
                 if (tuneToFrequency(frequency, modulation, feHandle)) {
                     switch (m_sType) {
                     case Atsc:
@@ -149,19 +152,19 @@ void SourceBackend::scanningThread()
                     }
                 }
                 if (m_isScanStopped) {
-                    TVControlPushEvent(ScanningChanged, m_tunerData->tunerId.c_str(), Stopped, nullptr);
+                    TVControlPushEvent(ScanningChanged, m_tunerData->tunerId.c_str(), Stopped, nullptr, (parental_lock_state)0);
                     m_isScanStopped = false;
                     m_scanIndex = i + 1;
                     break;
                 }
             }
             if (i == length) {
-                TVControlPushEvent(ScanningChanged, m_tunerData->tunerId.c_str(), Completed, nullptr);
+                TVControlPushEvent(ScanningChanged, m_tunerData->tunerId.c_str(), Completed, nullptr, (parental_lock_state)0);
                 m_scanIndex = 0;
             }
             dvbfe_close(feHandle);
         } else
-            TVControlPushEvent(ScanningChanged, m_tunerData->tunerId.c_str(), Stopped, nullptr);
+            TVControlPushEvent(ScanningChanged, m_tunerData->tunerId.c_str(), Stopped, nullptr, (parental_lock_state)0);
     }
 }
 
@@ -269,16 +272,20 @@ tvcontrol_return SourceBackend::getChannels(wpe_tvcontrol_channel_vector** chann
 
 tvcontrol_return SourceBackend::setCurrentChannel(uint64_t channelNo)
 {
-    tvcontrol_return ret = TVControlFailed;
-
     TvLogInfo("\nSet Channel invoked \n");
+    tvcontrol_return ret = TVControlFailed;
     if (m_channelNo != channelNo) {
-        m_channelChangeMutex.lock();
-        m_channelNo = channelNo;
-        m_channelChangeCondition.notify_all();
-        m_channelChangeMutex.unlock();
+        m_currentChannel = getChannelByLCN(channelNo);
+        bool lockTrack;
+        m_currentChannel->isParentalLocked(&lockTrack);
+        if (!lockTrack) {
+            m_channelChangeMutex.lock();
+            m_channelNo = channelNo;
+            m_channelChangeCondition.notify_all();
+            m_channelChangeMutex.unlock();
+            ret = TVControlSuccess;
+        }
     }
-    ret = TVControlSuccess;
     return ret;
 }
 
@@ -293,6 +300,7 @@ void SourceBackend::setCurrentChannelThread()
         TvLogInfo("\nTune to Channel:: %" PRIu64 "\n", m_channelNo);
         ChannelBackend* channel = getChannelByLCN(m_channelNo);
         if (channel) {
+            printf("UNCLOCKED");
             stopPlayBack();
             struct dvbfe_handle* feHandle = openFE(m_tunerData->tunerId);
             if (feHandle) {
@@ -318,7 +326,7 @@ void SourceBackend::setCurrentChannelThread()
                         int pmtPid = streamInfo[0];
                         startPlayBack(freq, modulation, pmtPid, videoPid, audioPid);
 
-                        TVControlPushEvent(ChannelChanged, m_tunerData->tunerId.c_str(), (scanning_state)0 /*irrelevant*/, nullptr);
+                        TVControlPushEvent(ChannelChanged, m_tunerData->tunerId.c_str(), (scanning_state)0 /*irrelevant*/, nullptr, (parental_lock_state)0);
                         TvLogInfo("%s:%s:%d \n", __FILE__, __func__, __LINE__);
                     }
                 } else {
@@ -622,7 +630,7 @@ bool SourceBackend::processTVCT(int dmxfd, int frequency)
                 channelInfo->serviceId = ch->source_id;
                 channelInfo->name = strdup(name.c_str());
                 channelInfo->number = logicalChannelNumber;
-                TVControlPushEvent(ScanningChanged, m_tunerData->tunerId.c_str(), Scanned, channelInfo);
+                TVControlPushEvent(ScanningChanged, m_tunerData->tunerId.c_str(), Scanned, channelInfo, (parental_lock_state)0);
             }
         }
     } while (sectionPattern != (uint32_t)((1 << numSections) - 1));
@@ -679,6 +687,28 @@ uint32_t SourceBackend::getBits(const uint8_t* buf, int startbit, int bitlen)
     tmpLong = tmpLong >> startbit;
     uint32_t mask = (1ULL << bitlen) - 1;
     return tmpLong & mask;
+}
+
+void SourceBackend::isParentalLocked(uint64_t channelNo, bool* isLocked)
+{
+    TvLogTrace();
+    m_currentChannel->isParentalLocked(isLocked);
+    TvLogTrace();
+    return;
+}
+
+tvcontrol_return SourceBackend::setParentalLock(uint64_t channelNo, bool* isLocked)
+{
+    TvLogTrace();
+    fflush(stdout);
+    tvcontrol_return ret = TVControlFailed;
+    bool lockChanged;
+    lockChanged = false;
+    ret = m_currentChannel->setParentalLock(isLocked, &lockChanged);
+    if ((ret == TVControlSuccess) && (lockChanged)) {
+        TVControlPushEvent(ParentalLockChanged, m_tunerData->tunerId.c_str(), Cleared, nullptr, ParentalLockOn);
+        return ret;
+    }
 }
 
 } // namespace LinuxDVB

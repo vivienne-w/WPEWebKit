@@ -31,6 +31,8 @@
 
 #include "loader-private.h"
 #include "tvcontrol-backend-private.h"
+
+#include <stdio.h>
 #include <stdlib.h>
 #include <wpe/tvcontrol-backend.h>
 
@@ -64,6 +66,7 @@ __attribute__((visibility("default")))
 void
 wpe_tvcontrol_backend_set_manager_event_client(struct wpe_tvcontrol_backend* backend, struct wpe_tvcontrol_backend_manager_event_client* client, void* client_data)
 {
+    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
     backend->event_client = client;
     backend->event_client_data = client_data;
 }
@@ -98,6 +101,28 @@ wpe_tvcontrol_backend_dispatch_scanning_state_event(struct wpe_tvcontrol_backend
 {
     if (backend->event_client)
         backend->event_client->handle_scanning_state_changed_event(backend->event_client_data, event);
+}
+
+__attribute__((visibility("default")))
+void
+wpe_tvcontrol_backend_dispatch_parental_control_event(struct wpe_tvcontrol_backend* backend, struct wpe_tvcontrol_event* event)
+{
+    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
+    if (backend->event_client) {
+        printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
+        backend->event_client->handle_parental_control_changed_event(backend->event_client_data, event);
+    }
+}
+
+__attribute__((visibility("default")))
+void
+wpe_tvcontrol_backend_dispatch_parental_lock_event(struct wpe_tvcontrol_backend* backend, struct wpe_tvcontrol_event* event)
+{
+    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
+    if (backend->event_client) {
+        printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
+        backend->event_client->handle_parental_lock_changed_event(backend->event_client_data, event);
+    }
 }
 
 __attribute__((visibility("default")))
@@ -185,4 +210,52 @@ wpe_tvcontrol_backend_set_current_channel(struct wpe_tvcontrol_backend* backend,
     printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
     ret = backend->interface->set_current_channel(backend->interface_data, tuner_id, type, channel_number);
     return ret;
+}
+
+__attribute__((visibility("default")))
+void
+wpe_tvcontrol_backend_is_parental_controlled(struct wpe_tvcontrol_backend* backend, bool* is_parental_controlled)
+{
+    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
+    backend->interface->is_parental_controlled(backend->interface_data, is_parental_controlled);
+    return;
+}
+
+__attribute__((visibility("default")))
+tvcontrol_return
+wpe_tvcontrol_backend_set_parental_control(struct wpe_tvcontrol_backend* backend, const char* pin, bool* is_locked)
+{
+    tvcontrol_return ret = TVControlFailed;
+    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
+    ret = backend->interface->set_parental_control(backend->interface_data, pin, is_locked);
+    return ret;
+}
+
+__attribute__((visibility("default")))
+tvcontrol_return
+wpe_tvcontrol_backend_set_parental_control_pin(struct wpe_tvcontrol_backend* backend, const char* old_pin, const char* new_pin)
+{
+    tvcontrol_return ret = TVControlFailed;
+    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
+    ret = backend->interface->set_parental_control_pin(backend->interface_data, old_pin, new_pin);
+    return ret;
+}
+
+__attribute__((visibility("default")))
+tvcontrol_return
+wpe_tvcontrol_backend_set_parental_lock(struct wpe_tvcontrol_backend* backend, const char* tuner_id, uint64_t channel_number, const char* pin, bool* is_locked)
+{
+    tvcontrol_return ret = TVControlFailed;
+    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
+    ret = backend->interface->set_parental_lock(backend->interface_data, tuner_id, channel_number, pin, is_locked);
+    return ret;
+}
+
+__attribute__((visibility("default")))
+void
+wpe_tvcontrol_backend_is_parental_locked(struct wpe_tvcontrol_backend* backend, const char* tuner_id, uint64_t channel_number, bool* is_parental_locked)
+{
+    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
+    backend->interface->is_parental_locked(backend->interface_data, tuner_id, channel_number, is_parental_locked);
+    return;
 }

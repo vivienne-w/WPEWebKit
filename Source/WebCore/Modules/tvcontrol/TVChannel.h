@@ -29,16 +29,21 @@
 
 #if ENABLE(TV_CONTROL)
 
+#include "ActiveDOMObject.h"
+#include "EventNames.h"
 #include "EventTarget.h"
+#include "JSDOMPromise.h"
 #include "PlatformTVChannel.h"
+#include "ScriptExecutionContext.h"
+#include "TVParentalLockChangedEvent.h"
 
 namespace WebCore {
 
 class TVSource;
 
-class TVChannel final : public RefCounted<TVChannel>, public EventTargetWithInlineData {
+class TVChannel final : public RefCounted<TVChannel>, public ContextDestructionObserver, public EventTargetWithInlineData {
 public:
-    static Ref<TVChannel> create(RefPtr<PlatformTVChannel>, TVSource*);
+    static Ref<TVChannel> create(ScriptExecutionContext*, RefPtr<PlatformTVChannel>, TVSource*);
     ~TVChannel() = default;
 
     enum class Type {
@@ -56,12 +61,17 @@ public:
     const String number() const { return m_platformTVChannel->number(); }
     bool isEmergency() const { return m_platformTVChannel->isEmergency(); }
     bool isFree() const { return true; }
+    bool isParentalLocked() const { return m_platformTVChannel->isParentalLocked(); }
 
     using RefCounted<TVChannel>::ref;
     using RefCounted<TVChannel>::deref;
 
+    typedef DOMPromise<std::nullptr_t> TVsetParentalLock;
+    void setParentalLock(const String&, bool, TVsetParentalLock&&);
+
+    void dispatchParentalLockChangedEvent(uint16_t);
 private:
-    explicit TVChannel(RefPtr<PlatformTVChannel>, TVSource*);
+    explicit TVChannel(ScriptExecutionContext*, RefPtr<PlatformTVChannel>, TVSource*);
 
     RefPtr<PlatformTVChannel> m_platformTVChannel;
     TVSource* m_parentTVSource;
@@ -69,8 +79,9 @@ private:
     void refEventTarget() override { ref(); }
     void derefEventTarget() override { deref(); }
 
+    void contextDestroyed() final;
     EventTargetInterface eventTargetInterface() const override { return TVChannelEventTargetInterfaceType; }
-    ScriptExecutionContext* scriptExecutionContext() const override { return nullptr; }
+    ScriptExecutionContext* scriptExecutionContext() const override;
 };
 
 typedef Vector<RefPtr<TVChannel> > TVChannelVector;

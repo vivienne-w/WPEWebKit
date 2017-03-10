@@ -286,6 +286,8 @@ namespace WebCore {
     macro(currentsourcechanged) \
     macro(currentchannelchanged) \
     macro(scanningstatechanged) \
+    macro(parentalcontrolchanged) \
+    macro(parentallockchanged)\
 // end of DOM_EVENT_NAMES_FOR_EACH
 
 struct EventNames {

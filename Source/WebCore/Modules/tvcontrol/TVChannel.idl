@@ -12,4 +12,7 @@ enum TVChannelType { "tv", "radio", "data" };
     readonly        attribute DOMString     number;
     readonly        attribute boolean       isEmergency;
     readonly        attribute boolean       isFree;
+    Promise<void>                           setParentalLock (DOMString pin, boolean isLocked);
+    readonly        attribute boolean       isParentalLocked;
+                    attribute EventHandler  onparentallockchanged;
 };

@@ -59,6 +59,16 @@ public:
     void didCurrentSourceChanged(String) override;
     void didCurrentChannelChanged(String) override;
     void didScanningStateChanged(String, RefPtr<PlatformTVChannel>, uint16_t) override;
+    void didParentalControlChanged(uint16_t) override;
+    void didParentalLockChanged(String, uint16_t) override;
+
+    bool isParentalControlled() const {return m_platformTVManager->isParentalControlled();}
+
+    typedef DOMPromise<std::nullptr_t> TVsetParentalControl;
+    void setParentalControl(const String&, bool, TVsetParentalControl&&);
+
+    typedef DOMPromise<std::nullptr_t> TVsetParentalControlPin;
+    void setParentalControlPin(const String&, const String&, TVsetParentalControl&&);
 
 private:
     TVManager(ScriptExecutionContext*);

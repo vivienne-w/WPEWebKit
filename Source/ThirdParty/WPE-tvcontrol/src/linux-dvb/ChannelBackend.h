@@ -28,7 +28,9 @@
 #ifndef CHANNEL_BACKEND_H_
 #define CHANNEL_BACKEND_H_
 
-#include <string>
+#include "TVConfig.h"
+
+#include <string.h>
 #include <wpe/tvcontrol-backend.h>
 
 namespace LinuxDVB {
@@ -46,7 +48,6 @@ public:
     void setNumber(uint64_t number) { m_number = number; }
     void setProgramNumber(int programNumber) { m_programNumber = programNumber; }
     void setFrequency(int frequency) { m_frequency = frequency; }
-
     uint64_t getLCN() const { return m_number; }
     int getFrequency() const { return m_frequency; }
     int getProgramNumber() const { return m_programNumber; }
@@ -54,7 +55,8 @@ public:
     uint64_t getServiceId() const { return m_serviceId; }
     uint64_t getTransportStreamId() const { return m_transportStreamId; }
     uint64_t getNetworkId() const { return m_networkId; }
-
+    void isParentalLocked(bool*);
+    tvcontrol_return setParentalLock(bool*, bool*);
 private:
     std::string m_name;
     uint64_t m_networkId;

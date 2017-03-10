@@ -30,17 +30,45 @@
 
 #if ENABLE(TV_CONTROL)
 
+#include "ExceptionCode.h"
+
 namespace WebCore {
 
-Ref<TVChannel> TVChannel::create(RefPtr<PlatformTVChannel> platformTVChannel, TVSource* parentTVSource)
+Ref<TVChannel> TVChannel::create(ScriptExecutionContext* context, RefPtr<PlatformTVChannel> platformTVChannel, TVSource* parentTVSource)
 {
-    return adoptRef(*new TVChannel(platformTVChannel, parentTVSource));
+    return adoptRef(*new TVChannel(context, platformTVChannel, parentTVSource));
 }
 
-TVChannel::TVChannel(RefPtr<PlatformTVChannel> platformTVChannel, TVSource* parentTVSource)
-    : m_platformTVChannel(platformTVChannel)
+TVChannel::TVChannel(ScriptExecutionContext* context, RefPtr<PlatformTVChannel> platformTVChannel, TVSource* parentTVSource)
+    : ContextDestructionObserver(context)
+    , m_platformTVChannel(platformTVChannel)
     , m_parentTVSource(parentTVSource)
 {
+}
+
+void TVChannel::setParentalLock(const String& pin, bool isLocked, TVsetParentalLock&& promise)
+{
+    if (m_platformTVChannel->setParentalLock(pin, isLocked))
+        promise.resolve(nullptr);
+    else
+        promise.reject(SECURITY_ERR, "Unmatched Pins!!!..Channel lock not set");
+}
+
+void TVChannel::dispatchParentalLockChangedEvent(uint16_t state)
+{
+    scriptExecutionContext()->postTask([=](ScriptExecutionContext&) {
+        dispatchEvent(TVParentalLockChangedEvent::create(eventNames().parentallockchangedEvent, (TVParentalLockChangedEvent::State)state));
+    });
+}
+
+ScriptExecutionContext* TVChannel::scriptExecutionContext() const
+{
+    return ContextDestructionObserver::scriptExecutionContext();
+}
+
+void TVChannel::contextDestroyed()
+{
+    ContextDestructionObserver::contextDestroyed();
 }
 
 } // namespace WebCore

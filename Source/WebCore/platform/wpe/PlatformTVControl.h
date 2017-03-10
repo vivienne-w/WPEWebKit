@@ -26,7 +26,7 @@
  */
 
 #pragma once
-
+#include <stdio.h>
 #if ENABLE(TV_CONTROL)
 
 struct wpe_tvcontrol_backend;
@@ -38,6 +38,8 @@ class PlatformTVControlBackend {
 public:
     struct wpe_tvcontrol_backend* m_backend;
     struct wpe_tvcontrol_channel* m_channel;
+    ~PlatformTVControlBackend() {printf("In PlatformTVControlBackend destructor\n"); fflush(stdout);}
+    PlatformTVControlBackend() {printf("In PlatformTVControlBackend constructor\n"); fflush(stdout);}
 };
 
 } // namespace WebCore

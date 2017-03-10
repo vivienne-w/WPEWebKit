@@ -34,6 +34,7 @@
 #include "EventNames.h"
 #include "Frame.h"
 #include "Navigator.h"
+#include "TVParentalControlChangedEvent.h"
 #include "TVTunerChangedEvent.h"
 
 namespace WebCore {
@@ -50,6 +51,8 @@ TVManager::TVManager(ScriptExecutionContext* context)
     : ActiveDOMObject(context)
     , m_platformTVManager(nullptr)
 {
+    if (!m_platformTVManager)
+        m_platformTVManager = std::make_unique<PlatformTVManager>(this);
     printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
 }
 
@@ -125,6 +128,25 @@ void TVManager::didScanningStateChanged(String tunerId, RefPtr<PlatformTVChannel
     }
 }
 
+void TVManager::didParentalControlChanged(uint16_t state)
+{
+    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
+    scriptExecutionContext()->postTask([=](ScriptExecutionContext&) {
+        dispatchEvent(TVParentalControlChangedEvent::create(eventNames().parentalcontrolchangedEvent, (TVParentalControlChangedEvent::State)state));
+    });
+}
+
+void TVManager::didParentalLockChanged(String tunerId, uint16_t state)
+{
+    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
+    for (auto& tuner : m_tunerList) {
+        if (equalIgnoringASCIICase(tunerId, tuner->id())) {
+            tuner->currentSource()->currentChannel()->dispatchParentalLockChangedEvent(state);
+            break;
+        }
+    }
+}
+
 void TVManager::getTuners(TVTunerPromise&& promise)
 {
     printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
@@ -156,6 +178,24 @@ void TVManager::getTuners(TVTunerPromise&& promise)
     }
     printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
     promise.reject(nullptr);
+}
+
+void TVManager::setParentalControl(const String& pin, bool isLocked, TVsetParentalControl&& promise)
+{
+    if (m_platformTVManager->setParentalControl(pin, isLocked))
+        promise.resolve(nullptr);
+    else
+        promise.reject(SECURITY_ERR, "Unmatched Pins!!!");
+    return;
+}
+
+void TVManager::setParentalControlPin(const String& oldPin, const String& newPin, TVsetParentalControl&& promise)
+{
+    if (m_platformTVManager->setParentalControlPin(oldPin, newPin))
+        promise.resolve(nullptr);
+    else
+        promise.reject(SECURITY_ERR, "Unmatched Pins!!!....Unable to Change Pin");
+    return;
 }
 
 ScriptExecutionContext* TVManager::scriptExecutionContext() const

@@ -26,8 +26,28 @@
  */
 
 #include "ChannelBackend.h"
+
+#include "tv-log.h"
+
 #define TV_DEBUG 1
 
 namespace LinuxDVB {
 
+void ChannelBackend::isParentalLocked(bool* isLocked)
+{
+    TvLogTrace();
+    printf("isLocked m_state%d", m_isParentalLocked);
+    *isLocked = m_isParentalLocked;
+    printf("isLocked%d m_state%d", *isLocked, m_isParentalLocked);
+}
+
+tvcontrol_return ChannelBackend::setParentalLock(bool* isLocked, bool* lockChanged)
+{
+    if (*isLocked != m_isParentalLocked) {
+        m_isParentalLocked = *isLocked;
+        *lockChanged = true;
+        return TVControlSuccess;
+    }
+    return TVControlFailed;
+}
 } // namespace LinuxDVB

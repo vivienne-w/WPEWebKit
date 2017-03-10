@@ -41,7 +41,6 @@ class PlatformTVSource;
 
 class PlatformTVChannel : public RefCounted<PlatformTVChannel> {
 public:
-    static RefPtr<PlatformTVChannel> create(PlatformTVControlBackend*, String);
 
     ~PlatformTVChannel();
 
@@ -51,6 +50,8 @@ public:
         Data
     };
 
+    static RefPtr<PlatformTVChannel> create(PlatformTVControlBackend*, String);
+
     const String& networkId() const { return m_networkId; }
     const String transportStreamId() const { return m_transportStreamId; }
     const String name() const { return m_name; }
@@ -59,6 +60,8 @@ public:
 
     Type type() const { return m_type; }
     bool isEmergency() const { return m_isEmergency; }
+    bool isParentalLocked();
+    bool setParentalLock(const String&, bool);
 
 private:
     PlatformTVChannel(PlatformTVControlBackend*, String);
@@ -71,6 +74,7 @@ private:
     String m_name;
     String m_number;
     bool m_isEmergency;
+    bool m_isParentalLocked;
     PlatformTVControlBackend* m_tvBackend;
 };
 
