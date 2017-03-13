@@ -270,6 +270,7 @@ set(WebCore_NON_SVG_IDL_FILES
     Modules/tvcontrol/TVCurrentSourceChangedEvent.idl
     Modules/tvcontrol/TVScanningStateChangedEvent.idl
     Modules/tvcontrol/TVCurrentChannelChangedEvent.idl
+    Modules/tvcontrol/TVProgram.idl
     Modules/tvcontrol/TVChannel.idl
     Modules/tvcontrol/TVSource.idl
     Modules/tvcontrol/TVTuner.idl
@@ -966,6 +967,7 @@ set(WebCore_SOURCES
     Modules/tvcontrol/TVScanningStateChangedEvent.cpp
     Modules/tvcontrol/TVCurrentChannelChangedEvent.cpp
     Modules/tvcontrol/TVChannel.cpp
+    Modules/tvcontrol/TVProgram.cpp
     Modules/tvcontrol/TVSource.cpp
     Modules/tvcontrol/TVTuner.cpp
     Modules/tvcontrol/TVManager.cpp

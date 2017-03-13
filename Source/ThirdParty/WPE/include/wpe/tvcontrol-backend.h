@@ -75,6 +75,22 @@ struct wpe_tvcontrol_channel {
     ChannelType type;
 };
 
+struct wpe_get_programs_options {
+    uint64_t startTime;
+    uint64_t endTime;
+};
+
+struct wpe_tvcontrol_program {
+    uint64_t    eventId;
+    char*       title;
+    uint64_t    startTime;
+    uint64_t    duration;
+    uint64_t    shortDescription;
+    uint64_t    longDescription;
+    uint64_t    rating;
+    uint64_t    seriesId;
+};
+
 struct wpe_tvcontrol_event {
     tvcontrol_events eventID;
     tuner_changed_operation operation;
@@ -99,6 +115,11 @@ struct wpe_tvcontrol_channel_vector {
     uint64_t length;
 };
 
+struct wpe_tvcontrol_program_vector {
+    struct wpe_tvcontrol_program* programs;
+    uint64_t                      length;
+};
+
 struct wpe_tvcontrol_backend_interface {
     void*               (*create)(struct  wpe_tvcontrol_backend*);
     void                (*destroy)(void*);
@@ -111,6 +132,8 @@ struct wpe_tvcontrol_backend_interface {
     tvcontrol_return    (*set_current_channel)(void*, const char*, SourceType, uint64_t);
     tvcontrol_return    (*set_current_source)(void*, const char*, SourceType);
     tvcontrol_return    (*get_channel_list)(void*, const char*, SourceType, struct wpe_tvcontrol_channel_vector**);
+    tvcontrol_return    (*get_program_list)(void*, const char*, uint64_t, struct wpe_get_programs_options*, struct wpe_tvcontrol_program_vector**);
+    tvcontrol_return    (*get_current_program)(void*, const char*, uint64_t, struct wpe_tvcontrol_program**);
     void                (*is_parental_controlled)(void*, bool*);
     tvcontrol_return    (*set_parental_control)(void*, const char*, bool*);
     tvcontrol_return    (*set_parental_control_pin)(void*i, const char*, const char*);
@@ -171,6 +194,12 @@ wpe_tvcontrol_backend_set_current_channel(struct wpe_tvcontrol_backend*, const c
 
 tvcontrol_return
 wpe_tvcontrol_backend_get_channel_list(struct wpe_tvcontrol_backend*, const char* tuner_id, SourceType type, struct wpe_tvcontrol_channel_vector** out_channel_list);
+
+tvcontrol_return
+wpe_tvcontrol_backend_get_program_list(struct wpe_tvcontrol_backend*, const char* tuner_id, uint64_t service_id, struct wpe_get_programs_options*, struct wpe_tvcontrol_program_vector** out_program_list);
+
+tvcontrol_return
+wpe_tvcontrol_backend_get_current_program(struct wpe_tvcontrol_backend*, const char* tuner_id, uint64_t service_id, struct wpe_tvcontrol_program**);
 
 void
 wpe_tvcontrol_backend_is_parental_controlled(struct wpe_tvcontrol_backend*, bool* is_parental_controlled);

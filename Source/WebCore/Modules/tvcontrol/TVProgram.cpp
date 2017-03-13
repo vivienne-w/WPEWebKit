@@ -25,24 +25,23 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#pragma once
-#include <stdio.h>
-#if ENABLE(TV_CONTROL)
+#include "config.h"
+#include "TVProgram.h"
 
-struct wpe_tvcontrol_backend;
-struct wpe_tvcontrol_channel;
-struct wpe_tvcontrol_program;
+#if ENABLE(TV_CONTROL)
 
 namespace WebCore {
 
-class PlatformTVControlBackend {
-public:
-    struct wpe_tvcontrol_backend* m_backend;
-    struct wpe_tvcontrol_channel* m_channel;
-    struct wpe_tvcontrol_program* m_program;
-    ~PlatformTVControlBackend() {printf("In PlatformTVControlBackend destructor\n"); fflush(stdout);}
-    PlatformTVControlBackend() {printf("In PlatformTVControlBackend constructor\n"); fflush(stdout);}
-};
+Ref<TVProgram> TVProgram::create(RefPtr<PlatformTVProgram> platformTVProgram, TVChannel* parentTVChannel)
+{
+    return adoptRef(*new TVProgram(platformTVProgram, parentTVChannel));
+}
+
+TVProgram::TVProgram(RefPtr<PlatformTVProgram> platformTVProgram, TVChannel* parentTVChannel)
+    : m_platformTVProgram(platformTVProgram)
+    , m_parentTVChannel(parentTVChannel)
+{
+}
 
 } // namespace WebCore
 

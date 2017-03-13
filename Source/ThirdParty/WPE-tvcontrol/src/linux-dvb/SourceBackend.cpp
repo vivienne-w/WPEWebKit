@@ -57,9 +57,11 @@ SourceBackend::SourceBackend(EventQueue<wpe_tvcontrol_event*>* eventQueue, Sourc
 {
     m_adapter = stoi(m_tunerData->tunerId.substr(0, m_tunerData->tunerId.find(":")));
     m_demux = stoi(m_tunerData->tunerId.substr(m_tunerData->tunerId.find(":") + 1));
+    m_siThread = std::thread(&SourceBackend::siThread, this);
     m_scanningThread = std::thread(&SourceBackend::scanningThread, this);
     m_setCurrentChannelThread = std::thread(&SourceBackend::setCurrentChannelThread, this);
     m_channelVector.length = 0;
+    m_frequency = 0;
 }
 
 SourceBackend::~SourceBackend()
@@ -68,6 +70,7 @@ SourceBackend::~SourceBackend()
     m_channelChangeCondition.notify_all();
     m_scanCondition.notify_all();
     m_scanningThread.join();
+    m_siThread.join();
     m_setCurrentChannelThread.join();
     clearChannelVector();
     clearChannelList();
@@ -80,7 +83,7 @@ void SourceBackend::clearChannelVector()
             if (m_channelVector.channels[i].name)
                 free(m_channelVector.channels[i].name);
         }
-        delete (m_channelVector.channels);
+        delete[] m_channelVector.channels;
         m_channelVector.length = 0;
     }
 }
@@ -339,6 +342,54 @@ void SourceBackend::setCurrentChannelThread()
     TvLogTrace();
 }
 
+void SourceBackend::siThread()
+{
+    int flag = 0;
+    while (m_isRunning) {
+        m_channelChangeMutex.lock();
+        m_channelChangeCondition.wait(m_channelChangeMutex);
+        m_channelChangeMutex.unlock();
+        if (!m_isRunning)
+            break;
+        ChannelBackend* channel = getChannelByLCN(m_channelNo);
+        int i;
+        if (m_frequency != channel->getFrequency()) {
+            m_frequency = channel->getFrequency();
+            if (flag)
+                stopEITThread();
+            startEITThread();
+            flag = 1;
+        } else
+            continue;
+    }
+}
+
+void SourceBackend::stopEITThread() {
+    m_isEITRunning = false;
+    m_EITThread.join();
+}
+
+void SourceBackend::startEITThread()
+{
+    m_isEITRunning = true;
+    if (processMGT())
+        fprintf(stderr, "%s(): error calling parse_mgt()\n", __FUNCTION__);
+
+    TvLogInfo("receiving EIT \n");
+    m_EITThread = std::thread(&SourceBackend::EITThread, this);
+}
+
+void SourceBackend::EITThread()
+{
+    while (m_isEITRunning) {
+        int i;
+        for (i = 0; i < 4; i++) {
+            if (processEIT(i, m_eitPid[i]))
+                fprintf(stderr, "%s(): error calling parse_eit()\n", __FUNCTION__);
+        }
+    }
+}
+
 void SourceBackend::dvbScan()
 {
 }
@@ -415,43 +466,16 @@ void SourceBackend::mpegScan(int programNumber, std::map<int, int>& streamInfo)
 
 void SourceBackend::atscScan(int frequency, uint64_t modulation)
 {
-    int vctFd;
     switch (modulation) {
     case DVBFE_ATSC_MOD_VSB_8:
-        vctFd = createSectionFilter(PID_VCT, TABLE_VCT_TERR);
+        if (!processTVCT(frequency))
+            fprintf(stderr, "%s(): error calling parse_tvct()\n", __FUNCTION__);
         break;
     default:
         TvLogInfo("Modulation not supported!!\n");
         return;
     }
-
-    struct pollfd pollFd;
-    pollFd.fd = vctFd;
-    pollFd.events = POLLIN | POLLPRI | POLLERR;
-    bool flag = true;
-
-    while (flag) {
-        int count = poll(&pollFd, 1, 100);
-        if (count < 0) {
-            fprintf(stderr, "Poll error\n");
-            break;
-        }
-        if (!count)
-            continue;
-        if (pollFd.revents & (POLLIN | POLLPRI)) {
-            switch (modulation) {
-            case DVBFE_ATSC_MOD_VSB_8:
-                if (processTVCT(pollFd.fd, frequency)) {
-                    flag = false;
-                    dvbdemux_stop(pollFd.fd);
-                } else
-                    fprintf(stderr, "%s(): error calling parse_stt()\n", __FUNCTION__);
-                break;
-            default:
-                break;
-            }
-        }
-    }
+}
 }
 
 int SourceBackend::createSectionFilter(uint16_t pid, uint8_t tableId)
@@ -474,6 +498,53 @@ int SourceBackend::createSectionFilter(uint16_t pid, uint8_t tableId)
         return -1;
     }
     return demuxFd;
+}
+
+int SourceBackend::parseSections(int dmxfd, struct atsc_section_psip** psip)
+{
+    unsigned char sibuf[4096];
+    int size;
+    int ret;
+    struct pollfd pollfd;
+    struct section* section;
+    struct section_ext* sectionExt;
+
+    // poll for data
+    pollfd.fd = dmxfd;
+    pollfd.events = POLLIN | POLLERR |POLLPRI;
+    if ((ret = poll(&pollfd, 1, 60000)) < 0) {
+        fprintf(stderr, "%s(): error calling poll()\n", __FUNCTION__);
+        return -1;
+    }
+
+    if (!ret)
+        return 0;
+
+    /* read it */
+    if ((size = read(dmxfd, sibuf, sizeof(sibuf))) < 0) {
+        fprintf(stderr, "%s(): error calling read()\n", __FUNCTION__);
+        return -1;
+    }
+
+    /* parse section */
+    section = section_codec(sibuf, size);
+    if (!section) {
+        fprintf(stderr, "%s(): error calling section_codec()\n", __FUNCTION__);
+        return -1;
+    }
+
+    sectionExt = section_ext_decode(section, 0);
+    if (!sectionExt) {
+        fprintf(stderr, "%s(): error calling section_ext_decode()\n", __FUNCTION__);
+        return -1;
+    }
+
+    *psip = atsc_section_psip_decode(sectionExt);
+    if (!*psip) {
+        fprintf(stderr, "%s(): error calling atsc_section_psip_decode()\n", __FUNCTION__);
+        return -1;
+    }
+    return 1;
 }
 
 bool SourceBackend::processPAT(int patFd, int programNumber, struct pollfd* pollfd, std::map<int, int>& streamInfo)
@@ -518,35 +589,24 @@ bool SourceBackend::processPAT(int patFd, int programNumber, struct pollfd* poll
     return true;
 }
 
-bool SourceBackend::processTVCT(int dmxfd, int frequency)
+bool SourceBackend::processTVCT(int frequency)
 {
+    int dmxfd;
     int numSections = -1;
     uint32_t sectionPattern = 0;
+    struct atsc_section_psip* psip;
+    const enum atsc_section_tag tag = stag_atsc_terrestrial_virtual_channel;
     do {
-        /* read it */
-        int size;
-        unsigned char siBuf[4096];
-        if ((size = read(dmxfd, siBuf, sizeof(siBuf))) < 0) {
-            fprintf(stderr, "%s(): error calling read()\n", __FUNCTION__);
-            return false;
+        dmxfd = createSectionFilter(PID_VCT, tag);
+        int ret = parseSections(dmxfd, &psip);
+        if (0 > ret) {
+            fprintf(stderr, "%s(): error calling atsc_scan_table()\n", __FUNCTION__);
+            return -1;
         }
 
-        struct section* section = section_codec(siBuf, size);
-        if (!section) {
-            fprintf(stderr, "%s(): error calling section_codec()\n", __FUNCTION__);
-            return false;
-        }
-        struct section_ext* sectionExt = section_ext_decode(section, 0);
-        if (!sectionExt) {
-            fprintf(stderr, "%s(): error calling section_ext_decode()\n", __FUNCTION__);
-            return false;
-        }
-
-        struct atsc_section_psip* psip = atsc_section_psip_decode(sectionExt);
-        if (!psip) {
-            fprintf(stderr,
-                "%s(): error calling atsc_section_psip_decode()\n", __FUNCTION__);
-            return false;
+        if (!ret) {
+            TvLogInfo("timeout\n");
+            return 0;
         }
 
         struct atsc_tvct_section* tvct;
@@ -577,13 +637,25 @@ bool SourceBackend::processTVCT(int dmxfd, int frequency)
             continue;
         sectionPattern |= 1 << tvct->head.ext_head.section_number;
 
-        int i;
+        int i, k;
         struct atsc_tvct_channel* ch;
         atsc_tvct_section_channels_for_each(tvct, ch, i)
         {
             /* initialize the currInfo structure */
             /* each EIT covers 3 hours */
             std::unique_ptr<ChannelBackend> currInfo = std::make_unique<ChannelBackend>();
+            currInfo->setNumEits((12 / 3) + !!(12 % 3));
+            if (currInfo->getEit(0)) {
+                fprintf(stderr, "%s(): non-NULL pointer detected during initialization", __FUNCTION__);
+                return -1;
+            }
+
+            currInfo->setEit(reinterpret_cast<atscEitInfo*>(calloc(currInfo->getNumEits(), sizeof(struct atscEitInfo))));
+            if (!currInfo->getEit(0)) {
+                fprintf(stderr, "%s(): error calling calloc()\n", __FUNCTION__);
+                return -1;
+            }
+
             char* serviceName = reinterpret_cast<char*>(malloc(sizeof(char) * 8));
             for (int k = 0; k < 7; k++) {
                 serviceName[k] = getBits((const uint8_t*)ch->short_name,
@@ -635,7 +707,284 @@ bool SourceBackend::processTVCT(int dmxfd, int frequency)
         }
     } while (sectionPattern != (uint32_t)((1 << numSections) - 1));
 
+    m_numChannels = m_channelList.size();
     return true;
+}
+
+bool SourceBackend::processEIT(int index, uint16_t pid)
+{
+    int numSections;
+    uint8_t currChannelIndex;
+    uint8_t sectionNum;
+    uint32_t sectionPattern;
+    const enum atsc_section_tag tag = stag_atsc_event_information;
+    struct atsc_eit_section* eit;
+    ChannelBackend* currInfo;
+    struct atscEitInfo* eitInfo;
+    struct atscEitSectionInfo* section;
+    uint16_t sourceId;
+    uint32_t eitInstancePattern = 0;
+    int i, k, ret;
+    struct atsc_section_psip* psip;
+    int dmxfd;
+    fflush(stdout);
+    while (eitInstancePattern != (uint32_t)((1 << m_numChannels) - 1)) {
+        sourceId = 0xFFFF;
+        sectionPattern = 0;
+        numSections = -1;
+        do {
+            dmxfd = createSectionFilter(pid, tag);
+            int ret = parseSections(dmxfd, &psip);
+            if (0 > ret) {
+                fprintf(stderr, "%s(): error calling atsc_scan_table()\n", __FUNCTION__);
+                return -1;
+            }
+            if (!ret) {
+                TvLogInfo("timeout\n");
+                return 0;
+            }
+            struct atsc_eit_section* eit;
+            eit = atsc_eit_section_codec(psip);
+            if (!eit) {
+                fprintf(stderr, "%s(): error decode table section\n", __FUNCTION__);
+                return false;
+            }
+
+            if (0xFFFF == sourceId) {
+                sourceId = atsc_eit_section_source_id(eit);
+                k = 0;
+                for (const auto& p : m_channelList) {
+                    if (sourceId == p.second->getServiceId()) {
+                        currInfo = p.second.get();
+                        currChannelIndex = k;
+                        if (!index)
+                            currInfo->setLastEvent(nullptr);
+                        break;
+                    }
+                    k++;
+                }
+                if (k == m_numChannels) {
+                    fprintf(stderr, "%s(): cannot find source_id 0x%04X in the EIT\n", __FUNCTION__, sourceId);
+                    return -1;
+                }
+            } else {
+                if (sourceId != atsc_eit_section_source_id(eit))
+                    continue;
+            }
+            if (eitInstancePattern & (1 << currChannelIndex)) {
+                /* we have received this instance,
+                 * so quit quick
+                 */
+                break;
+            }
+            if (-1 == numSections) {
+                numSections = 1 +
+                    eit->head.ext_head.last_section_number;
+                if (32 < numSections) {
+                    fprintf(stderr, "%s(): no support yet for tables having more than 32 sections\n", __FUNCTION__);
+                    return -1;
+                }
+            } else {
+                if (numSections != 1 + eit->head.ext_head.last_section_number) {
+                    fprintf(stderr, "%s(): last section number does not match\n", __FUNCTION__);
+                    return -1;
+                }
+            }
+            if (sectionPattern & (1 << eit->head.ext_head.section_number))
+                continue;
+            sectionPattern |= 1 << eit->head.ext_head.section_number;
+
+            fflush(stdout);
+            eitInfo = currInfo->getEit(index);
+            eitInfo->section = reinterpret_cast<atscEitSectionInfo*>(realloc(eitInfo->section,
+                (eitInfo->numEitSections + 1) * sizeof(struct atscEitSectionInfo)));
+            if (!eitInfo->section) {
+                fprintf(stderr, "%s(): error calling realloc()\n", __FUNCTION__);
+                return -1;
+            }
+            sectionNum = eit->head.ext_head.section_number;
+            if (!eitInfo->numEitSections) {
+                eitInfo->numEitSections = 1;
+                section = eitInfo->section;
+            } else {
+                /* have to sort it into section order
+                 * (temporal order)
+                 */
+                for (i = 0; i < eitInfo->numEitSections; i++) {
+                    if (eitInfo->section[i].sectionNum > sectionNum)
+                        break;
+                }
+                memmove(&eitInfo->section[i + 1],
+                    &eitInfo->section[i],
+                    (eitInfo->numEitSections - i) *
+                    sizeof(struct atscEitSectionInfo));
+                section = &eitInfo->section[i - 1];
+                section = &eitInfo->section[i];
+                eitInfo->numEitSections += 1;
+            }
+            section->sectionNum = sectionNum;
+            section->numEvents = eit->num_events_in_section;
+            section->numEtms = 0;
+            section->numReceivedEtms = 0;
+            if (!(section->events =  new ProgramBackend*[section->numEvents])) {
+                fprintf(stderr, "%s(): error calling calloc()\n", __FUNCTION__);
+                return -1;
+            }
+            if (processEvents(currInfo, eit, section)) {
+                fprintf(stderr, "%s(): error calling parse_events()\n", __FUNCTION__);
+                return -1;
+            }
+        } while (sectionPattern != (uint32_t)((1 << numSections) - 1));
+        eitInstancePattern |= 1 << currChannelIndex;
+    }
+    for (const auto& p : m_channelList) {
+        ChannelBackend* channel = p.second.get();
+        struct atscEitInfo* ei = channel->getEit(index);
+        struct atscEitSectionInfo* s;
+
+        if (!ei->numEitSections) {
+            channel->setLastEvent(nullptr);
+            continue;
+        }
+        s = &ei->section[ei->numEitSections - 1];
+        /* BUG: it's incorrect when last section has no event */
+        if (!s->numEvents) {
+            channel->setLastEvent(nullptr);
+            continue;
+        }
+        channel->setLastEvent((s->events[s->numEvents - 1]));
+    }
+    return 0;
+}
+
+bool SourceBackend::processEvents(ChannelBackend *currInfo,
+    struct atsc_eit_section* eit, struct atscEitSectionInfo* section)
+{
+    int i, j, k;
+    struct atsc_eit_event* e;
+    time_t startTime;
+    atsc_eit_section_events_for_each(eit, e, i) {
+        ProgramBackend* lastEvent = currInfo->getLastEvent();
+        if ((!i) && lastEvent) {
+            if (e->event_id == lastEvent->getEventId()) {
+                section->events[i] = nullptr;
+                // skip if it's the same event spanning
+                // over sections
+
+                continue;
+            }
+        }
+        if (e->ETM_location && 3 != e->ETM_location) {
+            /* FIXME assume 1 and 2 is interchangable as of now */
+            section->numEtms++;
+        }
+
+        currInfo->setEventInfoIndex(currInfo->getEventInfoIndex() + 1);
+        ProgramBackend* eInfo = new ProgramBackend();
+        int titleLength = (e->title_length)+1;
+        int bufPos = 0;
+        char* titleAddr = reinterpret_cast<char*>(malloc(titleLength));
+        struct atsc_text* eventTitle;
+        struct atsc_text_string* str;
+        eventTitle = atsc_eit_event_name_title_text(e);
+        if (!eventTitle)
+            continue;
+        atsc_text_strings_for_each(eventTitle, str, j) {
+            struct atsc_text_string_segment* seg;
+            atsc_text_string_segments_for_each(str, seg, k) {
+                if (0 > atsc_text_segment_decode(seg, (uint8_t **)&titleAddr, (size_t *)&titleLength, (size_t *)&bufPos)) {
+                    fprintf(stderr, "%s(): error calling atsc_text_segment_decode()\n", __FUNCTION__);
+                    return -1;
+                }
+            }
+        }
+        titleAddr[bufPos] = '\0';
+        std::string title(titleAddr);
+        eInfo->setTitle(title);
+        TvLogInfo("title = %s\n", title.c_str());
+        fflush(stdout);
+
+        TvLogInfo("event_id : %d\n", e->event_id);
+        fflush(stdout);
+        startTime = atsctime_to_unixtime(e->start_time);
+        eInfo->setDuration(e->length_in_seconds);
+        eInfo->setEventId(e->event_id);
+        eInfo->setStartTime(startTime);
+        section->events[i] = eInfo;
+        currInfo->appendPrograms(eInfo);
+    }
+    TvLogTrace();
+    fflush(stdout);
+    return 0;
+}
+
+bool SourceBackend::processMGT()
+{
+    const enum atsc_section_tag tag = stag_atsc_master_guide;
+    struct atsc_mgt_section* mgt;
+    struct atsc_mgt_table* t;
+    int i, j, ret;
+    struct atsc_section_psip* psip;
+    memset(m_eitPid, 0xFF, 128 * sizeof(uint16_t));
+    memset(m_ettPid, 0xFF, 128 * sizeof(uint16_t));
+    struct mgtTableName mgtTabNameArray[] = {
+        {0x0000, "terrestrial VCT with current_next_indictor=1"},
+        {0x0001, "terrestrial VCT with current_next_indictor=0"},
+        {0x0002, "cable VCT with current_next_indictor=1"},
+        {0x0003, "cable VCT with current_next_indictor=0"},
+        {0x0004, "channel ETT"},
+        {0x0005, "DCCSCT"},
+        {0x00FF, "reserved for future ATSC use"},
+        {0x017F, "EIT"},
+        {0x01FF, "reserved for future ATSC use"},
+        {0x027F, "event ETT"},
+        {0x02FF, "reserved for future ATSC use"},
+        {0x03FF, "RRT with rating region"},
+        {0x0FFF, "user private"},
+        {0x13FF, "reserved for future ATSC use"},
+        {0x14FF, "DCCT with dcc_id"},
+        {0xFFFF, "reserved for future ATSC use"}
+    };
+    int dmxfd;
+    dmxfd = createSectionFilter(PID_VCT, tag);
+    ret = parseSections(dmxfd, &psip);
+    if (0 > ret) {
+        fprintf(stderr, "%s(): error calling atsc_scan_table()\n", __FUNCTION__);
+        return -1;
+    }
+    if (!ret) {
+        TvLogInfo("timeout\n");
+        return 0;
+    }
+    mgt = atsc_mgt_section_codec(psip);
+    if (!mgt) {
+        fprintf(stderr, "%s(): error decode table section\n", __FUNCTION__);
+        return false;
+    }
+    atsc_mgt_section_tables_for_each(mgt, t, i) {
+        struct mgtTableName table;
+
+        for (j = 0; j < (int)(sizeof(mgtTabNameArray) / sizeof(struct mgtTableName)); j++) {
+            if (t->table_type > mgtTabNameArray[j].range)
+                continue;
+            table = mgtTabNameArray[j];
+            if (!j || mgtTabNameArray[j - 1].range + 1 == mgtTabNameArray[j].range)
+                j = -1;
+            else {
+                j = t->table_type - mgtTabNameArray[j - 1].range - 1;
+                if (0x017F == table.range)
+                    m_eitPid[j] = t->table_type_PID;
+                else if (0x027F == table.range)
+                    m_ettPid[j] = t->table_type_PID;
+            }
+            break;
+        }
+        fprintf(stdout, "  %2d: type = 0x%04X, PID = 0x%04X, %s", i,
+            t->table_type, t->table_type_PID, table.string);
+        if (-1 != j)
+            fprintf(stdout, " %d", j);
+    }
+    return 0;
 }
 
 void SourceBackend::parseAtscExtendedChannelNameDescriptor(char** serviceName, const unsigned char* buf)
@@ -687,6 +1036,32 @@ uint32_t SourceBackend::getBits(const uint8_t* buf, int startbit, int bitlen)
     tmpLong = tmpLong >> startbit;
     uint32_t mask = (1ULL << bitlen) - 1;
     return tmpLong & mask;
+}
+
+tvcontrol_return SourceBackend::getPrograms(uint64_t serviceId, struct wpe_get_programs_options* programsOptions, struct wpe_tvcontrol_program_vector** programVector)
+{
+    TvLogTrace();
+    ChannelBackend* channel;
+    for (const auto& p : m_channelList) {
+        if (serviceId == p.second->getServiceId()) {
+            channel = p.second.get();
+            break;
+        }
+    }
+    return channel->getPrograms(programsOptions, programVector);
+}
+
+tvcontrol_return SourceBackend::getCurrentProgram(uint64_t serviceId, struct wpe_tvcontrol_program** program)
+{
+    TvLogTrace();
+    ChannelBackend* channel;
+    for (const auto& p : m_channelList) {
+        if (serviceId == p.second->getServiceId()) {
+            channel = p.second.get();
+            break;
+        }
+    }
+    return channel->getCurrentProgram(program);
 }
 
 void SourceBackend::isParentalLocked(uint64_t channelNo, bool* isLocked)

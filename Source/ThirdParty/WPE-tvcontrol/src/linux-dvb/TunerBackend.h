@@ -56,6 +56,8 @@ public:
     tvcontrol_return setCurrentSource(SourceType);
     tvcontrol_return getChannels(SourceType, struct wpe_tvcontrol_channel_vector**);
     tvcontrol_return getSupportedSrcTypeList(wpe_tvcontrol_src_types_vector*);
+    tvcontrol_return getPrograms(uint64_t, struct wpe_get_programs_options*, struct wpe_tvcontrol_program_vector**);
+    tvcontrol_return getCurrentProgram(uint64_t, struct wpe_tvcontrol_program**);
     void isParentalLocked(uint64_t, bool*);
     tvcontrol_return setParentalLock(uint64_t, bool*);
 

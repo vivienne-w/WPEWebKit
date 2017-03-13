@@ -41,6 +41,11 @@
 
 #define TV_DEBUG 1
 
+struct mgtTableName {
+    uint16_t range;
+    const char *string;
+};
+
 struct TunerData {
     TunerData() = default;
     ~TunerData() = default;
@@ -67,6 +72,8 @@ public:
 
     wpe_tvcontrol_channel_vector m_channelVector;
 
+    tvcontrol_return getPrograms(uint64_t, struct wpe_get_programs_options* , struct wpe_tvcontrol_program_vector**);
+    tvcontrol_return getCurrentProgram(uint64_t, struct wpe_tvcontrol_program**);
 private:
     void parseAtscExtendedChannelNameDescriptor(char**, const unsigned char*);
     void startPlayBack(int, uint64_t, int, int, int);
@@ -77,21 +84,35 @@ private:
     void atscScan(int, uint64_t);
     void mpegScan(int, std::map<int, int>&);
     void dvbScan();
-    bool processTVCT(int, int);
+    bool processMGT();
+    bool processTVCT(int);
+    bool processEIT(int, uint16_t);
+    bool processEvents(ChannelBackend*, struct atsc_eit_section *, struct atscEitSectionInfo *);
     bool processPAT(int, int, struct pollfd*, std::map<int, int>&);
     void processPMT(int, std::map<int, int>&);
+    int parseSections(int, struct atsc_section_psip**);
     int createSectionFilter(uint16_t, uint8_t);
     void clearChannelList();
     void clearChannelVector();
     void scanningThread();
+    void siThread();
+    void stopEITThread();
+    void startEITThread();
+    void EITThread();
     void setCurrentChannelThread();
 
+    int m_numChannels;
+    uint16_t m_eitPid[128];
+    uint16_t m_ettPid[128];
     std::map<uint64_t, std::unique_ptr<ChannelBackend>> m_channelList;
     EventQueue<wpe_tvcontrol_event*>* m_eventQueue;
 
+    int m_frequency;
     SourceType m_sType;
     TunerData* m_tunerData;
     std::thread m_scanningThread;
+    std::thread m_siThread;
+    std::thread m_EITThread;
     std::thread m_setCurrentChannelThread;
     int m_adapter;
     int m_demux;
@@ -100,7 +121,9 @@ private:
     bool m_isRescanned;
     bool m_isScanStopped;
     bool m_isRunning;
+    bool m_isEITRunning;
     bool m_isScanInProgress;
+    bool m_isChannelChanged;
     std::mutex m_scanMutex;
     std::condition_variable_any m_scanCondition;
     pid_t m_pid;

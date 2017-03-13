@@ -25,24 +25,39 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#pragma once
-#include <stdio.h>
+#include "config.h"
+#include "PlatformTVProgram.h"
+
 #if ENABLE(TV_CONTROL)
 
-struct wpe_tvcontrol_backend;
-struct wpe_tvcontrol_channel;
-struct wpe_tvcontrol_program;
+#include "PlatformTVControl.h"
+#include <wpe/tvcontrol-backend.h>
 
 namespace WebCore {
 
-class PlatformTVControlBackend {
-public:
-    struct wpe_tvcontrol_backend* m_backend;
-    struct wpe_tvcontrol_channel* m_channel;
-    struct wpe_tvcontrol_program* m_program;
-    ~PlatformTVControlBackend() {printf("In PlatformTVControlBackend destructor\n"); fflush(stdout);}
-    PlatformTVControlBackend() {printf("In PlatformTVControlBackend constructor\n"); fflush(stdout);}
-};
+RefPtr<PlatformTVProgram> PlatformTVProgram::create(PlatformTVControlBackend* tvBackend)
+{
+    return adoptRef(new PlatformTVProgram(tvBackend));
+}
+
+PlatformTVProgram::PlatformTVProgram(PlatformTVControlBackend* tvBackend)
+    : m_tvBackend(tvBackend)
+{
+    m_eventId = (std::to_string(tvBackend->m_program->eventId)).c_str();
+    m_title = tvBackend->m_program->title;
+    m_startTime = tvBackend->m_program->startTime;
+    m_duration = tvBackend->m_program->duration;
+    m_shortDescription = (std::to_string(tvBackend->m_program->shortDescription)).c_str();
+    m_longDescription = (std::to_string(tvBackend->m_program->longDescription)).c_str();
+    m_rating  = (std::to_string(tvBackend->m_program->rating)).c_str();
+    m_seriesId  = (std::to_string(tvBackend->m_program->seriesId)).c_str();
+}
+
+PlatformTVProgram::~PlatformTVProgram()
+{
+}
+
+
 
 } // namespace WebCore
 

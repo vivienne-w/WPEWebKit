@@ -25,25 +25,11 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#pragma once
-#include <stdio.h>
-#if ENABLE(TV_CONTROL)
+#include "ChannelBackend.h"
+#include "tv-log.h"
 
-struct wpe_tvcontrol_backend;
-struct wpe_tvcontrol_channel;
-struct wpe_tvcontrol_program;
+#define TV_DEBUG 1
 
-namespace WebCore {
+namespace LinuxDVB {
 
-class PlatformTVControlBackend {
-public:
-    struct wpe_tvcontrol_backend* m_backend;
-    struct wpe_tvcontrol_channel* m_channel;
-    struct wpe_tvcontrol_program* m_program;
-    ~PlatformTVControlBackend() {printf("In PlatformTVControlBackend destructor\n"); fflush(stdout);}
-    PlatformTVControlBackend() {printf("In PlatformTVControlBackend constructor\n"); fflush(stdout);}
-};
-
-} // namespace WebCore
-
-#endif // ENABLE(TV_CONTROL)
+} // namespace LinuxDVB

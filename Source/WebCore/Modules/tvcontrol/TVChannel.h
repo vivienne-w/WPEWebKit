@@ -33,9 +33,11 @@
 #include "EventNames.h"
 #include "EventTarget.h"
 #include "JSDOMPromise.h"
+#include "JSTVProgram.h"
 #include "PlatformTVChannel.h"
 #include "ScriptExecutionContext.h"
 #include "TVParentalLockChangedEvent.h"
+#include "TVProgram.h"
 
 namespace WebCore {
 
@@ -43,6 +45,11 @@ class TVSource;
 
 class TVChannel final : public RefCounted<TVChannel>, public ContextDestructionObserver, public EventTargetWithInlineData {
 public:
+    struct GetProgramsOptions {
+        unsigned long long startTime;
+        unsigned long long endTime;
+    };
+
     static Ref<TVChannel> create(ScriptExecutionContext*, RefPtr<PlatformTVChannel>, TVSource*);
     ~TVChannel() = default;
 
@@ -51,6 +58,12 @@ public:
         Radio,
         Data
     };
+
+    typedef DOMPromise<TVProgramVector> TVProgramPromise;
+    typedef DOMPromise<TVProgram> TVPromise;
+
+    void getPrograms(const GetProgramsOptions&, TVProgramPromise&&);
+    void getCurrentProgram(TVPromise&&);
 
     const String networkId() const { return m_platformTVChannel->networkId(); }
     const String transportStreamId() const { return m_platformTVChannel->transportStreamId(); }
@@ -75,6 +88,9 @@ private:
 
     RefPtr<PlatformTVChannel> m_platformTVChannel;
     TVSource* m_parentTVSource;
+
+    Vector<RefPtr<TVProgram>> m_programList;
+    RefPtr<TVProgram> m_currentProgram;
 
     void refEventTarget() override { ref(); }
     void derefEventTarget() override { deref(); }

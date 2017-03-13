@@ -26,22 +26,45 @@
  */
 
 #pragma once
-#include <stdio.h>
+
 #if ENABLE(TV_CONTROL)
 
-struct wpe_tvcontrol_backend;
-struct wpe_tvcontrol_channel;
-struct wpe_tvcontrol_program;
+#include <wtf/RefCounted.h>
+#include <wtf/RefPtr.h>
+#include <wtf/Vector.h>
+#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
-class PlatformTVControlBackend {
+class PlatformTVControlBackend;
+class PlatformTVChannel;
+
+class PlatformTVProgram : public RefCounted<PlatformTVProgram> {
 public:
-    struct wpe_tvcontrol_backend* m_backend;
-    struct wpe_tvcontrol_channel* m_channel;
-    struct wpe_tvcontrol_program* m_program;
-    ~PlatformTVControlBackend() {printf("In PlatformTVControlBackend destructor\n"); fflush(stdout);}
-    PlatformTVControlBackend() {printf("In PlatformTVControlBackend constructor\n"); fflush(stdout);}
+    static RefPtr<PlatformTVProgram> create(PlatformTVControlBackend*);
+    ~PlatformTVProgram();
+
+    const String eventId() const { return m_eventId; }
+    const String title() const { return m_title; }
+    const unsigned long long& startTime() const { return m_startTime; }
+    const unsigned long long& duration() const { return m_duration; }
+    const String shortDescription() const { return m_shortDescription; }
+    const String longDescription() const { return m_longDescription; }
+    const String rating() const { return m_rating; }
+    const String seriesId() const { return m_seriesId; }
+
+private:
+    PlatformTVProgram(PlatformTVControlBackend*);
+
+    String m_eventId;
+    String m_title;
+    unsigned long long m_startTime;
+    unsigned long long m_duration;
+    String m_shortDescription;
+    String m_longDescription;
+    String m_rating;
+    String m_seriesId;
+    PlatformTVControlBackend* m_tvBackend;
 };
 
 } // namespace WebCore

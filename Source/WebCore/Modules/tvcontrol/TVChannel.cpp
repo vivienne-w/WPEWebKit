@@ -46,6 +46,47 @@ TVChannel::TVChannel(ScriptExecutionContext* context, RefPtr<PlatformTVChannel> 
 {
 }
 
+void TVChannel::getPrograms(const GetProgramsOptions& programsOptions, TVProgramPromise&& promise)
+{
+    if (m_platformTVChannel) {
+        Vector<RefPtr<PlatformTVProgram>> programVector;
+        printf("programOptions.startTime = %llu programOptions.endTime = %llu \n", programsOptions.startTime, programsOptions.endTime);
+        if (!m_platformTVChannel->getPrograms(programsOptions.startTime, programsOptions.endTime, programVector)) {
+            promise.reject(nullptr);
+            return;
+        }
+        if (programVector.size()) {
+            printf("%s:%s:%d:got %d programsssss\n", __FILE__, __func__, __LINE__, programVector.size());
+            for (auto& program : programVector) {
+                printf("    %s:%s \n", program->eventId().utf8().data(), program->title().utf8().data());
+                m_programList.append(TVProgram::create(program, this));
+            }
+            promise.resolve(m_programList);
+            return;
+        }
+    }
+
+    promise.reject(nullptr);
+}
+
+void TVChannel::getCurrentProgram(TVPromise&& promise)
+{
+    if (m_platformTVChannel) {
+        RefPtr<PlatformTVProgram> currentProgram;
+        if (!m_platformTVChannel->getCurrentProgram(currentProgram)) {
+            promise.reject(nullptr);
+            return;
+        }
+        if (currentProgram) {
+            printf("    eventId of current program= %s\n", currentProgram->eventId().utf8().data());
+            m_currentProgram = TVProgram::create(currentProgram, this);
+            return;
+        }
+        printf("%s:%s:%d\n", __FILE__, __func__, __LINE__);
+    }
+    promise.reject(nullptr);
+}
+
 void TVChannel::setParentalLock(const String& pin, bool isLocked, TVsetParentalLock&& promise)
 {
     if (m_platformTVChannel->setParentalLock(pin, isLocked))

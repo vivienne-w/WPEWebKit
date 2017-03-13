@@ -29,10 +29,11 @@
 
 #if ENABLE(TV_CONTROL)
 
+#include <PlatformTVProgram.h>
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
-#include <wtf/Vector.h>
 #include <wtf/text/WTFString.h>
+#include <wtf/Vector.h>
 
 namespace WebCore {
 
@@ -51,6 +52,9 @@ public:
     };
 
     static RefPtr<PlatformTVChannel> create(PlatformTVControlBackend*, String);
+
+    bool getPrograms(unsigned long long, unsigned long long, Vector<RefPtr<PlatformTVProgram>>&);
+    bool getCurrentProgram(RefPtr<PlatformTVProgram>&);
 
     const String& networkId() const { return m_networkId; }
     const String transportStreamId() const { return m_transportStreamId; }

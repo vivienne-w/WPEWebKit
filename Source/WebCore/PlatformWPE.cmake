@@ -179,6 +179,7 @@ list(APPEND WebCore_SOURCES
     platform/wpe/SoundWPE.cpp
     platform/wpe/ThemeWPE.cpp
     platform/wpe/WidgetWPE.cpp
+    platform/wpe/PlatformTVProgramWPE.cpp
     platform/wpe/PlatformTVChannelWPE.cpp
     platform/wpe/PlatformTVSourceWPE.cpp
     platform/wpe/PlatformTVTunerWPE.cpp

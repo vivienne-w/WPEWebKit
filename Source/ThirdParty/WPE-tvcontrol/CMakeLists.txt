@@ -29,6 +29,7 @@ if (USE_WPE_TVCONTROL_BACKEND_LINUX_DVB)
         src/linux-dvb/SourceBackend.cpp
         src/linux-dvb/TunerBackend.cpp
         src/linux-dvb/ChannelBackend.cpp
+        src/linux-dvb/ProgramBackend.cpp
     )
     add_definitions(-DTVCONTROL_BACKEND_LINUX_DVB=1)
 endif()

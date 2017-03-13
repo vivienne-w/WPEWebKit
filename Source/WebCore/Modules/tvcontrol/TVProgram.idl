@@ -1,0 +1,14 @@
+[
+    Conditional=TV_CONTROL,
+] interface TVProgram {
+    readonly        attribute DOMString          eventId;
+    readonly        attribute TVChannel          channel;
+    readonly        attribute DOMString          title;
+    readonly        attribute unsigned long long startTime;
+    readonly        attribute unsigned long long duration;
+    readonly        attribute DOMString?         shortDescription;
+    readonly        attribute DOMString?         longDescription;
+    readonly        attribute DOMString?         rating;
+    readonly        attribute boolean            isFree;
+    readonly        attribute DOMString?         seriesId;
+};

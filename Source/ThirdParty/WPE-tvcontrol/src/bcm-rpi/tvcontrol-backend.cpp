@@ -68,6 +68,8 @@ public:
     tvcontrol_return setCurrentSource(const char*, SourceType);
     tvcontrol_return getChannels(const char*, SourceType, struct wpe_tvcontrol_channel_vector**);
     void updateTunerList(const char*, tuner_changed_operation);
+    tvcontrol_return getPrograms(const char*, uint64_t, struct wpe_get_programs_options*, struct wpe_tvcontrol_program_vector**);
+    tvcontrol_return getCurrentProgram(const char*, uint64_t, struct wpe_tvcontrol_program**);
     void isParentalControlled(bool*);
     tvcontrol_return setParentalControl(const char*, bool*);
     tvcontrol_return setParentalControlPin(const char*, const char*);
@@ -231,6 +233,33 @@ tvcontrol_return TvControlBackend::getChannels(const char* tunerId, SourceType t
     LinuxDVB::TvTunerBackend* tuner;
     getTunner(tunerId, &tuner);
     ret = tuner->getChannels(type, channelVector);
+#endif
+    TvLogTrace();
+    return ret;
+}
+
+tvcontrol_return TvControlBackend::getPrograms(const char* tunerId, uint64_t serviceId, struct wpe_get_programs_options* programsOptions, struct wpe_tvc
+{
+    tvcontrol_return ret = TVControlFailed;
+    TvLogTrace();
+#ifdef TVCONTROL_BACKEND_LINUX_DVB
+    LinuxDVB::TvTunerBackend* tuner;
+    getTunner(tunerId, &tuner);
+    ret = tuner->getPrograms(serviceId, programsOptions, programVector);
+#endif
+    TvLogTrace();
+    fflush(stdout);
+    return ret;
+}
+
+tvcontrol_return TvControlBackend::getCurrentProgram(const char* tunerId, uint64_t serviceId, struct wpe_tvcontrol_program** program)
+{
+    tvcontrol_return ret = TVControlFailed;
+    TvLogTrace();
+#ifdef TVCONTROL_BACKEND_LINUX_DVB
+    LinuxDVB::TvTunerBackend* tuner;
+    getTunner(tunerId, &tuner);
+    ret = tuner->getCurrentProgram(serviceId, program);
 #endif
     TvLogTrace();
     return ret;
@@ -697,6 +726,24 @@ struct wpe_tvcontrol_backend_interface bcm_rpi_tvcontrol_backend_interface = {
         TvLogTrace();
         auto& backend = *static_cast<BCMRPi::TvControlBackend*>(data);
         return backend.getChannels(tuner_id, type, out_channel_list);
+    },
+    // get_program_list
+    [](void* data, const char* tuner_id, uint64_t service_id, struct wpe_get_programs_options* programs_options, struct wpe_tvcontrol_program_vector** o
+    {
+        tvcontrol_return ret = TVControlFailed;
+        TvLogTrace();
+        fflush(stdout);
+        auto& backend = *static_cast<BCMRPi::TvControlBackend*>(data);
+        return backend.getPrograms(tuner_id, service_id, programs_options, out_program_list);
+    },
+    // get_current_program
+    [](void* data, const char* tuner_id, uint64_t service_id, struct wpe_tvcontrol_program** program) -> tvcontrol_return
+    {
+        tvcontrol_return ret = TVControlFailed;
+        TvLogTrace();
+        fflush(stdout);
+        auto& backend = *static_cast<BCMRPi::TvControlBackend*>(data);
+        return backend.getCurrentProgram(tuner_id, service_id, program);
     },
     // is_parental_controlled
     [](void* data, bool* is_parental_controlled)

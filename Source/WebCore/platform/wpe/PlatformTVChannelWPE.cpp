@@ -58,6 +58,56 @@ PlatformTVChannel::~PlatformTVChannel()
 {
 }
 
+bool PlatformTVChannel::getPrograms(unsigned long long startTime, unsigned long long endTime, Vector<RefPtr<PlatformTVProgram>>& programVector)
+{
+    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
+    struct wpe_tvcontrol_program_vector* programList;
+    struct wpe_get_programs_options programsOptions;
+    programsOptions.startTime = startTime;
+    programsOptions.endTime = endTime;
+    tvcontrol_return ret = TVControlFailed;
+    std::string::size_type sz = 0;
+    ret = wpe_tvcontrol_backend_get_program_list(m_tvBackend->m_backend, m_tunerId.utf8().data(), std::stoull(m_serviceId.utf8().data(), &sz, 0), &programsOptions, &programList);
+    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
+    fflush(stdout);
+    if (ret == TVControlFailed || ret == TVControlNotImplemented)
+        return false;
+
+    if (programList) {
+        if (programList->length) {
+            for (uint64_t i = 0; i < programList->length; i++) {
+                printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
+                fflush(stdout);
+                m_tvBackend->m_program = &programList->programs[i];
+                programVector.append(PlatformTVProgram::create(m_tvBackend));
+            }
+            return true;
+        }
+    }
+    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
+    return false;
+}
+
+bool PlatformTVChannel::getCurrentProgram(RefPtr<PlatformTVProgram>& currentProgram)
+{
+    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
+    struct wpe_tvcontrol_program* program = nullptr;
+    tvcontrol_return ret = TVControlFailed;
+    std::string::size_type sz = 0;
+    ret = wpe_tvcontrol_backend_get_current_program(m_tvBackend->m_backend, m_tunerId.utf8().data(), std::stoull(m_serviceId.utf8().data(), &sz, 0), &program);
+    fflush(stdout);
+    if (ret == TVControlFailed || ret == TVControlNotImplemented)
+        return false;
+
+    if (program) {
+        m_tvBackend->m_program = program;
+        currentProgram = PlatformTVProgram::create(m_tvBackend);
+        return true;
+    }
+    printf("%s:%s:%d\n", __FILE__, __func__, __LINE__);
+    return false;
+}
+
 bool PlatformTVChannel::setParentalLock(const String& pin, bool isLocked)
 {
     return wpe_tvcontrol_backend_set_parental_lock(m_tvBackend->m_backend, m_tunerId.utf8().data(), atoi(m_number.utf8().data()), pin.utf8().data(), &isLocked);

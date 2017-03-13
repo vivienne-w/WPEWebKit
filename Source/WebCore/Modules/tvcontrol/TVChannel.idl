@@ -1,8 +1,15 @@
 enum TVChannelType { "tv", "radio", "data" };
 
+dictionary TVGetProgramsOptions {
+             unsigned long long startTime = 1174456800;
+             unsigned long long endTime = 1174465800;
+};
 [
     Conditional=TV_CONTROL,
 ] interface TVChannel : EventTarget {
+    Promise<sequence<TVProgram>> getPrograms (optional TVGetProgramsOptions startTime);
+    Promise<TVProgram>           getCurrentProgram ();
+
     readonly        attribute DOMString     networkId;
     readonly        attribute DOMString     transportStreamId;
     readonly        attribute DOMString     serviceId;

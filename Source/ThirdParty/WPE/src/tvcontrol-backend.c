@@ -213,6 +213,25 @@ wpe_tvcontrol_backend_set_current_channel(struct wpe_tvcontrol_backend* backend,
 }
 
 __attribute__((visibility("default")))
+tvcontrol_return
+wpe_tvcontrol_backend_get_program_list(struct wpe_tvcontrol_backend* backend, const char* tuner_id, uint64_t service_id, struct wpe_get_programs_options* programs_options, struct wpe_tvcontrol_program_vector** out_program_list)
+{
+    tvcontrol_return ret = TVControlFailed;
+    ret = backend->interface->get_program_list(backend->interface_data, tuner_id, service_id, programs_options, out_program_list);
+    return ret;
+}
+
+__attribute__((visibility("default")))
+tvcontrol_return
+wpe_tvcontrol_backend_get_current_program(struct wpe_tvcontrol_backend* backend, const char* tuner_id, uint64_t service_id, struct wpe_tvcontrol_program** program)
+{
+    tvcontrol_return ret = TVControlFailed;
+    ret = backend->interface->get_current_program(backend->interface_data, tuner_id, service_id, program);
+    printf("%s:%s:%d\n", __FILE__, __func__, __LINE__);
+    return ret;
+}
+
+__attribute__((visibility("default")))
 void
 wpe_tvcontrol_backend_is_parental_controlled(struct wpe_tvcontrol_backend* backend, bool* is_parental_controlled)
 {

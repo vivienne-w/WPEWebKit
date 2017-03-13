@@ -660,6 +660,24 @@ void TvTunerBackend::getConfiguration()
 #endif
 }
 
+tvcontrol_return TvTunerBackend::getPrograms(uint64_t serviceId, struct wpe_get_programs_options* programsOptions, struct wpe_tvcontrol_program_vector** programVector)
+{
+    TvLogTrace();
+    /* Get source corresponds to this type  */
+    SourceBackend* source;
+    getSource(m_sType, &source);
+    return source->getPrograms(serviceId, programsOptions, programVector);
+}
+
+tvcontrol_return TvTunerBackend::getCurrentProgram(uint64_t serviceId, struct wpe_tvcontrol_program** program)
+{
+    TvLogTrace();
+    /* Get source corresponds to this type  */
+    SourceBackend* source;
+    getSource(m_sType, &source);
+    return source->getCurrentProgram(serviceId, program);
+}
+
 void TvTunerBackend::isParentalLocked(uint64_t channelNumber, bool* isLocked)
 {
     TvLogTrace();

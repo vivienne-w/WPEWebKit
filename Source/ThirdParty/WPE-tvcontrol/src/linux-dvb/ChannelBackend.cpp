@@ -33,6 +33,100 @@
 
 namespace LinuxDVB {
 
+ChannelBackend::~ChannelBackend()
+{
+    clearProgramVector();
+    clearProgramList();
+}
+
+void ChannelBackend::clearProgramVector()
+{
+    if (m_programVector.length) {
+        for (int i; i < m_programVector.length; i++) {
+            if (m_programVector.programs[i].title)
+                free(m_programVector.programs[i].title);
+        }
+        delete[] m_programVector.programs;
+        m_programVector.length = 0;
+    }
+}
+
+void ChannelBackend::clearProgramList()
+{
+    if (!m_programList.empty())
+        m_programList.clear();
+}
+
+void ChannelBackend::appendPrograms(ProgramBackend* program)
+{
+    m_programList.push_back(program);
+}
+
+tvcontrol_return ChannelBackend::getPrograms(struct wpe_get_programs_options* programsOptions, wpe_tvcontrol_program_vector** programVector)
+{
+    tvcontrol_return ret = TVControlFailed;
+    if (!m_programList.empty()) {
+        if (m_programVector.length) {
+            delete[] m_programVector.programs;
+            m_programVector.length = 0;
+        }
+        int i = 0;
+        TvLogInfo("programsOptions->startTime = %llu:programsOptions->endTime = %llu ",
+            programsOptions->startTime, programsOptions->endTime);
+        unsigned long long startTime, endTime;
+        for (auto& program : m_programList) {
+            startTime = (unsigned long long)program->getStartTime();
+            endTime = (unsigned long long)(program->getStartTime() + program->getDuration());
+            if ((unsigned long long)startTime >= (unsigned long long)programsOptions->startTime) {
+                TvLogInfo("startTime = %llu:endTime = %llu ", startTime, endTime);
+                if ((unsigned long long)endTime <= (unsigned long long)programsOptions->endTime) {
+                    m_programVector.programs = reinterpret_cast<wpe_tvcontrol_program*>(realloc(m_programVector.programs,
+                        (i+1) * sizeof(struct wpe_tvcontrol_program)));
+                    m_programVector.programs[i].eventId = program->getEventId();
+                    m_programVector.programs[i].startTime = program->getStartTime();
+                    m_programVector.programs[i].duration = program->getDuration();
+                    m_programVector.programs[i].title =  strdup(program->getTitle().c_str());
+                    i++;
+                }
+            }
+        }
+        m_programVector.length = i;
+        *programVector = &m_programVector;
+        ret = TVControlSuccess;
+    } else
+        programVector = nullptr;
+    return ret;
+}
+
+tvcontrol_return ChannelBackend::getCurrentProgram(wpe_tvcontrol_program** currentProgram)
+{
+    time_t cTime;
+    time(&cTime);
+    tvcontrol_return ret = TVControlFailed;
+    struct tm currTime;
+    localtime_r(&cTime, &currTime);
+    TvLogInfo("current time = %d:%d", currTime.tm_hour, currTime.tm_min);
+    for (auto& program : m_programList) {
+        struct tm startTime;
+        time_t progStartTime = program->getStartTime();
+        localtime_r(&progStartTime, &startTime);
+        TvLogInfo("%s:%s:%d:startTime = %d:%d\n", __FILE__, __func__, __LINE__, startTime.tm_hour, startTime.tm_min);
+        if (startTime.tm_hour == currTime.tm_hour) {
+            if (currTime.tm_min >= startTime.tm_min && currTime.tm_min < (startTime.tm_min + ((program->getDuration()) / 60))) {
+                m_program = reinterpret_cast<wpe_tvcontrol_program*>(malloc(sizeof(struct wpe_tvcontrol_program)));
+                m_program->eventId = program->getEventId();
+                m_program->startTime = program->getStartTime();
+                m_program->duration = program->getDuration();
+                m_program->title =  strdup(program->getTitle().c_str());
+                break;
+            }
+        }
+    }
+    *currentProgram = m_program;
+    ret = TVControlSuccess;
+    return ret;
+}
+
 void ChannelBackend::isParentalLocked(bool* isLocked)
 {
     TvLogTrace();
@@ -50,4 +144,5 @@ tvcontrol_return ChannelBackend::setParentalLock(bool* isLocked, bool* lockChang
     }
     return TVControlFailed;
 }
+
 } // namespace LinuxDVB
