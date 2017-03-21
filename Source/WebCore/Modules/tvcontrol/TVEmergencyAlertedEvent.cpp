@@ -25,23 +25,32 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-enum TVSourceType { "dvb-t", "dvb-t2", "dvb-c", "dvb-c2", "dvb-s", "dvb-s2", "dvb-h", "dvb-sh", "atsc", "atsc-m-h", "isdb-t", "isdb-tb", "isdb-s", "isdb-c", "1seg", "dtmb", "cmmb", "t-dmb", "s-dmb" };
+#include "config.h"
+#include "TVEmergencyAlertedEvent.h"
 
-dictionary TVStartScanningOptions {
-    boolean isRescanned = false;
-};
-[
-    Conditional=TV_CONTROL,
-] interface TVSource : EventTarget {
-    Promise<sequence<TVChannel>>          getChannels ();
-    Promise<void>                         setCurrentChannel (DOMString channelNumber);
-    Promise<void>                         startScanning (optional TVStartScanningOptions isRescanned);
-    Promise<void>                         stopScanning ();
-    readonly        attribute TVTuner      tuner;
-    readonly        attribute TVSourceType type;
-    readonly        attribute boolean      isScanning;
-    readonly        attribute TVChannel?   currentChannel;
-                    attribute EventHandler oncurrentchannelchanged;
-                    attribute EventHandler onscanningstatechanged;
-                    attribute EventHandler onemergencyalerted;
-};
+#if ENABLE(TV_CONTROL)
+
+namespace WebCore {
+
+Ref<TVEmergencyAlertedEvent> TVEmergencyAlertedEvent::create(const AtomicString& type, String emergencyType, String severity, String description, RefPtr<TVChannel> channel, String url, Vector<String> regionList)
+{
+    return adoptRef(*new TVEmergencyAlertedEvent(type, emergencyType, severity, description, channel, url, regionList));
+}
+
+TVEmergencyAlertedEvent::TVEmergencyAlertedEvent(const AtomicString& type, String emergencyType, String severity, String description, RefPtr<TVChannel> channel, String url, Vector<String> regionList)
+    : Event(type, false, false)
+    , m_type(emergencyType)
+    , m_severity(severity)
+    , m_description(description)
+    , m_channel(channel)
+    , m_url(url)
+    , m_regionList(regionList)
+{
+}
+
+TVEmergencyAlertedEvent::~TVEmergencyAlertedEvent()
+{
+}
+} // namespace WebCore
+
+#endif // ENABLE(TV_CONTROL)

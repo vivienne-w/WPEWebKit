@@ -288,6 +288,7 @@ namespace WebCore {
     macro(scanningstatechanged) \
     macro(parentalcontrolchanged) \
     macro(parentallockchanged)\
+    macro(emergencyalerted)
 // end of DOM_EVENT_NAMES_FOR_EACH
 
 struct EventNames {

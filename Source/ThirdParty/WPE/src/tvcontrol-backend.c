@@ -126,6 +126,17 @@ wpe_tvcontrol_backend_dispatch_parental_lock_event(struct wpe_tvcontrol_backend*
 }
 
 __attribute__((visibility("default")))
+void
+wpe_tvcontrol_backend_dispatch_emergency_alert_event(struct wpe_tvcontrol_backend* backend, struct wpe_tvcontrol_event* event)
+{
+    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
+    if (backend->event_client) {
+        printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
+        backend->event_client->handle_emergency_alert_changed_event(backend->event_client_data, event);
+    }
+}
+
+__attribute__((visibility("default")))
 tvcontrol_return
 wpe_tvcontrol_backend_get_tuner_list(struct wpe_tvcontrol_backend* backend, struct wpe_tvcontrol_string_vector* out_tuner_list)
 {

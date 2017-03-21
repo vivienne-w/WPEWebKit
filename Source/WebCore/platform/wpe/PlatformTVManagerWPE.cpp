@@ -124,6 +124,27 @@ PlatformTVManager::PlatformTVManager(PlatformTVManagerClient* client)
                 tvManager->m_platformTVManagerClient->didParentalLockChanged(tunerId, state);
             });
         },
+        // handle emergency alerted event
+        [](void* data, wpe_tvcontrol_event* event)
+        {
+            printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
+            String tunerId(event->tuner_id.data, event->tuner_id.length);
+            PlatformTVManager* tvManager = reinterpret_cast<PlatformTVManager*>(data);
+            // If the attributes are null, convert them to null WTF string.
+            String emergencyType = event->emergencyAlert->type ? String(event->emergencyAlert->type) : String();
+            String emergencySeverity = event->emergencyAlert->severityLevel ? String(event->emergencyAlert->severityLevel, strlen(event->emergencyAlert->severityLevel)) : String();
+            String description = event->emergencyAlert->description ? String(event->emergencyAlert->description, strlen(event->emergencyAlert->description)) : String();
+            String url = event->emergencyAlert->url ? String(event->emergencyAlert->url, strlen(event->emergencyAlert->url)) : String();
+            String channelNo = event->emergencyAlert->channelNo ? (std::to_string(event->emergencyAlert->channelNo)).c_str() : String();
+            Vector<String> regionVector;
+            if (event->emergencyAlert->region->length) {
+                for (uint64_t i = 0; i < event->emergencyAlert->region->length; i++)
+                    regionVector.append(String(event->emergencyAlert->region->regions[i], strlen(event->emergencyAlert->region->regions[i])));
+            }
+            callOnMainThread([tvManager, tunerId, emergencyType, emergencySeverity, description, channelNo, url, regionVector] {
+                tvManager->m_platformTVManagerClient->didEmergencyAlerted(tunerId, emergencyType, emergencySeverity, description, channelNo, url, regionVector);
+            });
+        },
     };
     wpe_tvcontrol_backend_set_manager_event_client(m_tvBackend->m_backend, &s_eventClient, this);
 }

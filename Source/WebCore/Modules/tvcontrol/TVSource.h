@@ -37,6 +37,7 @@
 #include "ScriptExecutionContext.h"
 #include "TVChannel.h"
 #include "TVCurrentChannelChangedEvent.h"
+#include "TVEmergencyAlertedEvent.h"
 #include "TVScanningStateChangedEvent.h"
 
 namespace WebCore {
@@ -84,6 +85,7 @@ public:
     void stopScanning(TVPromise&&);
     void dispatchScanningStateChangedEvent(RefPtr<PlatformTVChannel>, uint16_t);
     void dispatchChannelChangedEvent();
+    void dispatchEmergencyAlertedEvent(String, String, String, String, String, Vector<String>);
     TVTuner* tuner() const { return m_parentTVTuner; }
     Type type() const { return ((Type)m_platformTVSource->type()); }
     bool isScanning() const { return m_isScanning; }

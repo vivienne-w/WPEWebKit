@@ -186,6 +186,21 @@ void TVSource::dispatchScanningStateChangedEvent(RefPtr<PlatformTVChannel> platf
     printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
 }
 
+void TVSource::dispatchEmergencyAlertedEvent(String type, String severity, String description, String channelNo, String url, Vector<String> regionList)
+{
+    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
+    RefPtr<TVChannel> protector = nullptr;
+    for (auto& channel : m_channelList) {
+        if (equalIgnoringASCIICase(channel->number(), channelNo) == 1) {
+            protector = channel;
+            break;
+        }
+    }
+    scriptExecutionContext()->postTask([=](ScriptExecutionContext&) {
+        dispatchEvent(TVEmergencyAlertedEvent::create(eventNames().emergencyalertedEvent, type, severity, description, protector, url, regionList));
+    });
+}
+
 ScriptExecutionContext* TVSource::scriptExecutionContext() const
 {
     return ContextDestructionObserver::scriptExecutionContext();

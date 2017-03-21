@@ -25,23 +25,41 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-enum TVSourceType { "dvb-t", "dvb-t2", "dvb-c", "dvb-c2", "dvb-s", "dvb-s2", "dvb-h", "dvb-sh", "atsc", "atsc-m-h", "isdb-t", "isdb-tb", "isdb-s", "isdb-c", "1seg", "dtmb", "cmmb", "t-dmb", "s-dmb" };
+#pragma once
 
-dictionary TVStartScanningOptions {
-    boolean isRescanned = false;
+#if ENABLE(TV_CONTROL)
+
+#include "Event.h"
+#include "JSTVChannel.h"
+
+namespace WebCore {
+
+class TVEmergencyAlertedEvent : public Event {
+public:
+
+    static Ref<TVEmergencyAlertedEvent> create(const AtomicString&, String, String, String, RefPtr<TVChannel>, String, Vector<String>);
+    ~TVEmergencyAlertedEvent();
+
+    const String type() const { return m_type; }
+    const String severityLevel() const { return m_severity; }
+    const String description() const { return m_description; }
+    RefPtr<TVChannel> channel() const { return m_channel; }
+    const String url() const { return m_url; }
+
+    const Vector<String>& getRegions() const { return m_regionList; }
+
+    virtual EventInterface eventInterface() const { return TVEmergencyAlertedEventInterfaceType; }
+
+private:
+    TVEmergencyAlertedEvent(const AtomicString&, String, String, String, RefPtr<TVChannel>, String, Vector<String>);
+    String m_type;
+    String m_severity;
+    String m_description;
+    RefPtr<TVChannel> m_channel;
+    String m_url;
+    Vector<String> m_regionList;
 };
-[
-    Conditional=TV_CONTROL,
-] interface TVSource : EventTarget {
-    Promise<sequence<TVChannel>>          getChannels ();
-    Promise<void>                         setCurrentChannel (DOMString channelNumber);
-    Promise<void>                         startScanning (optional TVStartScanningOptions isRescanned);
-    Promise<void>                         stopScanning ();
-    readonly        attribute TVTuner      tuner;
-    readonly        attribute TVSourceType type;
-    readonly        attribute boolean      isScanning;
-    readonly        attribute TVChannel?   currentChannel;
-                    attribute EventHandler oncurrentchannelchanged;
-                    attribute EventHandler onscanningstatechanged;
-                    attribute EventHandler onemergencyalerted;
-};
+
+} // namespace WebCore
+
+#endif // ENABLE(TV_CONTROL)

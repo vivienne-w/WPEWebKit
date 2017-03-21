@@ -56,12 +56,17 @@ struct wpe_tvcontrol_string_vector {
     uint64_t length;
 };
 
-typedef enum {TunerChanged, SourceChanged, ChannelChanged, ScanningChanged, ParentalControlChanged, ParentalLockChanged} tvcontrol_events;
+typedef enum {TunerChanged, SourceChanged, ChannelChanged, ScanningChanged, ParentalControlChanged, ParentalLockChanged, EmergencyAlerted} tvcontrol_events;
 
 
 typedef enum { DvbT, DvbT2, DvbC, DvbC2, DvbS, DvbS2, DvbH, DvbSh, Atsc, AtscMH, IsdbT, IsdbTb, IsdbS, IsdbC, _1seg, Dtmb, Cmmb, TDmb, SDmb, Undifined } SourceType;
 struct wpe_tvcontrol_src_types_vector {
     SourceType* types;
+    uint64_t length;
+};
+
+struct wpe_tvcontrol_region_vector {
+    const char** regions;
     uint64_t length;
 };
 
@@ -75,20 +80,29 @@ struct wpe_tvcontrol_channel {
     ChannelType type;
 };
 
+struct wpe_tvcontrol_emergency_alert {
+    const char* type;
+    const char* severityLevel;
+    const char* description;
+    uint64_t channelNo;
+    const char* url;
+    struct wpe_tvcontrol_region_vector* region;
+};
+
 struct wpe_get_programs_options {
     uint64_t startTime;
     uint64_t endTime;
 };
 
 struct wpe_tvcontrol_program {
-    uint64_t    eventId;
-    char*       title;
-    uint64_t    startTime;
-    uint64_t    duration;
-    uint64_t    shortDescription;
-    uint64_t    longDescription;
-    uint64_t    rating;
-    uint64_t    seriesId;
+    uint64_t eventId;
+    char* title;
+    uint64_t startTime;
+    uint64_t duration;
+    uint64_t shortDescription;
+    uint64_t longDescription;
+    uint64_t rating;
+    uint64_t seriesId;
 };
 
 struct wpe_tvcontrol_event {
@@ -99,6 +113,7 @@ struct wpe_tvcontrol_event {
     parental_lock_state parentalLock;
     struct wpe_tvcontrol_string tuner_id;
     struct wpe_tvcontrol_channel* channel_info;
+    struct wpe_tvcontrol_emergency_alert* emergencyAlert;
 };
 
 struct wpe_tvcontrol_backend_manager_event_client {
@@ -108,6 +123,7 @@ struct wpe_tvcontrol_backend_manager_event_client {
     void (*handle_scanning_state_changed_event)(void*, struct wpe_tvcontrol_event*);
     void (*handle_parental_control_changed_event)(void*, struct wpe_tvcontrol_event*);
     void (*handle_parental_lock_changed_event)(void*, struct wpe_tvcontrol_event*);
+    void (*handle_emergency_alert_changed_event)(void*, struct wpe_tvcontrol_event*);
 };
 
 struct wpe_tvcontrol_channel_vector {
@@ -167,6 +183,9 @@ wpe_tvcontrol_backend_dispatch_parental_control_event(struct wpe_tvcontrol_backe
 
 void
 wpe_tvcontrol_backend_dispatch_parental_lock_event(struct wpe_tvcontrol_backend*, struct wpe_tvcontrol_event*);
+
+void
+wpe_tvcontrol_backend_dispatch_emergency_alert_event(struct wpe_tvcontrol_backend*, struct wpe_tvcontrol_event*);
 
 tvcontrol_return
 wpe_tvcontrol_backend_get_tuner_list(struct wpe_tvcontrol_backend* backend, struct wpe_tvcontrol_string_vector* out_tuner_list);

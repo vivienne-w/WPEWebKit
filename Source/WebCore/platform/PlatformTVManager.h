@@ -44,6 +44,7 @@ public:
     virtual void didScanningStateChanged(String, RefPtr<PlatformTVChannel>, uint16_t) = 0;
     virtual void didParentalControlChanged(uint16_t) = 0;
     virtual void didParentalLockChanged(String, uint16_t) = 0;
+    virtual void didEmergencyAlerted(String, String, String, String, String, String, Vector<String>) = 0;
 protected:
     virtual ~PlatformTVManagerClient() = default;
 };

@@ -79,3 +79,4 @@ TVScanningStateChangedEvent conditional=TV_CONTROL
 TVCurrentChannelChangedEvent conditional=TV_CONTROL
 TVParentalLockChangedEvent conditional=TV_CONTROL
 TVParentalControlChangedEvent conditional=TV_CONTROL
+TVEmergencyAlertedEvent conditional=TV_CONTROL

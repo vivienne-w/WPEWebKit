@@ -147,6 +147,17 @@ void TVManager::didParentalLockChanged(String tunerId, uint16_t state)
     }
 }
 
+void TVManager::didEmergencyAlerted(String tunerId, String type, String severity, String description, String channelNo, String url, Vector<String> regionList)
+{
+    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
+    for (auto& tuner : m_tunerList) {
+        if (equalIgnoringASCIICase(tunerId, tuner->id())) {
+            tuner->currentSource()->dispatchEmergencyAlertedEvent(type, severity, description, channelNo, url, regionList);
+            break;
+        }
+    }
+}
+
 void TVManager::getTuners(TVTunerPromise&& promise)
 {
     printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);

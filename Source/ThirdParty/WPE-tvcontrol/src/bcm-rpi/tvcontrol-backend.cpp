@@ -98,6 +98,7 @@ private:
     void handleParentalControlChangedEvent(struct wpe_tvcontrol_event*);
     void handleScanningStateChangedEvent(struct wpe_tvcontrol_event*);
     void handleParentalLockChangedEvent(struct wpe_tvcontrol_event*);
+    void handleEmergencyAlertChangedEvent(struct wpe_tvcontrol_event*);
 
 #ifdef TVCONTROL_BACKEND_LINUX_DVB
     Country m_country;
@@ -130,7 +131,7 @@ TvControlBackend::TvControlBackend(struct wpe_tvcontrol_backend* backend)
         m_parentalControlPin = passKey; // Set the pin as the one previously saved by the user.
         infile.close();
     } else
-        m_parentalControlPin = "Metro123#"; // Set the pin to it's default value if the key file is now found.
+        m_parentalControlPin = "Metro123#"; // Set the pin to it's default value if the key file is not found.
 }
 
 TvControlBackend::~TvControlBackend()
@@ -180,6 +181,9 @@ void TvControlBackend::eventProcessor()
             break;
         case ParentalLockChanged:
             handleParentalLockChangedEvent(event);
+            break;
+        case EmergencyAlerted:
+            handleEmergencyAlertChangedEvent(event);
             break;
         default:
             TvLogInfo("Unknown Event\n");
@@ -238,7 +242,7 @@ tvcontrol_return TvControlBackend::getChannels(const char* tunerId, SourceType t
     return ret;
 }
 
-tvcontrol_return TvControlBackend::getPrograms(const char* tunerId, uint64_t serviceId, struct wpe_get_programs_options* programsOptions, struct wpe_tvc
+tvcontrol_return TvControlBackend::getPrograms(const char* tunerId, uint64_t serviceId, struct wpe_get_programs_options* programsOptions, struct wpe_tvcontrol_program_vector** programVector)
 {
     tvcontrol_return ret = TVControlFailed;
     TvLogTrace();
@@ -321,6 +325,19 @@ void TvControlBackend::handleParentalLockChangedEvent(struct wpe_tvcontrol_event
     wpe_tvcontrol_backend_dispatch_parental_lock_event(m_backend, event);
     if (event->tuner_id.data)
         free(event->tuner_id.data);
+}
+
+void TvControlBackend::handleEmergencyAlertChangedEvent(struct wpe_tvcontrol_event* event)
+{
+    TvLogTrace();
+    wpe_tvcontrol_backend_dispatch_emergency_alert_event(m_backend, event);
+    if (event->tuner_id.data)
+        free(event->tuner_id.data);
+    if (event->emergencyAlert) { // Free emergency_info.
+        if (event->emergencyAlert->channel)
+            free(event->emergencyAlert->channel);
+        free(event->emergencyAlert);
+    }
 }
 
 tvcontrol_return TvControlBackend::getTuners(struct wpe_tvcontrol_string_vector* outTunerList)

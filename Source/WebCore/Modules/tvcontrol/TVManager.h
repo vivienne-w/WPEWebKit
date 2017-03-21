@@ -61,6 +61,7 @@ public:
     void didScanningStateChanged(String, RefPtr<PlatformTVChannel>, uint16_t) override;
     void didParentalControlChanged(uint16_t) override;
     void didParentalLockChanged(String, uint16_t) override;
+    void didEmergencyAlerted(String, String, String, String, String, String, Vector<String>) override;
 
     bool isParentalControlled() const {return m_platformTVManager->isParentalControlled();}
 
