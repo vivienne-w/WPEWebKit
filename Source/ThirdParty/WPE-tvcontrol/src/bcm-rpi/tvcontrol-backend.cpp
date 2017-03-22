@@ -745,7 +745,7 @@ struct wpe_tvcontrol_backend_interface bcm_rpi_tvcontrol_backend_interface = {
         return backend.getChannels(tuner_id, type, out_channel_list);
     },
     // get_program_list
-    [](void* data, const char* tuner_id, uint64_t service_id, struct wpe_get_programs_options* programs_options, struct wpe_tvcontrol_program_vector** o
+    [](void* data, const char* tuner_id, uint64_t service_id, struct wpe_get_programs_options* programs_options, struct wpe_tvcontrol_program_vector** out_program_list) -> tvcontrol_return
     {
         tvcontrol_return ret = TVControlFailed;
         TvLogTrace();

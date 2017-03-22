@@ -31,14 +31,16 @@
 
 #include "ActiveDOMObject.h"
 #include "EventNames.h"
+#include "EventTarget.h"
 #include "JSDOMPromise.h"
 #include "PlatformTVProgram.h"
+#include "ScriptExecutionContext.h"
 
 namespace WebCore {
 
 class TVChannel;
 
-class TVProgram final : public RefCounted<TVProgram> {
+class TVProgram final : public RefCounted<TVProgram>, public EventTargetWithInlineData {
 public:
     static Ref<TVProgram> create(RefPtr<PlatformTVProgram>, TVChannel*);
     ~TVProgram() = default;
@@ -54,12 +56,19 @@ public:
     const String seriesId() const { return m_platformTVProgram->seriesId(); }
     bool isFree() const { return true; }
 
+    using RefCounted<TVProgram>::ref;
+    using RefCounted<TVProgram>::deref;
+
 private:
     explicit TVProgram(RefPtr<PlatformTVProgram>, TVChannel*);
 
     RefPtr<PlatformTVProgram> m_platformTVProgram;
     TVChannel* m_parentTVChannel;
+    void refEventTarget() override { ref(); }
+    void derefEventTarget() override { deref(); }
 
+    EventTargetInterface eventTargetInterface() const override { return TVProgramEventTargetInterfaceType; }
+    ScriptExecutionContext* scriptExecutionContext() const override { return nullptr; }
 };
 
 typedef Vector<RefPtr<TVProgram>> TVProgramVector;

@@ -477,7 +477,6 @@ void SourceBackend::atscScan(int frequency, uint64_t modulation)
         return;
     }
 }
-}
 
 int SourceBackend::createSectionFilter(uint16_t pid, uint8_t tableId)
 {
