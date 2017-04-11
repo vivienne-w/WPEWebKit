@@ -90,7 +90,7 @@ PlatformTVManager::PlatformTVManager(PlatformTVManagerClient* client)
         [](void* data, wpe_tvcontrol_event* event)
         {
 
-            uint16_t state = (uint16_t)event->state;
+            uint16_t state = (uint16_t)event->eventParams.state;
             String tunerId(event->tunerId.data, event->tunerId.length);
             PlatformTVManager* tvManager = reinterpret_cast<PlatformTVManager*>(data);
             RefPtr<PlatformTVChannel> protector = nullptr;
@@ -141,7 +141,7 @@ PlatformTVManager::PlatformTVManager(PlatformTVManagerClient* client)
             String url = paramValueorNull(url);
             String channelNo = uintToString(channelNo);
             Vector<String> regionVector;
-            if (event->subEvent.emergencyAlert->region->length) {
+            if (emergencyParam(region->length)) {
                 for (uint64_t i = 0; i < emergencyParam(region->length); i++)
                     regionVector.append(String(emergencyParam(region->regions[i]), strlen(emergencyParam(region->regions[i]))));
             }
