@@ -34,6 +34,10 @@
 #include <wpe/tvcontrol-backend.h>
 #include <wtf/MainThread.h>
 
+#define emergencyParam(paramName)event->eventParams.emergencyAlert->paramName
+#define paramValueorNull(param) emergencyParam(param) ? String(emergencyParam(param), strlen(emergencyParam(param))) : String()
+#define uintToString(param) emergencyParam(channelNo) ? (std::to_string(emergencyParam(channelNo))).c_str() : String()
+
 namespace WebCore {
 
 PlatformTVManager::PlatformTVManager(PlatformTVManagerClient* client)
@@ -49,9 +53,9 @@ PlatformTVManager::PlatformTVManager(PlatformTVManagerClient* client)
         // handle_tuner_event
         [](void* data, wpe_tvcontrol_event* event)
         {
-            String tunerId(event->tuner_id.data, event->tuner_id.length);
+            String tunerId(event->tunerId.data, event->tunerId.length);
             printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
-            uint16_t operation = event->operation;
+            uint16_t operation = event->eventParams.operation;
             PlatformTVManager* tvManager = reinterpret_cast<PlatformTVManager*>(data);
             callOnMainThread([tvManager, tunerId, operation] {
                 printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
@@ -61,8 +65,8 @@ PlatformTVManager::PlatformTVManager(PlatformTVManagerClient* client)
         // handle current source changed event
         [](void* data, wpe_tvcontrol_event* event)
         {
-            String tunerId(event->tuner_id.data, event->tuner_id.length);
-            printf("\n%s:%s:%d Tuner ID Hello = %s\n", __FILE__, __func__, __LINE__, event->tuner_id.data);
+            String tunerId(event->tunerId.data, event->tunerId.length);
+            printf("\n%s:%s:%d Tuner ID Hello = %s\n", __FILE__, __func__, __LINE__, event->tunerId.data);
             PlatformTVManager* tvManager = reinterpret_cast<PlatformTVManager*>(data);
             callOnMainThread([tvManager, tunerId] {
                 printf("\n%s:%s:%d Tuner ID  = %s\n", __FILE__, __func__, __LINE__, tunerId.utf8().data());
@@ -72,11 +76,11 @@ PlatformTVManager::PlatformTVManager(PlatformTVManagerClient* client)
         // handle current channel changed event
         [](void* data, wpe_tvcontrol_event* event)
         {
-            String tunerId(event->tuner_id.data, event->tuner_id.length);
+            String tunerId(event->tunerId.data, event->tunerId.length);
             PlatformTVManager* tvManager = reinterpret_cast<PlatformTVManager*>(data);
             RefPtr<PlatformTVChannel> protector = nullptr;
 
-            printf("\n%s:%s:%d Tuner ID  = %s\n", __FILE__, __func__, __LINE__, event->tuner_id.data);
+            printf("\n%s:%s:%d Tuner ID  = %s\n", __FILE__, __func__, __LINE__, event->tunerId.data);
             callOnMainThread([tvManager, tunerId] {
                 printf("\n%s:%s:%d Tuner ID  = %s\n", __FILE__, __func__, __LINE__, tunerId.utf8().data());
                 tvManager->m_platformTVManagerClient->didCurrentChannelChanged(tunerId);
@@ -87,15 +91,15 @@ PlatformTVManager::PlatformTVManager(PlatformTVManagerClient* client)
         {
 
             uint16_t state = (uint16_t)event->state;
-            String tunerId(event->tuner_id.data, event->tuner_id.length);
+            String tunerId(event->tunerId.data, event->tunerId.length);
             PlatformTVManager* tvManager = reinterpret_cast<PlatformTVManager*>(data);
             RefPtr<PlatformTVChannel> protector = nullptr;
 
-            if (event->channel_info) {
-                tvManager->m_tvBackend->m_channel = event->channel_info;
+            if (event->channelInfo) {
+                tvManager->m_tvBackend->m_channel = event->channelInfo;
                 protector = PlatformTVChannel::create(tvManager->m_tvBackend, tunerId);
             }
-            printf("\n%s:%s:%d Tuner ID  = %s\n", __FILE__, __func__, __LINE__, event->tuner_id.data);
+            printf("\n%s:%s:%d Tuner ID  = %s\n", __FILE__, __func__, __LINE__, event->tunerId.data);
             callOnMainThread([tvManager, tunerId, state, protector] {
                 printf("\n%s:%s:%d Tuner ID  = %s\n", __FILE__, __func__, __LINE__, tunerId.utf8().data());
                 tvManager->m_platformTVManagerClient->didScanningStateChanged(tunerId, protector, state);
@@ -105,7 +109,7 @@ PlatformTVManager::PlatformTVManager(PlatformTVManagerClient* client)
         [](void* data, wpe_tvcontrol_event* event)
         {
             printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
-            uint16_t state = (uint16_t)event->parentalControl;
+            uint16_t state = (uint16_t)event->eventParams.parentalControl;
             PlatformTVManager* tvManager = reinterpret_cast<PlatformTVManager*>(data);
             callOnMainThread([tvManager, state ] {
                 printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
@@ -116,8 +120,8 @@ PlatformTVManager::PlatformTVManager(PlatformTVManagerClient* client)
         [](void* data, wpe_tvcontrol_event* event)
         {
             printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
-            String tunerId(event->tuner_id.data, event->tuner_id.length);
-            uint16_t state = (uint16_t)event->parentalLock;
+            String tunerId(event->tunerId.data, event->tunerId.length);
+            uint16_t state = (uint16_t)event->eventParams.parentalLock;
             PlatformTVManager* tvManager = reinterpret_cast<PlatformTVManager*>(data);
             callOnMainThread([tvManager, tunerId, state ] {
                 printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
@@ -128,18 +132,18 @@ PlatformTVManager::PlatformTVManager(PlatformTVManagerClient* client)
         [](void* data, wpe_tvcontrol_event* event)
         {
             printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
-            String tunerId(event->tuner_id.data, event->tuner_id.length);
+            String tunerId(event->tunerId.data, event->tunerId.length);
             PlatformTVManager* tvManager = reinterpret_cast<PlatformTVManager*>(data);
             // If the attributes are null, convert them to null WTF string.
-            String emergencyType = event->emergencyAlert->type ? String(event->emergencyAlert->type) : String();
-            String emergencySeverity = event->emergencyAlert->severityLevel ? String(event->emergencyAlert->severityLevel, strlen(event->emergencyAlert->severityLevel)) : String();
-            String description = event->emergencyAlert->description ? String(event->emergencyAlert->description, strlen(event->emergencyAlert->description)) : String();
-            String url = event->emergencyAlert->url ? String(event->emergencyAlert->url, strlen(event->emergencyAlert->url)) : String();
-            String channelNo = event->emergencyAlert->channelNo ? (std::to_string(event->emergencyAlert->channelNo)).c_str() : String();
+            String emergencyType = paramValueorNull(type);
+            String emergencySeverity = paramValueorNull(severityLevel);
+            String description = paramValueorNull(description);
+            String url = paramValueorNull(url);
+            String channelNo = uintToString(channelNo);
             Vector<String> regionVector;
-            if (event->emergencyAlert->region->length) {
-                for (uint64_t i = 0; i < event->emergencyAlert->region->length; i++)
-                    regionVector.append(String(event->emergencyAlert->region->regions[i], strlen(event->emergencyAlert->region->regions[i])));
+            if (event->subEvent.emergencyAlert->region->length) {
+                for (uint64_t i = 0; i < emergencyParam(region->length); i++)
+                    regionVector.append(String(emergencyParam(region->regions[i]), strlen(emergencyParam(region->regions[i]))));
             }
             callOnMainThread([tvManager, tunerId, emergencyType, emergencySeverity, description, channelNo, url, regionVector] {
                 tvManager->m_platformTVManagerClient->didEmergencyAlerted(tunerId, emergencyType, emergencySeverity, description, channelNo, url, regionVector);
