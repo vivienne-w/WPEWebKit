@@ -93,11 +93,11 @@ PlatformTVManager::PlatformTVManager(PlatformTVManagerClient* client)
             PlatformTVManager* tvManager = reinterpret_cast<PlatformTVManager*>(data);
             Vector<RefPtr<PlatformTVProgram>> programs;
 
-            if (event->programsInfo) {
-                for (uint64_t i = 0; i < event->programsInfo->length; i++) {
+            if (event->eventParams.programsInfo) {
+                for (uint64_t i = 0; i < event->eventParams.programsInfo->length; i++) {
                     printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
                     fflush(stdout);
-                    tvManager->m_tvBackend->m_program = &event->programsInfo->programs[i];
+                    tvManager->m_tvBackend->m_program = &event->eventParams.programsInfo->programs[i];
                     programs.append(PlatformTVProgram::create(tvManager->m_tvBackend));
                 }
             }
