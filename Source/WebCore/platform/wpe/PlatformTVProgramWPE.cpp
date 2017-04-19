@@ -51,6 +51,7 @@ PlatformTVProgram::PlatformTVProgram(PlatformTVControlBackend* tvBackend)
     m_longDescription = (std::to_string(tvBackend->m_program->longDescription)).c_str();
     m_rating  = (std::to_string(tvBackend->m_program->rating)).c_str();
     m_seriesId  = (std::to_string(tvBackend->m_program->seriesId)).c_str();
+    m_serviceId = (std::to_string(tvBackend->m_program->serviceId)).c_str();
 }
 
 PlatformTVProgram::~PlatformTVProgram()

@@ -86,6 +86,27 @@ PlatformTVManager::PlatformTVManager(PlatformTVManagerClient* client)
                 tvManager->m_platformTVManagerClient->didCurrentChannelChanged(tunerId);
             });
         },
+        // handle eit broadcasted event
+        [](void* data, wpe_tvcontrol_event* event)
+        {
+            String tunerId(event->tunerId.data, event->tunerId.length);
+            PlatformTVManager* tvManager = reinterpret_cast<PlatformTVManager*>(data);
+            Vector<RefPtr<PlatformTVProgram>> programs;
+
+            if (event->programsInfo) {
+                for (uint64_t i = 0; i < event->programsInfo->length; i++) {
+                    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
+                    fflush(stdout);
+                    tvManager->m_tvBackend->m_program = &event->programsInfo->programs[i];
+                    programs.append(PlatformTVProgram::create(tvManager->m_tvBackend));
+                }
+            }
+            printf("\n%s:%s:%d Tuner ID  = %s\n", __FILE__, __func__, __LINE__, event->tunerId.data);
+            callOnMainThread([tvManager, tunerId, programs] {
+                printf("\n%s:%s:%d Tuner ID  = %s\n", __FILE__, __func__, __LINE__, tunerId.utf8().data());
+                tvManager->m_platformTVManagerClient->didEITBroadcasted(tunerId, programs);
+            });
+        },
         // handle scan state  changed event
         [](void* data, wpe_tvcontrol_event* event)
         {

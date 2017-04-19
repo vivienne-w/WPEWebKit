@@ -269,6 +269,7 @@ set(WebCore_NON_SVG_IDL_FILES
     Modules/tvcontrol/TVTunerChangedEvent.idl
     Modules/tvcontrol/TVCurrentSourceChangedEvent.idl
     Modules/tvcontrol/TVScanningStateChangedEvent.idl
+    Modules/tvcontrol/TVEITBroadcastedEvent.idl
     Modules/tvcontrol/TVCurrentChannelChangedEvent.idl
     Modules/tvcontrol/TVEmergencyAlertedEvent.idl
     Modules/tvcontrol/TVParentalControlChangedEvent.idl
@@ -968,6 +969,7 @@ set(WebCore_SOURCES
     Modules/tvcontrol/TVTunerChangedEvent.cpp
     Modules/tvcontrol/TVCurrentSourceChangedEvent.cpp
     Modules/tvcontrol/TVScanningStateChangedEvent.cpp
+    Modules/tvcontrol/TVEITBroadcastedEvent.cpp
     Modules/tvcontrol/TVCurrentChannelChangedEvent.cpp
     Modules/tvcontrol/TVEmergencyAlertedEvent.cpp
     Modules/tvcontrol/TVParentalControlChangedEvent.cpp
@@ -1233,6 +1235,7 @@ set(WebCore_SOURCES
     bindings/js/JSTrackCustom.cpp
     bindings/js/JSTrackEventCustom.cpp
     bindings/js/JSTreeWalkerCustom.cpp
+    bindings/js/JSTVEITBroadcastedEventCustom.cpp
     bindings/js/JSVideoTrackCustom.cpp
     bindings/js/JSVideoTrackListCustom.cpp
     bindings/js/JSWebGL2RenderingContextCustom.cpp

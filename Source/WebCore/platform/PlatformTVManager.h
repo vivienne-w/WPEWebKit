@@ -41,6 +41,7 @@ public:
     virtual void didTunerOperationChanged(String, uint16_t) = 0;
     virtual void didCurrentSourceChanged(String) = 0;
     virtual void didCurrentChannelChanged(String) = 0;
+    virtual void didEITBroadcasted(String, Vector<RefPtr<PlatformTVProgram>>) = 0;
     virtual void didScanningStateChanged(String, RefPtr<PlatformTVChannel>, uint16_t) = 0;
     virtual void didParentalControlChanged(uint16_t) = 0;
     virtual void didParentalLockChanged(String, uint16_t) = 0;

@@ -58,6 +58,7 @@ public:
     void didTunerOperationChanged(String, uint16_t) override;
     void didCurrentSourceChanged(String) override;
     void didCurrentChannelChanged(String) override;
+    void didEITBroadcasted(String, Vector<RefPtr<PlatformTVProgram>>) override;
     void didScanningStateChanged(String, RefPtr<PlatformTVChannel>, uint16_t) override;
     void didParentalControlChanged(uint16_t) override;
     void didParentalLockChanged(String, uint16_t) override;

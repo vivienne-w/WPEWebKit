@@ -162,6 +162,28 @@ void TVSource::dispatchChannelChangedEvent()
     printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
 }
 
+void TVSource::dispatchEITBroadcastedEvent(Vector<RefPtr<PlatformTVProgram>> platformTVPrograms)
+{
+    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
+    Vector<RefPtr<TVProgram>> protector;
+    if (platformTVPrograms.size()) {
+        printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
+        for (auto& program : platformTVPrograms) {
+            printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
+            for (auto& channel : m_channelList) {
+                if (equalIgnoringASCIICase(program->serviceId(), channel->serviceId())) {
+                    protector.append(TVProgram::create(program, channel.get()));
+                    break;
+                }
+            }
+        }
+    }
+    scriptExecutionContext()->postTask([=](ScriptExecutionContext&) {
+        dispatchEvent(TVEITBroadcastedEvent::create(eventNames().eitbroadcastedEvent, protector));
+    });
+    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
+}
+
 void TVSource::dispatchScanningStateChangedEvent(RefPtr<PlatformTVChannel> platformTVChannel, uint16_t state)
 {
     printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);

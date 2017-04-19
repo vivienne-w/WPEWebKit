@@ -42,6 +42,7 @@ dictionary TVStartScanningOptions {
     readonly        attribute boolean      isScanning;
     readonly        attribute TVChannel?   currentChannel;
                     attribute EventHandler oncurrentchannelchanged;
+                    attribute EventHandler oneitbroadcasted;
                     attribute EventHandler onscanningstatechanged;
                     attribute EventHandler onemergencyalerted;
 };

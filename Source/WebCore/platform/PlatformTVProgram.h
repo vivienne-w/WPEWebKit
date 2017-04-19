@@ -52,6 +52,7 @@ public:
     const String longDescription() const { return m_longDescription; }
     const String rating() const { return m_rating; }
     const String seriesId() const { return m_seriesId; }
+    const String serviceId() const { return m_serviceId; }
 
 private:
     PlatformTVProgram(PlatformTVControlBackend*);
@@ -64,6 +65,7 @@ private:
     String m_longDescription;
     String m_rating;
     String m_seriesId;
+    String m_serviceId;
     PlatformTVControlBackend* m_tvBackend;
 };
 

@@ -285,6 +285,7 @@ namespace WebCore {
     macro(tunerchanged) \
     macro(currentsourcechanged) \
     macro(currentchannelchanged) \
+    macro(eitbroadcasted) \
     macro(scanningstatechanged) \
     macro(parentalcontrolchanged) \
     macro(parentallockchanged)\

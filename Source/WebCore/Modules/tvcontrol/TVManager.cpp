@@ -115,6 +115,18 @@ void TVManager::didCurrentChannelChanged(String tunerId)
     }
 }
 
+void TVManager::didEITBroadcasted(String tunerId, Vector<RefPtr<PlatformTVProgram>> platformTVPrograms)
+{
+    printf("\n%s:%s:%d\n TUNER ID = %s", __FILE__, __func__, __LINE__, tunerId.utf8().data());
+    for (auto& tuner : m_tunerList) {
+        if (equalIgnoringASCIICase(tunerId, tuner->id())) {
+            printf("\n%s:%s:%d\n TUNER ID = %s", __FILE__, __func__, __LINE__, tunerId.utf8().data());
+            tuner->currentSource()->dispatchEITBroadcastedEvent(platformTVPrograms);
+            break;
+        }
+    }
+}
+
 void TVManager::didScanningStateChanged(String tunerId, RefPtr<PlatformTVChannel> platformTVChannel, uint16_t state)
 {
     for (auto& tuner : m_tunerList) {
