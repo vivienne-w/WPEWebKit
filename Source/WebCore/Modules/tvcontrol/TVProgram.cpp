@@ -43,6 +43,54 @@ TVProgram::TVProgram(RefPtr<PlatformTVProgram> platformTVProgram, TVChannel* par
 {
 }
 
+const Vector<String>& TVProgram::getAudioLanguages()
+{
+    if (m_platformTVProgram) {
+        Vector<String> platformAudioLanguagesList;
+        if (!m_platformTVProgram->getAudioLanguages(platformAudioLanguagesList))
+            return m_audioLanguagesList;
+
+        if (platformAudioLanguagesList.size()) {
+            for (auto& language : platformAudioLanguagesList)
+                m_audioLanguagesList.append(language);
+        }
+    }
+
+    return m_audioLanguagesList;
+}
+
+const Vector<String>& TVProgram::getSubtitleLanguages()
+{
+    if (m_platformTVProgram) {
+        Vector<String> platformSubtitleLanguagesList;
+        if (!m_platformTVProgram->getSubtitleLanguages(platformSubtitleLanguagesList))
+            return m_subtitleLanguagesList;
+
+        if (platformSubtitleLanguagesList.size()) {
+            for (auto& language : platformSubtitleLanguagesList)
+                m_subtitleLanguagesList.append(language);
+        }
+    }
+
+    return m_subtitleLanguagesList;
+}
+
+const Vector<String>& TVProgram::getGenres()
+{
+    if (m_platformTVProgram) {
+        Vector<String> platformGenresList;
+        if (!m_platformTVProgram->getGenres(platformGenresList))
+            return m_genresList;
+
+        if (platformGenresList.size()) {
+            for (auto& genre : platformGenresList)
+                m_genresList.append(genre);
+        }
+    }
+
+    return m_genresList;
+}
+
 } // namespace WebCore
 
 #endif // ENABLE(TV_CONTROL)

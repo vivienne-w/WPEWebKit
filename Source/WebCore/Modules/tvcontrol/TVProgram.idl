@@ -1,6 +1,9 @@
 [
     Conditional=TV_CONTROL,
 ] interface TVProgram {
+    sequence<DOMString> getAudioLanguages ();
+    sequence<DOMString> getSubtitleLanguages ();
+    sequence<DOMString> getGenres ();
     readonly        attribute DOMString          eventId;
     readonly        attribute TVChannel          channel;
     readonly        attribute DOMString          title;

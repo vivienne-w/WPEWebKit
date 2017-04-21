@@ -45,6 +45,10 @@ public:
     static Ref<TVProgram> create(RefPtr<PlatformTVProgram>, TVChannel*);
     ~TVProgram() = default;
 
+    const Vector<String>& getAudioLanguages();
+    const Vector<String>& getSubtitleLanguages();
+    const Vector<String>& getGenres();
+
     const String eventId() const { return m_platformTVProgram->eventId(); }
     TVChannel* channel() const { return m_parentTVChannel; }
     const String title() const { return m_platformTVProgram->title(); }
@@ -61,6 +65,9 @@ public:
 
 private:
     explicit TVProgram(RefPtr<PlatformTVProgram>, TVChannel*);
+    Vector<String> m_audioLanguagesList;
+    Vector<String> m_subtitleLanguagesList;
+    Vector<String> m_genresList;
 
     RefPtr<PlatformTVProgram> m_platformTVProgram;
     TVChannel* m_parentTVChannel;

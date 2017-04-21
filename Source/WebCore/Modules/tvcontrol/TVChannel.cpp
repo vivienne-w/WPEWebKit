@@ -78,8 +78,9 @@ void TVChannel::getCurrentProgram(TVPromise&& promise)
             return;
         }
         if (currentProgram) {
-            printf("    eventId of current program= %s\n", currentProgram->eventId().utf8().data());
+            printf("eventId of current program= %s\n", currentProgram->eventId().utf8().data());
             m_currentProgram = TVProgram::create(currentProgram, this);
+            promise.resolve(m_currentProgram);
             return;
         }
         printf("%s:%s:%d\n", __FILE__, __func__, __LINE__);

@@ -98,7 +98,7 @@ PlatformTVManager::PlatformTVManager(PlatformTVManagerClient* client)
                     printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
                     fflush(stdout);
                     tvManager->m_tvBackend->m_program = &event->eventParams.programsInfo->programs[i];
-                    programs.append(PlatformTVProgram::create(tvManager->m_tvBackend));
+                    programs.append(PlatformTVProgram::create(tvManager->m_tvBackend, tunerId));
                 }
             }
             printf("\n%s:%s:%d Tuner ID  = %s\n", __FILE__, __func__, __LINE__, event->tunerId.data);

@@ -79,7 +79,7 @@ bool PlatformTVChannel::getPrograms(unsigned long long startTime, unsigned long 
                 printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
                 fflush(stdout);
                 m_tvBackend->m_program = &programList->programs[i];
-                programVector.append(PlatformTVProgram::create(m_tvBackend));
+                programVector.append(PlatformTVProgram::create(m_tvBackend, m_tunerId));
             }
             return true;
         }
@@ -101,7 +101,7 @@ bool PlatformTVChannel::getCurrentProgram(RefPtr<PlatformTVProgram>& currentProg
 
     if (program) {
         m_tvBackend->m_program = program;
-        currentProgram = PlatformTVProgram::create(m_tvBackend);
+        currentProgram = PlatformTVProgram::create(m_tvBackend, m_tunerId);
         return true;
     }
     printf("%s:%s:%d\n", __FILE__, __func__, __LINE__);

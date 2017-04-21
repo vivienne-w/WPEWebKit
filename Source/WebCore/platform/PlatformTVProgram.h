@@ -41,8 +41,12 @@ class PlatformTVChannel;
 
 class PlatformTVProgram : public RefCounted<PlatformTVProgram> {
 public:
-    static RefPtr<PlatformTVProgram> create(PlatformTVControlBackend*);
+    static RefPtr<PlatformTVProgram> create(PlatformTVControlBackend*, String);
     ~PlatformTVProgram();
+
+    bool getAudioLanguages(Vector<String>&);
+    bool getSubtitleLanguages(Vector<String>&);
+    bool getGenres(Vector<String>&);
 
     const String eventId() const { return m_eventId; }
     const String title() const { return m_title; }
@@ -55,8 +59,9 @@ public:
     const String serviceId() const { return m_serviceId; }
 
 private:
-    PlatformTVProgram(PlatformTVControlBackend*);
+    PlatformTVProgram(PlatformTVControlBackend*, String);
 
+    String m_tunerId;
     String m_eventId;
     String m_title;
     unsigned long long m_startTime;

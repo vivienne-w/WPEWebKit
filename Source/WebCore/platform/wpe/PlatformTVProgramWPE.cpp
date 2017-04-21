@@ -35,13 +35,14 @@
 
 namespace WebCore {
 
-RefPtr<PlatformTVProgram> PlatformTVProgram::create(PlatformTVControlBackend* tvBackend)
+RefPtr<PlatformTVProgram> PlatformTVProgram::create(PlatformTVControlBackend* tvBackend, String tunerId)
 {
-    return adoptRef(new PlatformTVProgram(tvBackend));
+    return adoptRef(new PlatformTVProgram(tvBackend, tunerId));
 }
 
-PlatformTVProgram::PlatformTVProgram(PlatformTVControlBackend* tvBackend)
-    : m_tvBackend(tvBackend)
+PlatformTVProgram::PlatformTVProgram(PlatformTVControlBackend* tvBackend, String tunerId)
+    : m_tunerId(tunerId)
+    , m_tvBackend(tvBackend)
 {
     m_eventId = (std::to_string(tvBackend->m_program->eventId)).c_str();
     m_title = tvBackend->m_program->title;
@@ -49,7 +50,7 @@ PlatformTVProgram::PlatformTVProgram(PlatformTVControlBackend* tvBackend)
     m_duration = tvBackend->m_program->duration;
     m_shortDescription = (std::to_string(tvBackend->m_program->shortDescription)).c_str();
     m_longDescription = (std::to_string(tvBackend->m_program->longDescription)).c_str();
-    m_rating  = (std::to_string(tvBackend->m_program->rating)).c_str();
+    m_rating  = tvBackend->m_program->rating;
     m_seriesId  = (std::to_string(tvBackend->m_program->seriesId)).c_str();
     m_serviceId = (std::to_string(tvBackend->m_program->serviceId)).c_str();
 }
@@ -58,7 +59,53 @@ PlatformTVProgram::~PlatformTVProgram()
 {
 }
 
+bool PlatformTVProgram::getAudioLanguages(Vector<String>& audioLanguagesVector)
+{
+    struct wpe_tvcontrol_string_vector audioLanguagesList;
+    audioLanguagesList.length = 0;
+    std::string::size_type sz = 0;
+    wpe_tvcontrol_backend_get_audio_languages_list(m_tvBackend->m_backend, m_tunerId.utf8().data(), std::stoull(m_serviceId.utf8().data(), &sz, 0), std::stoull(m_eventId.utf8().data(), &sz, 0), &audioLanguagesList);
+    if (audioLanguagesList.length) {
+        for (uint64_t i = 0; i < audioLanguagesList.length; i++) {
+            String language(audioLanguagesList.strings[i].data, audioLanguagesList.strings[i].length);
+            audioLanguagesVector.append((String)language);
+        }
+        return true;
+    }
+    return false;
+}
 
+
+bool PlatformTVProgram::getSubtitleLanguages(Vector<String>& subtitleLanguagesVector)
+{
+    struct wpe_tvcontrol_string_vector subtitleLanguagesList;
+    subtitleLanguagesList.length = 0;
+    std::string::size_type sz = 0;
+    wpe_tvcontrol_backend_get_subtitle_languages_list(m_tvBackend->m_backend, m_tunerId.utf8().data(), std::stoull(m_serviceId.utf8().data(), &sz, 0), std::stoull(m_eventId.utf8().data(), &sz, 0), &subtitleLanguagesList);
+    if (subtitleLanguagesList.length) {
+        for (uint64_t i = 0; i < subtitleLanguagesList.length; i++) {
+            String language(subtitleLanguagesList.strings[i].data, subtitleLanguagesList.strings[i].length);
+            subtitleLanguagesVector.append(language);
+        }
+        return true;
+    }
+    return false;
+}
+bool PlatformTVProgram::getGenres(Vector<String>& genresVector)
+{
+    struct wpe_tvcontrol_string_vector genresList;
+    genresList.length = 0;
+    std::string::size_type sz = 0;
+    wpe_tvcontrol_backend_get_genres_list(m_tvBackend->m_backend, m_tunerId.utf8().data(), std::stoull(m_serviceId.utf8().data(), &sz, 0), std::stoull(m_eventId.utf8().data(), &sz, 0), &genresList);
+    if (genresList.length) {
+        for (uint64_t i = 0; i < genresList.length; i++) {
+            String genre(genresList.strings[i].data, genresList.strings[i].length);
+            genresVector.append(genre);
+        }
+        return true;
+    }
+    return false;
+}
 
 } // namespace WebCore
 
