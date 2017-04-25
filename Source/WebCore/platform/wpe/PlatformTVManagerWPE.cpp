@@ -107,7 +107,7 @@ PlatformTVManager::PlatformTVManager(PlatformTVManagerClient* client)
                 tvManager->m_platformTVManagerClient->didEITBroadcasted(tunerId, programs);
             });
         },
-        // handle scan state  changed event
+        // handle scan state changed event
         [](void* data, wpe_tvcontrol_event* event)
         {
 

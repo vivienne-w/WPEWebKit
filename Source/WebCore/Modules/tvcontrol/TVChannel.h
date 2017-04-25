@@ -83,6 +83,7 @@ public:
     void setParentalLock(const String&, bool, TVsetParentalLock&&);
 
     void dispatchParentalLockChangedEvent(uint16_t);
+
 private:
     explicit TVChannel(ScriptExecutionContext*, RefPtr<PlatformTVChannel>, TVSource*);
 
