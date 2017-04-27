@@ -51,14 +51,12 @@ TVSource::TVSource(ScriptExecutionContext* context, RefPtr<PlatformTVSource> pla
 
 TVSource::~TVSource()
 {
-    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
     if (m_channelList.size())
         m_channelList.clear();
 }
 
 void TVSource::getChannels(TVChannelPromise&& promise)
 {
-    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
 
     if (ScanningStarted == m_scanState) {
         promise.reject(INVALID_STATE_ERR, "Invalid state: scanning in progress");
@@ -82,13 +80,11 @@ void TVSource::getChannels(TVChannelPromise&& promise)
             return;
         }
     }
-    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
     promise.reject(nullptr);
 }
 
 void TVSource::setCurrentChannel(const String& channelNumber, TVPromise&& promise)
 {
-    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
     if (ScanningStarted == m_scanState) {
         promise.reject(INVALID_STATE_ERR, "Invalid state: scanning in progress");
         return;
@@ -97,53 +93,43 @@ void TVSource::setCurrentChannel(const String& channelNumber, TVPromise&& promis
         for (auto& channel : m_channelList) {
             if (equalIgnoringASCIICase(channel->number(), channelNumber) == 1) {
                 m_currentChannel = channel;
-                printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
                 if (m_platformTVSource->setCurrentChannel(channelNumber)) {
                     promise.resolve(nullptr);
                     return;
                 }
                 if (channel->isParentalLocked()) {
-                    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
                     promise.reject(INVALID_ACCESS_ERR, "Cannot Access a parental locked channel");
                     return;
                 }
             }
         }
-        printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
     }
     promise.reject(nullptr);
 }
 
 void TVSource::startScanning(const StartScanningOptions& scanningOptions, TVPromise&& promise)
 {
-    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
     if (ScanningStarted == m_scanState) {
-        printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
         promise.reject(nullptr);
         return;
     }
     if (m_platformTVSource) {
-        printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
         m_scanState = ScanningStarted;
         m_isScanning = true;
         if (m_platformTVSource->startScanning(scanningOptions.isRescanned)) {
             m_isScanning = false;
             promise.resolve(nullptr);
-            printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
             return;
         }
         m_scanState = ScanningCompleted;
     }
-    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
     promise.reject(nullptr);
 }
 
 void TVSource::stopScanning(TVPromise&& promise)
 {
-    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
     if (m_platformTVSource) {
         if (ScanningCompleted != m_scanState) {
-            printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
             if (m_platformTVSource->stopScanning()) {
                 promise.resolve(nullptr);
                 return;
@@ -155,21 +141,16 @@ void TVSource::stopScanning(TVPromise&& promise)
 
 void TVSource::dispatchChannelChangedEvent()
 {
-    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
     scriptExecutionContext()->postTask([=](ScriptExecutionContext&) {
         dispatchEvent(TVCurrentChannelChangedEvent::create(eventNames().currentchannelchangedEvent, currentChannel()));
     });
-    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
 }
 
 void TVSource::dispatchEITBroadcastedEvent(Vector<RefPtr<PlatformTVProgram>> platformTVPrograms)
 {
-    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
     Vector<RefPtr<TVProgram>> protector;
     if (platformTVPrograms.size()) {
-        printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
         for (auto& program : platformTVPrograms) {
-            printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
             for (auto& channel : m_channelList) {
                 if (equalIgnoringASCIICase(program->serviceId(), channel->serviceId())) {
                     protector.append(TVProgram::create(program, channel.get()));
@@ -181,12 +162,10 @@ void TVSource::dispatchEITBroadcastedEvent(Vector<RefPtr<PlatformTVProgram>> pla
     scriptExecutionContext()->postTask([=](ScriptExecutionContext&) {
         dispatchEvent(TVEITBroadcastedEvent::create(eventNames().eitbroadcastedEvent, protector));
     });
-    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
 }
 
 void TVSource::dispatchScanningStateChangedEvent(RefPtr<PlatformTVChannel> platformTVChannel, uint16_t state)
 {
-    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
     RefPtr<TVChannel> protector = nullptr;
     switch (static_cast<TVScanningStateChangedEvent::State>(state)) {
     case TVScanningStateChangedEvent::State::Completed:
@@ -200,17 +179,14 @@ void TVSource::dispatchScanningStateChangedEvent(RefPtr<PlatformTVChannel> platf
         protector = TVChannel::create(scriptExecutionContext(), platformTVChannel, this);
         m_channelList.append(protector);
     }
-    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
     scriptExecutionContext()->postTask([=](ScriptExecutionContext&) {
         dispatchEvent(TVScanningStateChangedEvent::create(eventNames().scanningstatechangedEvent,
             (TVScanningStateChangedEvent::State)state, protector));
     });
-    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
 }
 
 void TVSource::dispatchEmergencyAlertedEvent(String type, String severity, String description, String channelNo, String url, Vector<String> regionList)
 {
-    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
     RefPtr<TVChannel> protector = nullptr;
     for (auto& channel : m_channelList) {
         if (equalIgnoringASCIICase(channel->number(), channelNo) == 1) {

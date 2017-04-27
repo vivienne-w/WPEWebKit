@@ -73,12 +73,10 @@ const Vector<TVTuner::SourceType>& TVTuner::getSupportedSourceTypes()
 
 void TVTuner::getSources(TVSourcePromise&& promise)
 {
-    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
     if (m_sourceList.size()) {
         promise.resolve(m_sourceList);
         return;
     }
-    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
     if (m_platformTVTuner) {
         Vector<RefPtr<PlatformTVSource>> platformSourceList;
         if (!m_platformTVTuner->getSources(platformSourceList)) {
@@ -93,13 +91,11 @@ void TVTuner::getSources(TVSourcePromise&& promise)
             return;
         }
     }
-    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
     promise.reject(nullptr);
 }
 
 void TVTuner::setCurrentSource(TVTuner::SourceType sourceType, TVPromise&& promise)
 {
-    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
     if (m_platformTVTuner) {
         m_currentSource = nullptr;
         if (m_sourceList.isEmpty()) {
@@ -122,16 +118,13 @@ void TVTuner::setCurrentSource(TVTuner::SourceType sourceType, TVPromise&& promi
                 }
             }
         }
-        printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
     }
-    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
     promise.reject(nullptr);
 }
 
 void TVTuner::dispatchSourceChangedEvent()
 {
 
-    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
     scriptExecutionContext()->postTask([=](ScriptExecutionContext&) {
         dispatchEvent(TVCurrentSourceChangedEvent::create(eventNames().currentsourcechangedEvent, currentSource()));
     });

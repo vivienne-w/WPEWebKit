@@ -41,7 +41,6 @@ namespace WebCore {
 
 Ref<TVManager> TVManager::create(ScriptExecutionContext* context)
 {
-    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
     Ref<TVManager> tvManager(adoptRef(*new TVManager(context)));
     tvManager->suspendIfNeeded();
     return tvManager;
@@ -53,12 +52,10 @@ TVManager::TVManager(ScriptExecutionContext* context)
 {
     if (!m_platformTVManager)
         m_platformTVManager = std::make_unique<PlatformTVManager>(this);
-    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
 }
 
 TVManager::~TVManager()
 {
-    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
     if (m_tunerList.size())
         m_tunerList.clear();
 }
@@ -73,15 +70,12 @@ void TVManager::didTunerOperationChanged(String tunerId, uint16_t event)
     int position;
     if ((TVTunerChangedEvent::Operation)event == TVTunerChangedEvent::Operation::Added) {
         m_tunerList.append(TVTuner::create(scriptExecutionContext(), PlatformTVTuner::create(tunerId.utf8().data(), m_platformTVManager->m_tvBackend)));
-        printf("Found and Added the Tuner");
     } else { // Case when DVB Adapter is closed.
         position = 0;
         // Iterate  private tuner list and get the particular tuner info
         for (auto& tuner : m_tunerList) {
-            printf("Id of this tuner %s\n", (tuner->id()).utf8().data());
             if (equalIgnoringASCIICase(tunerId, tuner->id())) {
                 m_tunerList.remove(position);
-                printf("Found and Deleted the Tuner");
                 break;
             }
             position++;
@@ -94,7 +88,6 @@ void TVManager::didTunerOperationChanged(String tunerId, uint16_t event)
 
 void TVManager::didCurrentSourceChanged(String tunerId)
 {
-    printf("\n%s:%s:%d\n TUNER ID = %s", __FILE__, __func__, __LINE__, tunerId.utf8().data());
     for (auto& tuner : m_tunerList) {
         if (equalIgnoringASCIICase(tunerId, tuner->id())) {
             tuner->dispatchSourceChangedEvent();
@@ -105,10 +98,8 @@ void TVManager::didCurrentSourceChanged(String tunerId)
 
 void TVManager::didCurrentChannelChanged(String tunerId)
 {
-    printf("\n%s:%s:%d\n TUNER ID = %s", __FILE__, __func__, __LINE__, tunerId.utf8().data());
     for (auto& tuner : m_tunerList) {
         if (equalIgnoringASCIICase(tunerId, tuner->id())) {
-            printf("\n%s:%s:%d\n TUNER ID = %s", __FILE__, __func__, __LINE__, tunerId.utf8().data());
             tuner->currentSource()->dispatchChannelChangedEvent();
             break;
         }
@@ -117,10 +108,8 @@ void TVManager::didCurrentChannelChanged(String tunerId)
 
 void TVManager::didEITBroadcasted(String tunerId, Vector<RefPtr<PlatformTVProgram>> platformTVPrograms)
 {
-    printf("\n%s:%s:%d\n TUNER ID = %s", __FILE__, __func__, __LINE__, tunerId.utf8().data());
     for (auto& tuner : m_tunerList) {
         if (equalIgnoringASCIICase(tunerId, tuner->id())) {
-            printf("\n%s:%s:%d\n TUNER ID = %s", __FILE__, __func__, __LINE__, tunerId.utf8().data());
             tuner->currentSource()->dispatchEITBroadcastedEvent(platformTVPrograms);
             break;
         }
@@ -131,8 +120,6 @@ void TVManager::didScanningStateChanged(String tunerId, RefPtr<PlatformTVChannel
 {
     for (auto& tuner : m_tunerList) {
         if (equalIgnoringASCIICase(tunerId, tuner->id())) {
-            printf("Scanning state  dispatched from Mgr = ");
-            printf("%" PRIu16 "\n", state);
 
             tuner->currentSource()->dispatchScanningStateChangedEvent(platformTVChannel, state);
             break;
@@ -142,7 +129,6 @@ void TVManager::didScanningStateChanged(String tunerId, RefPtr<PlatformTVChannel
 
 void TVManager::didParentalControlChanged(uint16_t state)
 {
-    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
     scriptExecutionContext()->postTask([=](ScriptExecutionContext&) {
         dispatchEvent(TVParentalControlChangedEvent::create(eventNames().parentalcontrolchangedEvent, (TVParentalControlChangedEvent::State)state));
     });
@@ -150,7 +136,6 @@ void TVManager::didParentalControlChanged(uint16_t state)
 
 void TVManager::didParentalLockChanged(String tunerId, uint16_t state)
 {
-    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
     for (auto& tuner : m_tunerList) {
         if (equalIgnoringASCIICase(tunerId, tuner->id())) {
             tuner->currentSource()->currentChannel()->dispatchParentalLockChangedEvent(state);
@@ -161,7 +146,6 @@ void TVManager::didParentalLockChanged(String tunerId, uint16_t state)
 
 void TVManager::didEmergencyAlerted(String tunerId, String type, String severity, String description, String channelNo, String url, Vector<String> regionList)
 {
-    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
     for (auto& tuner : m_tunerList) {
         if (equalIgnoringASCIICase(tunerId, tuner->id())) {
             tuner->currentSource()->dispatchEmergencyAlertedEvent(type, severity, description, channelNo, url, regionList);
@@ -172,7 +156,6 @@ void TVManager::didEmergencyAlerted(String tunerId, String type, String severity
 
 void TVManager::getTuners(TVTunerPromise&& promise)
 {
-    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
     if (m_tunerList.size()) {
         promise.resolve(m_tunerList);
         return;
@@ -187,9 +170,7 @@ void TVManager::getTuners(TVTunerPromise&& promise)
             return;
         }
         if (platformTunerList.size()) {
-            printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
             for (auto& tuner : platformTunerList) {
-                printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
                 m_tunerList.append(TVTuner::create(document(), tuner));
             }
             platformTunerList.clear();
@@ -199,7 +180,6 @@ void TVManager::getTuners(TVTunerPromise&& promise)
             return;
         }
     }
-    printf("\n%s:%s:%d\n", __FILE__, __func__, __LINE__);
     promise.reject(nullptr);
 }
 

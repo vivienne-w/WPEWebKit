@@ -50,15 +50,12 @@ void TVChannel::getPrograms(const GetProgramsOptions& programsOptions, TVProgram
 {
     if (m_platformTVChannel) {
         Vector<RefPtr<PlatformTVProgram>> programVector;
-        printf("programOptions.startTime = %llu programOptions.endTime = %llu \n", programsOptions.startTime, programsOptions.endTime);
         if (!m_platformTVChannel->getPrograms(programsOptions.startTime, programsOptions.endTime, programVector)) {
             promise.reject(nullptr);
             return;
         }
         if (programVector.size()) {
-            printf("%s:%s:%d:got %d programsssss\n", __FILE__, __func__, __LINE__, programVector.size());
             for (auto& program : programVector) {
-                printf("    %s:%s \n", program->eventId().utf8().data(), program->title().utf8().data());
                 m_programList.append(TVProgram::create(program, this));
             }
             promise.resolve(m_programList);
@@ -78,12 +75,10 @@ void TVChannel::getCurrentProgram(TVPromise&& promise)
             return;
         }
         if (currentProgram) {
-            printf("eventId of current program= %s\n", currentProgram->eventId().utf8().data());
             m_currentProgram = TVProgram::create(currentProgram, this);
             promise.resolve(*(m_currentProgram));
             return;
         }
-        printf("%s:%s:%d\n", __FILE__, __func__, __LINE__);
     }
     promise.reject(nullptr);
 }
