@@ -61,15 +61,15 @@ PlatformTVProgram::~PlatformTVProgram()
 
 bool PlatformTVProgram::getAudioLanguages(Vector<String>& audioLanguagesVector)
 {
-    struct wpe_tvcontrol_string_vector audioLanguagesList;
-    audioLanguagesList.length = 0;
+    struct wpe_tvcontrol_string_vector* audioLanguagesList;
     std::string::size_type sz = 0;
     wpe_tvcontrol_backend_get_audio_languages_list(m_tvBackend->m_backend, m_tunerId.utf8().data(), std::stoull(m_serviceId.utf8().data(), &sz, 0), std::stoull(m_eventId.utf8().data(), &sz, 0), &audioLanguagesList);
-    if (audioLanguagesList.length) {
-        for (uint64_t i = 0; i < audioLanguagesList.length; i++) {
-            String language(audioLanguagesList.strings[i].data, audioLanguagesList.strings[i].length);
+    if (audioLanguagesList->length) {
+        for (uint64_t i = 0; i < audioLanguagesList->length; i++) {
+            String language(audioLanguagesList->strings[i].data, audioLanguagesList->strings[i].length);
             audioLanguagesVector.append((String)language);
         }
+        wpe_tvcontrol_backend_clear_string_vector(&audioLanguagesList);
         return true;
     }
     return false;
@@ -78,30 +78,30 @@ bool PlatformTVProgram::getAudioLanguages(Vector<String>& audioLanguagesVector)
 
 bool PlatformTVProgram::getSubtitleLanguages(Vector<String>& subtitleLanguagesVector)
 {
-    struct wpe_tvcontrol_string_vector subtitleLanguagesList;
-    subtitleLanguagesList.length = 0;
+    struct wpe_tvcontrol_string_vector* subtitleLanguagesList;
     std::string::size_type sz = 0;
     wpe_tvcontrol_backend_get_subtitle_languages_list(m_tvBackend->m_backend, m_tunerId.utf8().data(), std::stoull(m_serviceId.utf8().data(), &sz, 0), std::stoull(m_eventId.utf8().data(), &sz, 0), &subtitleLanguagesList);
-    if (subtitleLanguagesList.length) {
-        for (uint64_t i = 0; i < subtitleLanguagesList.length; i++) {
-            String language(subtitleLanguagesList.strings[i].data, subtitleLanguagesList.strings[i].length);
+    if (subtitleLanguagesList->length) {
+        for (uint64_t i = 0; i < subtitleLanguagesList->length; i++) {
+            String language(subtitleLanguagesList->strings[i].data, subtitleLanguagesList->strings[i].length);
             subtitleLanguagesVector.append(language);
         }
+        wpe_tvcontrol_backend_clear_string_vector(&subtitleLanguagesList);
         return true;
     }
     return false;
 }
 bool PlatformTVProgram::getGenres(Vector<String>& genresVector)
 {
-    struct wpe_tvcontrol_string_vector genresList;
-    genresList.length = 0;
+    struct wpe_tvcontrol_string_vector* genresList;
     std::string::size_type sz = 0;
     wpe_tvcontrol_backend_get_genres_list(m_tvBackend->m_backend, m_tunerId.utf8().data(), std::stoull(m_serviceId.utf8().data(), &sz, 0), std::stoull(m_eventId.utf8().data(), &sz, 0), &genresList);
-    if (genresList.length) {
-        for (uint64_t i = 0; i < genresList.length; i++) {
-            String genre(genresList.strings[i].data, genresList.strings[i].length);
+    if (genresList->length) {
+        for (uint64_t i = 0; i < genresList->length; i++) {
+            String genre(genresList->strings[i].data, genresList->strings[i].length);
             genresVector.append(genre);
         }
+        wpe_tvcontrol_backend_clear_string_vector(&genresList);
         return true;
     }
     return false;
