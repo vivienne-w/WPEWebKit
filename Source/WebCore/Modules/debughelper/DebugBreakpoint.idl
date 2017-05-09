@@ -1,0 +1,11 @@
+/*
+ * Copyright (C) 2014 Igalia. All rights reserved.
+ */
+
+[
+    JSGenerateToJSObject,
+    JSGenerateToNativeObject,
+] interface DebugBreakpoint {
+  static void printMessage(DOMString message);
+  static void crash(optional DOMString message = "");
+};
