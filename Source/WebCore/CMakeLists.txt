@@ -34,6 +34,7 @@ set(WebCore_PRIVATE_INCLUDE_DIRECTORIES
     "${WEBCORE_DIR}/Modules/beacon"
     "${WEBCORE_DIR}/Modules/cache"
     "${WEBCORE_DIR}/Modules/credentialmanagement"
+    "${WEBCORE_DIR}/Modules/debughelper"
     "${WEBCORE_DIR}/Modules/encryptedmedia"
     "${WEBCORE_DIR}/Modules/encryptedmedia/legacy"
     "${WEBCORE_DIR}/Modules/entriesapi"
@@ -194,6 +195,7 @@ set(WebCore_IDL_INCLUDES
     Modules/airplay
     Modules/cache
     Modules/credentialmanagement
+    Modules/debughelper
     Modules/encryptedmedia/legacy
     Modules/entriesapi
     Modules/fetch
@@ -256,6 +258,8 @@ set(WebCore_NON_SVG_IDL_FILES
     Modules/entriesapi/FileSystemEntryCallback.idl
     Modules/entriesapi/FileSystemFileEntry.idl
     Modules/entriesapi/HTMLInputElementEntriesAPI.idl
+
+    Modules/debughelper/DebugBreakpoint.idl
 
     Modules/fetch/DOMWindowFetch.idl
     Modules/fetch/FetchBody.idl
@@ -1238,6 +1242,10 @@ set(WebCoreTestSupport_LIBRARIES
 if (NOT WTF_OS_WINDOWS)
     list(APPEND WebCoreTestSupport_LIBRARIES WebCore)
 endif ()
+
+list(APPEND WebCore_SOURCES
+  Modules/debughelper/DebugBreakpoint.cpp
+)
 
 if (ENABLE_LEGACY_ENCRYPTED_MEDIA)
     list(APPEND WebCore_SOURCES

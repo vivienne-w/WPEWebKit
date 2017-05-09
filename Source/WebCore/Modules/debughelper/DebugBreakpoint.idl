@@ -1,0 +1,12 @@
+/*
+ * Copyright (C) 2014 Igalia. All rights reserved.
+ */
+
+[
+ ImplementationLacksVTable
+] interface DebugBreakpoint {
+  static void printMessage(DOMString message);
+  static void print(DOMString message);
+  static void warn(DOMString message);
+  static void crash(optional DOMString message = "");
+};
