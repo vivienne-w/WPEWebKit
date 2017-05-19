@@ -97,7 +97,7 @@ bool PlatformTVSource::startScanning(bool scanningOption)
 bool PlatformTVSource::stopScanning()
 {
     tvcontrol_return ret = TVControlFailed;
-    wpe_tvcontrol_backend_stop_scanning(m_tvBackend->m_backend, m_tunerId.utf8().data());
+    ret = wpe_tvcontrol_backend_stop_scanning(m_tvBackend->m_backend, m_tunerId.utf8().data());
     if (ret == TVControlFailed || ret == TVControlNotImplemented)
         return false;
     return true;

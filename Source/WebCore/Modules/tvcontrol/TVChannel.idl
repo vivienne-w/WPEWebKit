@@ -1,8 +1,8 @@
 enum TVChannelType { "tv", "radio", "data" };
 
 dictionary TVGetProgramsOptions {
-             unsigned long long startTime = 1174456800;
-             unsigned long long endTime = 1174465800;
+             unsigned long long startTime = 0;
+             unsigned long long endTime = 0;
 };
 [
     Conditional=TV_CONTROL,

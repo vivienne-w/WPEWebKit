@@ -50,6 +50,8 @@ void TVChannel::getPrograms(const GetProgramsOptions& programsOptions, TVProgram
 {
     if (m_platformTVChannel) {
         Vector<RefPtr<PlatformTVProgram>> programVector;
+        if (m_programList.size())
+            m_programList.clear();
         if (!m_platformTVChannel->getPrograms(programsOptions.startTime, programsOptions.endTime, programVector)) {
             promise.reject(nullptr);
             return;

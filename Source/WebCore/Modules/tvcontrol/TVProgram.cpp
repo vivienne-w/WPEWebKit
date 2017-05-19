@@ -51,6 +51,8 @@ const Vector<String>& TVProgram::getAudioLanguages()
             return m_audioLanguagesList;
 
         if (platformAudioLanguagesList.size()) {
+            if (m_audioLanguagesList.size())
+                m_audioLanguagesList.clear();
             for (auto& language : platformAudioLanguagesList)
                 m_audioLanguagesList.append(language);
         }
@@ -67,6 +69,8 @@ const Vector<String>& TVProgram::getSubtitleLanguages()
             return m_subtitleLanguagesList;
 
         if (platformSubtitleLanguagesList.size()) {
+            if (m_subtitleLanguagesList.size())
+                m_subtitleLanguagesList.clear();
             for (auto& language : platformSubtitleLanguagesList)
                 m_subtitleLanguagesList.append(language);
         }
