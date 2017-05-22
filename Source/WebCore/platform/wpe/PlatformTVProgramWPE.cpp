@@ -46,8 +46,8 @@ PlatformTVProgram::PlatformTVProgram(PlatformTVControlBackend* tvBackend, String
 {
     m_eventId = (std::to_string(tvBackend->m_program->eventId)).c_str();
     m_title = tvBackend->m_program->title;
-    m_startTime = tvBackend->m_program->startTime;
-    m_duration = tvBackend->m_program->duration;
+    m_startTime = (tvBackend->m_program->startTime) * 1000;
+    m_duration = (tvBackend->m_program->duration) * 1000;
     m_shortDescription = (std::to_string(tvBackend->m_program->shortDescription)).c_str();
     m_longDescription = (std::to_string(tvBackend->m_program->longDescription)).c_str();
     m_rating  = tvBackend->m_program->rating;
