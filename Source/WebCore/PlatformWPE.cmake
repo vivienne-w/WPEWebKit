@@ -50,6 +50,8 @@ list(APPEND WebCore_SOURCES
 
     page/scrolling/coordinatedgraphics/ScrollingCoordinatorCoordinatedGraphics.cpp
     page/scrolling/coordinatedgraphics/ScrollingStateNodeCoordinatedGraphics.cpp
+    page/linux/ResourceUsageOverlayLinux.cpp
+    page/linux/ResourceUsageThreadLinux.cpp
 
     page/scrolling/ScrollingStateStickyNode.cpp
     page/scrolling/ScrollingThread.cpp
