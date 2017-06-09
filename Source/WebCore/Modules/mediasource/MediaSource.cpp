@@ -49,6 +49,16 @@
 #include "TimeRanges.h"
 #include "VideoTrackList.h"
 
+// ### DEBUG ###
+#undef LOG_DISABLED
+#define LOG_DISABLED 0
+#undef LOG
+#define LOG(channel, msg, ...) do { printf("%s: ", #channel); printf(msg, ## __VA_ARGS__); printf("\n"); fflush(stdout); } while (false)
+
+#if !LOG_DISABLED
+#include <wtf/text/StringBuilder.h>
+#endif
+
 namespace WebCore {
 
 URLRegistry* MediaSource::s_registry;
