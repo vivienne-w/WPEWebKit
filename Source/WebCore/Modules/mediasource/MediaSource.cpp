@@ -49,6 +49,8 @@
 #include "TimeRanges.h"
 #include "VideoTrackList.h"
 
+#include <wtf/text/StringBuilder.h>
+
 // ### DEBUG ###
 #undef LOG_DISABLED
 #define LOG_DISABLED 0
@@ -273,6 +275,17 @@ void MediaSource::completeSeek()
     monitorSourceBuffers();
 }
 
+String MediaSource::detailedBuffered()
+{
+    StringBuilder result;
+    for (RefPtr<SourceBuffer> sourceBuffer : *m_activeSourceBuffers) {
+        if (!result.isEmpty())
+            result.append("; ");
+        result.append(sourceBuffer->detailedBuffered());
+    }
+    return result.toString();
+}
+
 Ref<TimeRanges> MediaSource::seekable()
 {
     // 6. HTMLMediaElement Extensions, seekable
@@ -438,8 +451,11 @@ void MediaSource::monitorSourceBuffers()
         // 3. Playback may resume at this point if it was previously suspended by a transition to HAVE_CURRENT_DATA.
         m_private->setReadyState(MediaPlayer::HaveEnoughData);
 
-        if (m_pendingSeekTime.isValid())
+        if (m_pendingSeekTime.isValid()) {
+            LOG(MediaSource, "MediaSource::monitorSourceBuffers(): completeSeek() because HaveEnoughData. pendingSeekTime: %s, buffered: %s",
+                toString(m_pendingSeekTime).utf8().data(), detailedBuffered().utf8().data());
             completeSeek();
+        }
 
         // 4. Abort these steps.
         return;
@@ -453,8 +469,11 @@ void MediaSource::monitorSourceBuffers()
         // 3. Playback may resume at this point if it was previously suspended by a transition to HAVE_CURRENT_DATA.
         m_private->setReadyState(MediaPlayer::HaveFutureData);
 
-        if (m_pendingSeekTime.isValid())
+        if (m_pendingSeekTime.isValid()) {
+            LOG(MediaSource, "MediaSource::monitorSourceBuffers(): completeSeek() because HaveFutureData. pendingSeekTime: %s, buffered: %s",
+                toString(m_pendingSeekTime).utf8().data(), detailedBuffered().utf8().data());
             completeSeek();
+        }
 
         // 4. Abort these steps.
         return;

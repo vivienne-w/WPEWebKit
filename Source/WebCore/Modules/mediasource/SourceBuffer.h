@@ -117,6 +117,8 @@ public:
 
     bool hasPendingActivity() const final;
 
+    String detailedBuffered();
+
 private:
     SourceBuffer(Ref<SourceBufferPrivate>&&, MediaSource*);
 
