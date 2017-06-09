@@ -136,6 +136,8 @@ private:
 
     void completeSeek();
 
+    String detailedBuffered();
+
     static URLRegistry* s_registry;
 
     RefPtr<MediaSourcePrivate> m_private;

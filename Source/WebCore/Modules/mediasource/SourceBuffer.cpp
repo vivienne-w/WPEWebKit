@@ -66,9 +66,7 @@
 #undef LOG
 #define LOG(channel, msg, ...) do { printf("%s: ", #channel); printf(msg, ## __VA_ARGS__); printf("\n"); fflush(stdout); } while (false)
 
-#if !LOG_DISABLED
 #include <wtf/text/StringBuilder.h>
-#endif
 
 namespace WebCore {
 
@@ -326,7 +324,7 @@ ExceptionOr<void> SourceBuffer::remove(double start, double end)
 
 ExceptionOr<void> SourceBuffer::remove(const MediaTime& start, const MediaTime& end)
 {
-    LOG(MediaSource, "SourceBuffer::remove(%p) - start(%lf), end(%lf)", this, start.toDouble(), end.toDouble());
+    LOG(MediaSource, "SourceBuffer::remove(%s) - start(%lf), end(%lf)", id().utf8().data(), start.toDouble(), end.toDouble());
 
     // https://rawgit.com/w3c/media-source/45627646344eea0170dd1cbc5a3d508ca751abb8/media-source-respec.html#dom-sourcebuffer-remove
     // Section 3.2 remove() method steps.
@@ -435,7 +433,7 @@ void SourceBuffer::removedFromMediaSource()
 
 void SourceBuffer::seekToTime(const MediaTime& time)
 {
-    LOG(MediaSource, "SourceBuffer::seekToTime(%p) - time(%s)", this, toString(time).utf8().data());
+    LOG(MediaSource, "### SourceBuffer::seekToTime(%s) - time(%s)", id().utf8().data(), toString(time).utf8().data());
 
     for (auto& trackBufferPair : m_trackBufferMap) {
         TrackBuffer& trackBuffer = trackBufferPair.value;
@@ -485,6 +483,24 @@ MediaTime SourceBuffer::sourceBufferPrivateFastSeekTimeForMediaTime(const MediaT
 bool SourceBuffer::hasPendingActivity() const
 {
     return m_source || m_asyncEventQueue.hasPendingEvents();
+}
+
+String SourceBuffer::detailedBuffered()
+{
+    StringBuilder result;
+
+    for (auto& trackBufferPair : m_trackBufferMap) {
+        TrackBuffer& trackBuffer = trackBufferPair.value;
+        const AtomicString& trackID = trackBufferPair.key;
+        if (!result.isEmpty())
+            result.append(", ");
+        result.append(trackID.string());
+        result.append(": ");
+        StringPrintStream out;
+        trackBuffer.buffered.dump(out);
+        result.append(out.toString());
+    }
+    return result.toString();
 }
 
 void SourceBuffer::stop()
@@ -543,7 +559,7 @@ ExceptionOr<void> SourceBuffer::appendBufferInternal(const unsigned char* data, 
 #if USE(GSTREAMER)
     // 5. If the buffer full flag equals true, then throw a QuotaExceededError exception and abort these step.
     if (m_bufferFull) {
-        LOG(MediaSource, "SourceBuffer::appendBufferInternal(%p) -  buffer full, failing with QuotaExceededError error", this);
+        LOG(MediaSource, "SourceBuffer::appendBufferInternal(%s) -  buffer full, failing with QuotaExceededError error", id().utf8().data());
         return Exception { QuotaExceededError };
     }
 #endif
@@ -613,6 +629,14 @@ void SourceBuffer::sourceBufferPrivateAppendComplete(AppendResult result)
     if (isRemoved())
         return;
 
+    bool readyForMoreSamples = true;
+    for (auto& trackBufferPair : m_trackBufferMap) {
+        const AtomicString& trackID = trackBufferPair.key;
+        readyForMoreSamples &= m_private->isReadyForMoreSamples(trackID);
+    }
+
+    LOG(MediaSource, "### SourceBuffer::sourceBufferPrivateAppendComplete(%s): readyForMoreSamples: %s", id().utf8().data(), readyForMoreSamples ? "true" : "false");
+
     // Resolve the changes it TrackBuffers' buffered ranges
     // into the SourceBuffer's buffered ranges
     updateBufferedFromTrackBuffers();
@@ -623,7 +647,7 @@ void SourceBuffer::sourceBufferPrivateAppendComplete(AppendResult result)
     // 2. If the input buffer contains bytes that violate the SourceBuffer byte stream format specification,
     // then run the append error algorithm with the decode error parameter set to true and abort this algorithm.
     if (result == ParsingFailed) {
-        LOG(MediaSource, "SourceBuffer::sourceBufferPrivateAppendComplete(%p) - result = ParsingFailed", this);
+        LOG(MediaSource, "SourceBuffer::sourceBufferPrivateAppendComplete(%s) - result = ParsingFailed", id().utf8().data());
         appendError(true);
         return;
     }
@@ -660,7 +684,7 @@ void SourceBuffer::sourceBufferPrivateAppendComplete(AppendResult result)
         const auto& trackID = trackBufferPair.key;
 
         if (trackBuffer.needsReenqueueing) {
-            LOG(MediaSource, "SourceBuffer::sourceBufferPrivateAppendComplete(%p) - reenqueuing at time (%s)", this, toString(currentMediaTime).utf8().data());
+            LOG(MediaSource, "SourceBuffer::sourceBufferPrivateAppendComplete(%s) - reenqueuing at time (%s)", id().utf8().data(), toString(currentMediaTime).utf8().data());
             reenqueueMediaForTime(trackBuffer, trackID, currentMediaTime);
         } else
             provideMediaData(trackBuffer, trackID);
@@ -670,7 +694,7 @@ void SourceBuffer::sourceBufferPrivateAppendComplete(AppendResult result)
     if (extraMemoryCost() > this->maximumBufferSize())
         m_bufferFull = true;
 
-    LOG(Media, "SourceBuffer::sourceBufferPrivateAppendComplete(%p) - buffered = %s", this, toString(m_buffered->ranges()).utf8().data());
+    LOG(Media, "SourceBuffer::sourceBufferPrivateAppendComplete(%s) - buffered = %s", id().utf8().data(), toString(m_buffered->ranges()).utf8().data());
 }
 
 void SourceBuffer::sourceBufferPrivateDidReceiveRenderingError(int error)
@@ -679,7 +703,7 @@ void SourceBuffer::sourceBufferPrivateDidReceiveRenderingError(int error)
     UNUSED_PARAM(error);
 #endif
 
-    LOG(MediaSource, "SourceBuffer::sourceBufferPrivateDidReceiveRenderingError(%p) - result = %i", this, error);
+    LOG(MediaSource, "SourceBuffer::sourceBufferPrivateDidReceiveRenderingError(%s) - result = %i", id().utf8().data(), error);
 
     if (!isRemoved())
         m_source->streamEndedWithError(MediaSource::EndOfStreamError::Decode);
@@ -687,6 +711,8 @@ void SourceBuffer::sourceBufferPrivateDidReceiveRenderingError(int error)
 
 String SourceBuffer::id() const
 {
+    if (m_trackBufferMap.isEmpty())
+        return String::format("%p", this);
     return m_trackBufferMap.begin()->key.string();
 }
 
@@ -723,7 +749,7 @@ static PlatformTimeRanges removeSamplesFromTrackBuffer(const DecodeOrderSampleMa
 
         const RefPtr<MediaSample>& sample = sampleIt.second;
         if (UNLIKELY(mediaSourceLogEnabled()))
-            LOG(MediaSource, "SourceBuffer::%s(%p) - removing sample(%s)", logPrefix, buffer, toString(*sampleIt.second).utf8().data());
+            LOG(MediaSource, "SourceBuffer::%s(%s) - removing sample(%s)", logPrefix, buffer->id().utf8().data(), toString(*sampleIt.second).utf8().data());
         // Remove the erased samples from the TrackBuffer sample map.
         trackBuffer.samples.removeSample(sample.get());
 
@@ -777,7 +803,7 @@ static PlatformTimeRanges removeSamplesFromTrackBuffer(const DecodeOrderSampleMa
 
 #if !LOG_DISABLED
     if (bytesRemoved)
-        LOG(MediaSource, "SourceBuffer::%s(%p) removed %zu bytes, start(%lf), end(%lf)", logPrefix, buffer, bytesRemoved, earliestSample.toDouble(), latestSample.toDouble());
+        LOG(MediaSource, "SourceBuffer::%s(%s) removed %zu bytes, start(%lf), end(%lf)", logPrefix, buffer->id().utf8().data(), bytesRemoved, earliestSample.toDouble(), latestSample.toDouble());
 #endif
 
     return erasedRanges;
@@ -785,7 +811,7 @@ static PlatformTimeRanges removeSamplesFromTrackBuffer(const DecodeOrderSampleMa
 
 void SourceBuffer::removeCodedFrames(const MediaTime& start, const MediaTime& end)
 {
-    LOG(MediaSource, "SourceBuffer::removeCodedFrames(%p) - start(%s), end(%s)", this, toString(start).utf8().data(), toString(end).utf8().data());
+    LOG(MediaSource, "SourceBuffer::removeCodedFrames(%s) - start(%s), end(%s)", id().utf8().data(), toString(start).utf8().data(), toString(end).utf8().data());
 
     // 3.5.9 Coded Frame Removal Algorithm
     // https://dvcs.w3.org/hg/html-media/raw-file/tip/media-source/media-source.html#sourcebuffer-coded-frame-removal
@@ -817,7 +843,7 @@ void SourceBuffer::removeCodedFrames(const MediaTime& start, const MediaTime& en
             std::pair<RefPtr<MediaSample>, RefPtr<MediaSample>> replacementSamples = sample->divide(time);
             if (!replacementSamples.first || !replacementSamples.second)
                 return;
-            LOG(MediaSource, "SourceBuffer::removeCodedFrames(%p) - splitting sample (%s) into\n\t(%s)\n\t(%s)", this,
+            LOG(MediaSource, "SourceBuffer::removeCodedFrames(%s) - splitting sample (%s) into\n\t(%s)\n\t(%s)", id().utf8().data(),
                 toString(sample).utf8().data(),
                 toString(replacementSamples.first).utf8().data(),
                 toString(replacementSamples.second).utf8().data());
@@ -878,7 +904,7 @@ void SourceBuffer::removeCodedFrames(const MediaTime& start, const MediaTime& en
     // 4. If buffer full flag equals true and this object is ready to accept more bytes, then set the buffer full flag to false.
     // No-op
 
-    LOG(Media, "SourceBuffer::removeCodedFrames(%p) - buffered = %s", this, toString(m_buffered->ranges()).utf8().data());
+    LOG(Media, "SourceBuffer::removeCodedFrames(%s) - buffered = %s", id().utf8().data(), toString(m_buffered->ranges()).utf8().data());
 }
 
 void SourceBuffer::removeTimerFired()
@@ -920,7 +946,7 @@ void SourceBuffer::evictCodedFrames(size_t newDataSize)
     // 1. Let new data equal the data that is about to be appended to this SourceBuffer.
     // 2. If the buffer full flag equals false, then abort these steps.
     if (!m_bufferFull) {
-        LOG(MediaSource, "SourceBuffer::evictCodedFrames(%p) - buffer is not full, current buffer size %zu", this, extraMemoryCost());
+        LOG(MediaSource, "SourceBuffer::evictCodedFrames(%s) - buffer is not full, current buffer size %zu", id().utf8().data(), extraMemoryCost());
         return;
     }
 
@@ -963,7 +989,7 @@ void SourceBuffer::evictCodedFrames(size_t newDataSize)
 #endif
 
 #if !LOG_DISABLED
-    LOG(MediaSource, "SourceBuffer::evictCodedFrames(%p) - currentTime = %lf, require %zu bytes, maximum buffer size is %zu", this, m_source->currentTime().toDouble(), extraMemoryCost() + newDataSize, maximumBufferSize);
+    LOG(MediaSource, "SourceBuffer::evictCodedFrames(%s) - currentTime = %lf, require %zu bytes, maximum buffer size is %zu", id().utf8().data(), m_source->currentTime().toDouble(), extraMemoryCost() + newDataSize, maximumBufferSize);
     size_t initialBufferedSize = extraMemoryCost();
 #endif
 
@@ -982,7 +1008,7 @@ void SourceBuffer::evictCodedFrames(size_t newDataSize)
                 toString(removalRange.end(i)).utf8().data());
             removeCodedFrames(removalRange.start(i), removalRange.end(i));
             if (extraMemoryCost() + newDataSize < maximumBufferSize) {
-                LOG(MediaSource, "SourceBuffer::evictCodedFrames(%p) - the buffer is not full anymore.", this);
+                LOG(MediaSource, "SourceBuffer::evictCodedFrames(%s) - the buffer is not full anymore.", id().utf8().data());
                 m_bufferFull = false;
                 break;
             }
@@ -996,7 +1022,7 @@ void SourceBuffer::evictCodedFrames(size_t newDataSize)
     }
 
     if (!m_bufferFull) {
-        LOG(MediaSource, "SourceBuffer::evictCodedFrames(%p) - evicted %zu bytes", this, initialBufferedSize - extraMemoryCost());
+        LOG(MediaSource, "SourceBuffer::evictCodedFrames(%s) - evicted %zu bytes", id().utf8().data(), initialBufferedSize - extraMemoryCost());
         return;
     }
 
@@ -1009,7 +1035,7 @@ void SourceBuffer::evictCodedFrames(size_t newDataSize)
     MediaTime minimumRangeStart = currentTime + thirtySeconds;
 
     if (currentTimeRange == buffered.length() - 1) {
-        LOG(MediaSource, "SourceBuffer::evictCodedFrames(%p) - evicted %zu bytes from the beginning but failed to free enough.", this, initialBufferedSize - extraMemoryCost());
+        LOG(MediaSource, "SourceBuffer::evictCodedFrames(%s) - evicted %zu bytes from the beginning but failed to free enough.", id().utf8().data(), initialBufferedSize - extraMemoryCost());
         minimumRangeStart = m_groupEndTimestamp;
     }
 
@@ -1021,7 +1047,7 @@ void SourceBuffer::evictCodedFrames(size_t newDataSize)
         rangeEnd = m_source->duration();
 #else
     if (currentTimeRange == buffered.length() - 1) {
-        LOG(MediaSource, "SourceBuffer::evictCodedFrames(%p) - evicted %zu bytes but FAILED to free enough", this, initialBufferedSize - extraMemoryCost());
+        LOG(MediaSource, "SourceBuffer::evictCodedFrames(%s) - evicted %zu bytes but FAILED to free enough", id().utf8().data(), initialBufferedSize - extraMemoryCost());
         return;
     }
 
@@ -1031,18 +1057,18 @@ void SourceBuffer::evictCodedFrames(size_t newDataSize)
 #endif
     rangeStart = rangeEnd - thirtySeconds;
 
-    LOG(MediaSource, "SourceBuffer::evictCodedFrames(%p) - minimumRangeStart: %f, duration: %f", this, minimumRangeStart.toDouble(), m_source->duration().toDouble());
+    LOG(MediaSource, "SourceBuffer::evictCodedFrames(%s) - minimumRangeStart: %f, duration: %f", id().utf8().data(), minimumRangeStart.toDouble(), m_source->duration().toDouble());
 
     auto removeFramesWhileFull = [&] (PlatformTimeRanges& ranges, const char* tag) {
         for (int i = ranges.length()-1; i >= 0; --i) {
-            LOG(MediaSource, "SourceBuffer::evictCodedFrames(%p) - removing coded frames in range [%f, %f)", this, ranges.start(i).toDouble(), ranges.end(i).toDouble());
+            LOG(MediaSource, "SourceBuffer::evictCodedFrames(%s) - removing coded frames in range [%f, %f)", id().utf8().data(), ranges.start(i).toDouble(), ranges.end(i).toDouble());
             WTFLogAlways("!!! evictCodedFrames(): %s Removing [%s..%s]",
                 tag,
                 toString(ranges.start(i)).utf8().data(),
                 toString(ranges.end(i)).utf8().data());
             removeCodedFrames(ranges.start(i), ranges.end(i));
             if (extraMemoryCost() + newDataSize < maximumBufferSize) {
-                LOG(MediaSource, "SourceBuffer::evictCodedFrames(%p) - buffer is not full anymore.", this);
+                LOG(MediaSource, "SourceBuffer::evictCodedFrames(%s) - buffer is not full anymore.", id().utf8().data());
                 m_bufferFull = false;
                 break;
             }
@@ -1051,8 +1077,8 @@ void SourceBuffer::evictCodedFrames(size_t newDataSize)
 
     const auto safeToRemoveRange = PlatformTimeRanges(minimumRangeStart, rangeEnd);
     while (rangeStart > minimumRangeStart) {
-        LOG(MediaSource, "SourceBuffer::evictCodedFrames(%p) - evicting: extraMemoryCost: %zu, rangeStart: %f, rangeEnd: %f",
-                this, extraMemoryCost(), rangeStart.toDouble(), rangeEnd.toDouble());
+        LOG(MediaSource, "SourceBuffer::evictCodedFrames(%s) - evicting: extraMemoryCost: %zu, rangeStart: %f, rangeEnd: %f",
+                id().utf8().data(), extraMemoryCost(), rangeStart.toDouble(), rangeEnd.toDouble());
 
         auto removalRange = PlatformTimeRanges(rangeStart, rangeEnd);
         removalRange.intersectWith(safeToRemoveRange);
@@ -1069,11 +1095,11 @@ void SourceBuffer::evictCodedFrames(size_t newDataSize)
     }
 
     if (m_bufferFull && currentTimeRange == notFound) {
-        LOG(MediaSource, "SourceBuffer::evictCodedFrames(%p) - We tried hard to evict, but the buffer is still full and current time is unbuffered, let's try to remove more buffered data.", this);
+        LOG(MediaSource, "SourceBuffer::evictCodedFrames(%s) - We tried hard to evict, but the buffer is still full and current time is unbuffered, let's try to remove more buffered data.", id().utf8().data());
         removeFramesWhileFull(buffered, String::format("%s: (C)", id().utf8().data()).utf8().data());
     }
 
-    LOG(MediaSource, "SourceBuffer::evictCodedFrames(%p) - evicted %zu bytes%s", this, initialBufferedSize - extraMemoryCost(), m_bufferFull ? " but FAILED to free enough" : "");
+    LOG(MediaSource, "SourceBuffer::evictCodedFrames(%s) - evicted %zu bytes%s", id().utf8().data(), initialBufferedSize - extraMemoryCost(), m_bufferFull ? " but FAILED to free enough" : "");
 }
 
 size_t SourceBuffer::maxBufferSizeVideo = 0;
@@ -1180,7 +1206,7 @@ void SourceBuffer::sourceBufferPrivateDidReceiveInitializationSegment(const Init
     if (isRemoved())
         return;
 
-    LOG(MediaSource, "SourceBuffer::sourceBufferPrivateDidReceiveInitializationSegment(%p)", this);
+    LOG(MediaSource, "SourceBuffer::sourceBufferPrivateDidReceiveInitializationSegment(%s)", id().utf8().data());
 
     // 3.5.8 Initialization Segment Received (ctd)
     // https://rawgit.com/w3c/media-source/c3ad59c7a370d04430969ba73d18dc9bcde57a33/index.html#sourcebuffer-init-segment-received [Editor's Draft 09 January 2015]
@@ -1657,7 +1683,7 @@ void SourceBuffer::sourceBufferPrivateDidReceiveSample(MediaSample& sample)
         // the presentation timestamp.
         MediaTime presentationStartTime = MediaTime::zeroTime();
         if (presentationTimestamp < presentationStartTime) {
-            LOG(MediaSource, "SourceBuffer::sourceBufferPrivateDidReceiveSample(%p) - failing because presentationTimestamp < presentationStartTime", this);
+            LOG(MediaSource, "SourceBuffer::sourceBufferPrivateDidReceiveSample(%s) - failing because presentationTimestamp < presentationStartTime", id().utf8().data());
             m_source->streamEndedWithError(MediaSource::EndOfStreamError::Decode);
             return;
         }
@@ -2003,7 +2029,7 @@ void SourceBuffer::sourceBufferPrivateReenqueSamples(const AtomicString& trackID
     if (isRemoved())
         return;
 
-    LOG(MediaSource, "SourceBuffer::sourceBufferPrivateReenqueSamples(%p)", this);
+    LOG(MediaSource, "SourceBuffer::sourceBufferPrivateReenqueSamples(%s)", id().utf8().data());
     auto it = m_trackBufferMap.find(trackID);
     if (it == m_trackBufferMap.end())
         return;
@@ -2018,7 +2044,7 @@ void SourceBuffer::sourceBufferPrivateDidBecomeReadyForMoreSamples(const AtomicS
     if (isRemoved())
         return;
 
-    LOG(MediaSource, "SourceBuffer::sourceBufferPrivateDidBecomeReadyForMoreSamples(%p)", this);
+    LOG(MediaSource, "SourceBuffer::sourceBufferPrivateDidBecomeReadyForMoreSamples(%s)", id().utf8().data());
     auto it = m_trackBufferMap.find(trackID);
     if (it == m_trackBufferMap.end())
         return;
@@ -2030,6 +2056,10 @@ void SourceBuffer::sourceBufferPrivateDidBecomeReadyForMoreSamples(const AtomicS
 
 void SourceBuffer::provideMediaData(TrackBuffer& trackBuffer, const AtomicString& trackID)
 {
+    MediaTime providedSamplesStart = MediaTime::invalidTime();
+    MediaTime providedSamplesStop = MediaTime::invalidTime();
+    MediaTime providedSamplesEnd = MediaTime::invalidTime();
+
     if (m_source->isSeeking())
         return;
 
@@ -2037,8 +2067,14 @@ void SourceBuffer::provideMediaData(TrackBuffer& trackBuffer, const AtomicString
     unsigned enqueuedSamples = 0;
 #endif
 
+    if (!trackBuffer.decodeQueue.empty()) {
+        auto endSample = trackBuffer.decodeQueue.rbegin()->second;
+        providedSamplesEnd = endSample->decodeTime();
+    }
+
     while (!trackBuffer.decodeQueue.empty()) {
         if (!m_private->isReadyForMoreSamples(trackID)) {
+            LOG(MediaSource, "SourceBuffer::provideMediaData(%s) - Break: Track %s isn't ready for more samples", id().utf8().data(), trackID.string().utf8().data());
             m_private->notifyClientWhenReadyForMoreSamples(trackID);
             break;
         }
@@ -2057,18 +2093,32 @@ void SourceBuffer::provideMediaData(TrackBuffer& trackBuffer, const AtomicString
         // new current time without triggering this early return.
         // FIXME(135867): Make this gap detection logic less arbitrary.
         MediaTime oneSecond(1, 1);
-        if (trackBuffer.lastEnqueuedDecodeEndTime.isValid() && sample->decodeTime() - trackBuffer.lastEnqueuedDecodeEndTime > oneSecond)
+        if (trackBuffer.lastEnqueuedDecodeEndTime.isValid() && sample->decodeTime() - trackBuffer.lastEnqueuedDecodeEndTime > oneSecond) {
+            LOG(MediaSource, "SourceBuffer::provideMediaData(%s) - Break: Sample (%s) >1 sec after lastEnqueuedDecodeEndTime (%s)",
+                id().utf8().data(), toString(sample->decodeTime()).utf8().data(), toString(trackBuffer.lastEnqueuedDecodeEndTime).utf8().data());
             break;
+        }
 
         trackBuffer.lastEnqueuedPresentationTime = sample->presentationTime();
         trackBuffer.lastEnqueuedDecodeEndTime = sample->decodeTime() + sample->duration();
+
+        if (providedSamplesStart.isInvalid() || providedSamplesStart > sample->decodeTime())
+            providedSamplesStart = sample->decodeTime();
+        if (providedSamplesStop.isInvalid() || providedSamplesStop < sample->decodeTime())
+            providedSamplesStop = sample->decodeTime();
+
         m_private->enqueueSample(sample.releaseNonNull(), trackID);
 #if !LOG_DISABLED
         ++enqueuedSamples;
 #endif
     }
 
-    LOG(MediaSource, "SourceBuffer::provideMediaData(%p) - Enqueued %u samples", this, enqueuedSamples);
+    if (!providedSamplesStart.isInvalid()) {
+        LOG(MediaSource, "### SourceBuffer::provideMediaData(%s): [%f, %f] remaining ... %f]\n", id().utf8().data(),
+            providedSamplesStart.toDouble(), providedSamplesStop.toDouble(), providedSamplesEnd.toDouble());
+    }
+
+    LOG(MediaSource, "SourceBuffer::provideMediaData(%s) - Enqueued %u samples", id().utf8().data(), enqueuedSamples);
 }
 
 static String printDecodeQueue(DecodeOrderSampleMap::MapType decodeQueue)
@@ -2091,7 +2141,10 @@ void SourceBuffer::reenqueueMediaForTime(TrackBuffer& trackBuffer, const AtomicS
     String ledetAfter = "Not reached";
     String earlyReturn = "Not reached";
 
+    LOG(MediaSource, "SourceBuffer::reenqueueMediaForTime(%s) - trackID: %s, time: %s", id().utf8().data(), trackID.string().utf8().data(), toString(time).utf8().data());
     m_private->flush(trackID);
+
+    LOG(MediaSource, "SourceBuffer::reenqueueMediaForTime(%s): Clearing decode queue", id().utf8().data());
     trackBuffer.decodeQueue.clear();
 
     // Find the sample which contains the current presentation time.
@@ -2108,6 +2161,9 @@ void SourceBuffer::reenqueueMediaForTime(TrackBuffer& trackBuffer, const AtomicS
         if ((currentSamplePTSIterator->first - time) > currentTimeFudgeFactor())
             earlyReturn.append(String::format("First sample available %s is too much beyond requested time %s",
                     toString(currentSamplePTSIterator->first).utf8().data(), toString(time).utf8().data()));
+        LOG(MediaSource, "SourceBuffer::reenqueueMediaForTime(%s): Returning because the first sample (%s) is beyond the reenqueue time (%s)",
+            id().utf8().data(), (currentSamplePTSIterator == trackBuffer.samples.presentationOrder().end()) ? "not found" : toString(currentSamplePTSIterator->first).utf8().data(),
+            toString(time).utf8().data());
         goto end;
     }
 
@@ -2121,6 +2177,7 @@ void SourceBuffer::reenqueueMediaForTime(TrackBuffer& trackBuffer, const AtomicS
         auto reverseLastSyncSampleIter = trackBuffer.samples.decodeOrder().findSyncSamplePriorToDecodeIterator(reverseCurrentSampleIter);
         if (reverseLastSyncSampleIter == trackBuffer.samples.decodeOrder().rend()) {
             earlyReturn = "(B) No sync sample found before requested time";
+            LOG(MediaSource, "SourceBuffer::reenqueueMediaForTime(%s): Returning because the last sync sample couldn't be found", id().utf8().data());
             goto end;
         }
 
@@ -2135,14 +2192,25 @@ void SourceBuffer::reenqueueMediaForTime(TrackBuffer& trackBuffer, const AtomicS
             auto& lastSample = trackBuffer.decodeQueue.rbegin()->second;
             trackBuffer.lastEnqueuedPresentationTime = lastSample->presentationTime();
             trackBuffer.lastEnqueuedDecodeEndTime = lastSample->decodeTime();
+            LOG(MediaSource, "SourceBuffer::reenqueueMediaForTime(%s): Non-displaying samples: [%s, %s]",
+                id().utf8().data(), toString(trackBuffer.decodeQueue.begin()->first.first).utf8().data(),
+                toString(trackBuffer.decodeQueue.rbegin()->first.first).utf8().data());
         } else {
             trackBuffer.lastEnqueuedPresentationTime = MediaTime::invalidTime();
             trackBuffer.lastEnqueuedDecodeEndTime = MediaTime::invalidTime();
         }
 
+        LOG(MediaSource, "SourceBuffer::reenqueueMediaForTime(%s): lastDecodeTimestamp: %s, lastEnqueuedDecodeEndTime: %s, lastEnqueuedPresentationTime: %s",
+            id().utf8().data(),
+            toString(trackBuffer.lastDecodeTimestamp).utf8().data(),
+            toString(trackBuffer.lastEnqueuedDecodeEndTime).utf8().data(),
+            toString(trackBuffer.lastEnqueuedPresentationTime).utf8().data());
+
         // Fill the decode queue with the remaining samples.
-        for (auto iter = currentSampleDTSIterator; iter != trackBuffer.samples.decodeOrder().end(); ++iter)
+        for (auto iter = currentSampleDTSIterator; iter != trackBuffer.samples.decodeOrder().end(); ++iter) {
+            LOG(MediaSource, "SourceBuffer::reenqueueMediaForTime(%s): Adding displaying sample to decodeQueue: %s", id().utf8().data(), toString(iter->first.first).utf8().data());
             trackBuffer.decodeQueue.insert(*iter);
+        }
 
         dqAfter = printDecodeQueue(trackBuffer.decodeQueue);
         provideMediaData(trackBuffer, trackID);
@@ -2180,7 +2248,7 @@ void SourceBuffer::monitorBufferingRate()
 
     m_averageBufferRate += (interval * ExponentialMovingAverageCoefficient) * (rateSinceLastMonitor - m_averageBufferRate);
 
-    LOG(MediaSource, "SourceBuffer::monitorBufferingRate(%p) - m_avegareBufferRate: %lf", this, m_averageBufferRate);
+    LOG(MediaSource, "SourceBuffer::monitorBufferingRate(%s) - m_avegareBufferRate: %lf", id().utf8().data(), m_averageBufferRate);
 }
 
 void SourceBuffer::updateBufferedFromTrackBuffers()

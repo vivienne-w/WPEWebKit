@@ -48,6 +48,7 @@
 #include <gst/video/video.h>
 #include <wtf/Condition.h>
 #include <wtf/MainThread.h>
+#include <wtf/StringPrintStream.h>
 #include <wtf/glib/GMutexLocker.h>
 #include <wtf/glib/GUniquePtr.h>
 #include <wtf/text/CString.h>
@@ -645,7 +646,7 @@ void webKitMediaSrcUriHandlerInit(gpointer gIface, gpointer)
 
 static void seekNeedsDataMainThread(WebKitMediaSrc* source)
 {
-    GST_DEBUG("Buffering needed before seek");
+    GST_DEBUG("### Buffering needed before seek");
 
     ASSERT(WTF::isMainThread());
 
@@ -725,6 +726,7 @@ void webKitMediaSrcSetMediaPlayerPrivate(WebKitMediaSrc* source, WebCore::MediaP
 
 void webKitMediaSrcSetReadyForSamples(WebKitMediaSrc* source, bool isReady)
 {
+    GST_DEBUG("### isReady: %s", isReady ? "true" : "false");
     if (source) {
         GST_OBJECT_LOCK(source);
         for (Stream* stream : source->priv->streams)
@@ -735,6 +737,7 @@ void webKitMediaSrcSetReadyForSamples(WebKitMediaSrc* source, bool isReady)
 
 void webKitMediaSrcPrepareSeek(WebKitMediaSrc* source, const MediaTime& time)
 {
+    GST_DEBUG("### time: %s", toString(time).utf8().data());
     GST_OBJECT_LOCK(source);
     source->priv->seekTime = time;
     source->priv->appsrcSeekDataCount = 0;

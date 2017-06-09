@@ -49,6 +49,8 @@
 #include "TimeRanges.h"
 #include "VideoTrackList.h"
 
+#include <wtf/text/StringBuilder.h>
+
 // ### DEBUG ###
 #undef LOG_DISABLED
 #define LOG_DISABLED 0
@@ -56,6 +58,7 @@
 #define LOG(channel, msg, ...) do { printf("%s: ", #channel); printf(msg, ## __VA_ARGS__); printf("\n"); fflush(stdout); } while (false)
 
 #if !LOG_DISABLED
+#include <wtf/StringPrintStream.h>
 #include <wtf/text/StringBuilder.h>
 #endif
 
@@ -215,6 +218,7 @@ std::unique_ptr<PlatformTimeRanges> MediaSource::buffered() const
 
 void MediaSource::seekToTime(const MediaTime& time)
 {
+    LOG(MediaSource, "### MediaSource::seekToTime(%p): time %s", this, toString(time).utf8().data());
     if (isClosed())
         return;
 
@@ -251,6 +255,7 @@ void MediaSource::seekToTime(const MediaTime& time)
 
 void MediaSource::completeSeek()
 {
+    LOG(MediaSource, "### MediaSource::completeSeek(%p)", this);
     if (isClosed())
         return;
 
@@ -272,6 +277,17 @@ void MediaSource::completeSeek()
     m_private->seekCompleted();
 
     monitorSourceBuffers();
+}
+
+String MediaSource::detailedBuffered()
+{
+    StringBuilder result;
+    for (RefPtr<SourceBuffer> sourceBuffer : *m_activeSourceBuffers) {
+        if (!result.isEmpty())
+            result.append("; ");
+        result.append(sourceBuffer->detailedBuffered());
+    }
+    return result.toString();
 }
 
 Ref<TimeRanges> MediaSource::seekable()
@@ -402,6 +418,8 @@ void MediaSource::monitorSourceBuffers()
     if (isClosed())
         return;
 
+    LOG(MediaSource, "### MediaSource::monitorSourceBuffers(%p): buffered: %s", this, detailedBuffered().utf8().data());
+
     // 2.4.4 SourceBuffer Monitoring
     // https://rawgit.com/w3c/media-source/45627646344eea0170dd1cbc5a3d508ca751abb8/media-source-respec.html#buffer-monitoring
 
@@ -439,8 +457,11 @@ void MediaSource::monitorSourceBuffers()
         // 3. Playback may resume at this point if it was previously suspended by a transition to HAVE_CURRENT_DATA.
         m_private->setReadyState(MediaPlayer::HaveEnoughData);
 
-        if (m_pendingSeekTime.isValid())
+        if (m_pendingSeekTime.isValid()) {
+            LOG(MediaSource, "MediaSource::monitorSourceBuffers(): completeSeek() because HaveEnoughData. pendingSeekTime: %s, buffered: %s",
+                toString(m_pendingSeekTime).utf8().data(), detailedBuffered().utf8().data());
             completeSeek();
+        }
 
         // 4. Abort these steps.
         return;
@@ -454,8 +475,11 @@ void MediaSource::monitorSourceBuffers()
         // 3. Playback may resume at this point if it was previously suspended by a transition to HAVE_CURRENT_DATA.
         m_private->setReadyState(MediaPlayer::HaveFutureData);
 
-        if (m_pendingSeekTime.isValid())
+        if (m_pendingSeekTime.isValid()) {
+            LOG(MediaSource, "MediaSource::monitorSourceBuffers(): completeSeek() because HaveFutureData. pendingSeekTime: %s, buffered: %s",
+                toString(m_pendingSeekTime).utf8().data(), detailedBuffered().utf8().data());
             completeSeek();
+        }
 
         // 4. Abort these steps.
         return;

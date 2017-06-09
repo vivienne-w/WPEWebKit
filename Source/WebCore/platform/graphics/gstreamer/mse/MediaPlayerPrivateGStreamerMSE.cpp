@@ -243,6 +243,8 @@ bool MediaPlayerPrivateGStreamerMSE::changePipelineState(GstState newState)
 
 void MediaPlayerPrivateGStreamerMSE::notifySeekNeedsDataForTime(const MediaTime& seekTime)
 {
+    GST_DEBUG("### seekTime: %s", toString(seekTime).utf8().data());
+
     // Reenqueue samples needed to resume playback in the new position.
     m_mediaSource->seekToTime(seekTime);
 
@@ -263,6 +265,8 @@ bool MediaPlayerPrivateGStreamerMSE::doSeek(const MediaTime&, float, GstSeekFlag
 
 bool MediaPlayerPrivateGStreamerMSE::doSeek()
 {
+    GST_DEBUG("### doSeek()");
+
     MediaTime seekTime = m_seekTime;
     double rate = m_player->rate();
     GstSeekFlags seekType = static_cast<GstSeekFlags>(GST_SEEK_FLAG_FLUSH | hardwareDependantSeekFlags());
@@ -340,7 +344,7 @@ bool MediaPlayerPrivateGStreamerMSE::doSeek()
         m_mseSeekCompleted = true;
         m_mediaSource->seekToTime(seekTime);
         if (!m_mseSeekCompleted) {
-            GST_DEBUG("[Seek] Delaying the seek: MSE is not ready");
+            GST_DEBUG("### [Seek] Delaying the seek: MSE is not ready");
             m_readyState = MediaPlayer::HaveMetadata;
             GstStateChangeReturn setStateResult = gst_element_set_state(m_pipeline.get(), GST_STATE_PAUSED);
             if (setStateResult == GST_STATE_CHANGE_FAILURE) {
@@ -362,7 +366,7 @@ bool MediaPlayerPrivateGStreamerMSE::doSeek()
         return m_seeking;
     }
 
-    GST_DEBUG("We can seek now");
+    GST_DEBUG("### We can seek now");
 
     MediaTime startTime = seekTime, endTime = MediaTime::invalidTime();
 
@@ -380,6 +384,9 @@ bool MediaPlayerPrivateGStreamerMSE::doSeek()
     webKitMediaSrcPrepareSeek(WEBKIT_MEDIA_SRC(m_source.get()), seekTime);
 
     m_gstSeekCompleted = false;
+
+    GST_DEBUG("### gst_element_seek(): %s", toString(startTime).utf8().data());
+
     if (!gst_element_seek(m_pipeline.get(), rate, GST_FORMAT_TIME, seekType, GST_SEEK_TYPE_SET, toGstClockTime(startTime), GST_SEEK_TYPE_SET, toGstClockTime(endTime))) {
         webKitMediaSrcSetReadyForSamples(WEBKIT_MEDIA_SRC(m_source.get()), true);
         m_seeking = false;
@@ -395,6 +402,8 @@ bool MediaPlayerPrivateGStreamerMSE::doSeek()
 
 void MediaPlayerPrivateGStreamerMSE::maybeFinishSeek()
 {
+    GST_DEBUG("### maybeFinishSeek()");
+
     if (!m_seeking || !m_mseSeekCompleted || !m_gstSeekCompleted)
         return;
 
@@ -477,6 +486,8 @@ void MediaPlayerPrivateGStreamerMSE::setReadyState(MediaPlayer::ReadyState ready
 
 void MediaPlayerPrivateGStreamerMSE::waitForSeekCompleted()
 {
+    GST_DEBUG("### waitForSeekCompleted()");
+
     if (!m_seeking)
         return;
 
@@ -495,8 +506,10 @@ void MediaPlayerPrivateGStreamerMSE::seekCompleted()
 
     doSeek();
 
-    if (!seeking() && m_readyState >= MediaPlayer::HaveFutureData)
+    if (!seeking() && m_readyState >= MediaPlayer::HaveFutureData) {
+        GST_DEBUG("### changePipelineState(PLAYING)");
         changePipelineState(GST_STATE_PLAYING);
+    }
 
     if (!seeking())
         m_player->timeChanged();
@@ -616,6 +629,7 @@ void MediaPlayerPrivateGStreamerMSE::updateStates()
             }
 
             if (!seeking() && !buffering && !m_paused && m_playbackRate) {
+                GST_DEBUG("### CHANGE_SUCCESS && !seeking() && !buffering() && !m_paused && m_playbackRate: changePipelineState(PLAYING)");
                 GST_DEBUG("[Buffering] Restarting playback.");
                 changePipelineState(GST_STATE_PLAYING);
             }
@@ -694,9 +708,10 @@ void MediaPlayerPrivateGStreamerMSE::asyncStateChangeDone()
     if (UNLIKELY(!m_pipeline || m_errorOccured))
         return;
 
-    if (m_seeking)
+    if (m_seeking) {
+        GST_DEBUG("### While m_seeking");
         maybeFinishSeek();
-    else
+    } else
         updateStates();
 }
 

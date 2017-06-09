@@ -125,6 +125,7 @@ bool SourceBufferPrivateGStreamer::isReadyForMoreSamples(const AtomicString&)
 
 void SourceBufferPrivateGStreamer::setReadyForMoreSamples(bool isReady)
 {
+    GST_DEBUG("### isReady: %s", isReady ? "true" : "false");
     ASSERT(WTF::isMainThread());
     m_isReadyForMoreSamples = isReady;
 }
