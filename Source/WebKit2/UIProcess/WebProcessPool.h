@@ -283,7 +283,8 @@ public:
     // Network Process Management
     NetworkProcessProxy& ensureNetworkProcess();
     NetworkProcessProxy* networkProcess() { return m_networkProcess.get(); }
-    void networkProcessCrashed(NetworkProcessProxy*);
+    void networkProcessCrashed(NetworkProcessProxy&, Vector<RefPtr<Messages::WebProcessProxy::GetNetworkProcessConnection::DelayedReply>>&&);
+    void networkProcessFailedToLaunch(NetworkProcessProxy&);
 
     void getNetworkProcessConnection(PassRefPtr<Messages::WebProcessProxy::GetNetworkProcessConnection::DelayedReply>);
 
