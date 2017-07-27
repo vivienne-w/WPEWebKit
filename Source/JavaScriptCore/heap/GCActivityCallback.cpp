@@ -62,6 +62,7 @@ GCActivityCallback::GCActivityCallback(Heap* heap)
 GCActivityCallback::GCActivityCallback(Heap* heap)
     : GCActivityCallback(heap->vm())
 {
+    g_source_set_ready_time(m_timer.get(), g_get_monotonic_time() + s_decade * G_USEC_PER_SEC);
 }
 #endif
 
@@ -119,15 +120,14 @@ void GCActivityCallback::cancelTimer()
 void GCActivityCallback::scheduleTimer(double newDelay)
 {
     ASSERT(newDelay >= 0);
-    if (m_delay != -1 && newDelay * timerSlop > m_delay)
+    if (newDelay * timerSlop > m_delay)
         return;
 
+    double delta = m_delay - newDelay;
     m_delay = newDelay;
-    if (!m_delay) {
-        g_source_set_ready_time(m_timer.get(), 0);
-        return;
-    }
+    m_nextFireTime = WTF::currentTime() + newDelay;
 
+#if 0
     auto delayDuration = std::chrono::duration<double>(m_delay);
     std::chrono::microseconds safeDelayDuration =
         Options::maxDelayForGCTimers() ? std::chrono::seconds(Options::maxDelayForGCTimers()) : std::chrono::microseconds::max();
@@ -137,12 +137,17 @@ void GCActivityCallback::scheduleTimer(double newDelay)
     gint64 targetTime = currentTime + std::min<gint64>(G_MAXINT64 - currentTime, safeDelayDuration.count());
     ASSERT(targetTime >= currentTime);
     g_source_set_ready_time(m_timer.get(), targetTime);
+#endif
+
+    gint64 readyTime = g_source_get_ready_time(m_timer.get());
+    g_source_set_ready_time(m_timer.get(), readyTime - delta * G_USEC_PER_SEC);
 }
 
 void GCActivityCallback::cancelTimer()
 {
-    m_delay = -1;
-    g_source_set_ready_time(m_timer.get(), -1);
+    m_delay = s_decade;
+    m_nextFireTime = 0;
+    g_source_set_ready_time(m_timer.get(), g_get_monotonic_time() + s_decade * G_USEC_PER_SEC);
 }
 #endif
 

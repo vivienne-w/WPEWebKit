@@ -82,6 +82,7 @@ protected:
     void stop();
     Ecore_Timer* m_timer;
 #elif USE(GLIB)
+    static const long s_decade;
     void timerDidFire();
     GRefPtr<GSource> m_timer;
 #endif
