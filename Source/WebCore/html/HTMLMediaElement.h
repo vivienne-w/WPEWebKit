@@ -478,6 +478,7 @@ public:
     void updateShouldPlay();
 
     RenderMedia* renderer() const;
+    RenderMedia* elementRenderer() const override { return renderer(); };
 
     void resetPlaybackSessionState();
     bool isVisibleInViewport() const;

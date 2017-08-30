@@ -129,6 +129,7 @@ class IntRect;
 class IntSize;
 class MediaPlayer;
 class PlatformTimeRanges;
+class RenderMedia;
 
 struct MediaPlayerFactory;
 
@@ -283,6 +284,8 @@ public:
 #endif
 
     virtual bool mediaPlayerShouldDisableSleep() const { return false; }
+
+    virtual RenderMedia* elementRenderer() const { return nullptr; }
 };
 
 class MediaPlayerSupportsTypeClient {

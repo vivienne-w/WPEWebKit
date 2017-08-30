@@ -486,9 +486,11 @@ void MediaPlayer::loadWithNextMediaEngine(const MediaPlayerFactory* current)
     if (!engine) {
         LOG(Media, "MediaPlayer::loadWithNextMediaEngine - no media engine found for type \"%s\"", m_contentMIMEType.utf8().data());
         m_currentMediaEngine = engine;
+        // ### Clean old PlatformLayer (aka: PlayerPrivate) before replacing it with the null instance
         m_private = nullptr;
     } else if (m_currentMediaEngine != engine) {
         m_currentMediaEngine = engine;
+        // ### Clean old PlatformLayer (aka: PlayerPrivate) before replacing it with the null instance
         m_private = engine->constructor(this);
         m_client.mediaPlayerEngineUpdated(this);
         m_private->setPrivateBrowsingMode(m_privateBrowsing);

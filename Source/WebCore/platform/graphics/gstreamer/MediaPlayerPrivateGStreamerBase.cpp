@@ -84,6 +84,10 @@
 #if USE(TEXTURE_MAPPER_GL)
 #include "BitmapTextureGL.h"
 #include "BitmapTexturePool.h"
+#include "RenderMedia.h"
+#include "RenderLayer.h"
+#include "RenderLayerBacking.h"
+#include "GraphicsLayer.h"
 #include "TextureMapperGL.h"
 #endif
 #if USE(COORDINATED_GRAPHICS_THREADED)
@@ -315,6 +319,35 @@ MediaPlayerPrivateGStreamerBase::~MediaPlayerPrivateGStreamerBase()
     }
 
     g_mutex_clear(&m_sampleMutex);
+
+#if USE(TEXTURE_MAPPER_GL) && USE(COORDINATED_GRAPHICS)
+    if (m_player) {
+        RenderMedia* renderer = m_player->client().elementRenderer();
+        if (renderer) {
+            RenderLayer* layer = renderer->layer();
+            if (layer) {
+                RenderLayerBacking* backing = layer->backing();
+                if (backing) {
+                    GraphicsLayer* graphicsLayer = backing->graphicsLayer();
+                    if (graphicsLayer) {
+                        printf("### %s: Clearing platformLayer via setContentsToPlatformLayer()\n", __PRETTY_FUNCTION__); fflush(stdout);
+                        graphicsLayer->setContentsToPlatformLayer(nullptr, GraphicsLayer::NoContentsLayer);
+                    } else {
+                        printf("### %s: No graphicsLayer\n", __PRETTY_FUNCTION__); fflush(stdout);
+                    }
+                } else {
+                    printf("### %s: No backing\n", __PRETTY_FUNCTION__); fflush(stdout);
+                }
+            } else {
+                printf("### %s: No layer\n", __PRETTY_FUNCTION__); fflush(stdout);
+            }
+        } else {
+            printf("### %s: No renderer\n", __PRETTY_FUNCTION__); fflush(stdout);
+        }
+    } else {
+        printf("### %s: No m_player\n", __PRETTY_FUNCTION__); fflush(stdout);
+    }
+#endif
 
     m_player = nullptr;
 

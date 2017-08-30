@@ -393,6 +393,8 @@ void CoordinatedGraphicsLayer::setContentsNeedsDisplay()
 
 void CoordinatedGraphicsLayer::setContentsToPlatformLayer(PlatformLayer* platformLayer, ContentsLayerPurpose)
 {
+    printf("### %s: platformLayer: %p\n", __PRETTY_FUNCTION__, platformLayer); fflush(stdout);
+
 #if USE(GRAPHICS_SURFACE)
     if (m_platformLayer) {
         ASSERT(m_platformLayerToken.isValid());
@@ -1250,6 +1252,8 @@ void CoordinatedGraphicsLayer::animationStartedTimerFired()
 #if USE(COORDINATED_GRAPHICS_THREADED)
 void CoordinatedGraphicsLayer::platformLayerWillBeDestroyed()
 {
+    printf("### %s: Resetting PlatformLayer\n", __PRETTY_FUNCTION__); fflush(stdout);
+    setContentsToPlatformLayer(nullptr, NoContentsLayer);
 }
 
 void CoordinatedGraphicsLayer::setPlatformLayerNeedsDisplay()

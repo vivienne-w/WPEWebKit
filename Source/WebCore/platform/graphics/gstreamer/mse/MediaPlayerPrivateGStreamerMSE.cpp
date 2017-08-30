@@ -114,6 +114,8 @@ bool MediaPlayerPrivateGStreamerMSE::isAvailable()
 MediaPlayerPrivateGStreamerMSE::MediaPlayerPrivateGStreamerMSE(MediaPlayer* player)
     : MediaPlayerPrivateGStreamer(player)
 {
+    printf("### %s: %p\n", __PRETTY_FUNCTION__, reinterpret_cast<PlatformLayer*>(this)); fflush(stdout);
+
     GST_TRACE("creating the player (%p)", this);
 }
 
