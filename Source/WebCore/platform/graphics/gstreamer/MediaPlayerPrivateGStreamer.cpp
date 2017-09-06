@@ -2259,6 +2259,11 @@ void MediaPlayerPrivateGStreamer::createGSTPlayBin()
     g_object_set(m_pipeline.get(), "video-sink", m_videoSink.get(), nullptr);
 #endif    
     
+    GRefPtr<GstElementFactory> brcmfactory = adoptGRef(gst_element_factory_find("brcmvideosink"));
+
+    m_videoSink = gst_element_factory_create(brcmfactory.get(), "BrcmVideoSink");
+    g_object_set(m_pipeline.get(), "video-sink", m_videoSink.get(), nullptr);
+
 #if !USE(WESTEROS_SINK) && !USE(FUSION_SINK)
     g_object_set(m_pipeline.get(), "audio-sink", createAudioSink(), nullptr);
 #endif
