@@ -323,7 +323,7 @@ public:
 private:
 #if ENABLE(DRAG_SUPPORT)
     static DragState& dragState();
-    static const Seconds TextDragDelay;
+    static const double TextDragDelay;
     Ref<DataTransfer> createDraggingDataTransfer() const;
 #endif
 
@@ -564,7 +564,7 @@ private:
     IntPoint m_lastKnownMousePosition;
     IntPoint m_lastKnownMouseGlobalPosition;
     IntPoint m_mouseDownPos; // In our view's coords.
-    WallTime m_mouseDownTimestamp;
+    double m_mouseDownTimestamp { 0 };
     PlatformMouseEvent m_mouseDown;
 
 #if PLATFORM(COCOA)

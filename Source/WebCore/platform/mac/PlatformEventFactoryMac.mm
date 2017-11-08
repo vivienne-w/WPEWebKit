@@ -39,7 +39,6 @@
 #import <pal/spi/mac/NSEventSPI.h>
 #import <pal/spi/mac/NSMenuSPI.h>
 #import <wtf/ASCIICType.h>
-#import <wtf/WallTime.h>
 
 namespace WebCore {
 
@@ -618,9 +617,9 @@ static CFTimeInterval cachedStartupTimeIntervalSince1970()
     return systemStartupTime;
 }
 
-WallTime eventTimeStampSince1970(NSEvent* event)
+double eventTimeStampSince1970(NSEvent* event)
 {
-    return WallTime::fromRawSeconds(static_cast<double>(cachedStartupTimeIntervalSince1970() + [event timestamp]));
+    return static_cast<double>(cachedStartupTimeIntervalSince1970() + [event timestamp]);
 }
 
 static inline bool isKeyUpEvent(NSEvent *event)

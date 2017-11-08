@@ -37,11 +37,12 @@ namespace WebCore {
 
 TypeAhead::TypeAhead(TypeAheadDataSource* dataSource)
     : m_dataSource(dataSource)
+    , m_lastTypeTime(0)
     , m_repeatingChar(0)
 {
 }
 
-static const Seconds typeAheadTimeout { 1_s };
+static const DOMTimeStamp typeAheadTimeout = 1000;
 
 static String stripLeadingWhiteSpace(const String& string)
 {
@@ -62,7 +63,7 @@ int TypeAhead::handleEvent(KeyboardEvent* event, MatchModeFlags matchMode)
         return -1;
 
     int optionCount = m_dataSource->optionCount();
-    Seconds delta = event->timeStamp() - m_lastTypeTime;
+    DOMTimeStamp delta = event->timeStamp() - m_lastTypeTime;
     m_lastTypeTime = event->timeStamp();
 
     UChar c = event->charCode();

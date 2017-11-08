@@ -18,8 +18,6 @@
  * Boston, MA 02110-1301, USA.
  */
 
-typedef double DOMHighResTimeStamp;
-
 [
     Constructor(DOMString type, optional EventInit eventInitDict),
     CustomToJSObject,
@@ -50,7 +48,7 @@ typedef double DOMHighResTimeStamp;
     [EnabledAtRuntime=ShadowDOM] readonly attribute boolean composed;
 
     [Unforgeable] readonly attribute boolean isTrusted;
-    [CallWith=ScriptExecutionContext, ImplementedAs=timeStampForBindings] readonly attribute DOMHighResTimeStamp timeStamp;
+    readonly attribute DOMTimeStamp timeStamp;
 
     void initEvent(DOMString type, optional boolean bubbles = false, optional boolean cancelable = false); // Historical.
 

@@ -112,8 +112,8 @@ FloatPoint ScrollAnimatorGtk::computeVelocity()
     if (m_scrollHistory.isEmpty())
         return { };
 
-    auto first = m_scrollHistory[0].timestamp();
-    auto last = m_scrollHistory.rbegin()->timestamp();
+    double first = m_scrollHistory[0].timestamp();
+    double last = m_scrollHistory.rbegin()->timestamp();
 
     if (last == first)
         return { };
@@ -124,7 +124,7 @@ FloatPoint ScrollAnimatorGtk::computeVelocity()
 
     m_scrollHistory.clear();
 
-    return FloatPoint(accumDelta.x() * -1000 / (last - first).value(), accumDelta.y() * -1000 / (last - first).value());
+    return FloatPoint(accumDelta.x() * -1000 / (last - first), accumDelta.y() * -1000 / (last - first));
 }
 
 bool ScrollAnimatorGtk::handleWheelEvent(const PlatformWheelEvent& event)
@@ -132,7 +132,7 @@ bool ScrollAnimatorGtk::handleWheelEvent(const PlatformWheelEvent& event)
     m_kineticAnimation->stop();
 
     m_scrollHistory.removeAllMatching([&event] (PlatformWheelEvent& otherEvent) -> bool {
-        return (event.timestamp() - otherEvent.timestamp()) > scrollCaptureThreshold;
+        return Seconds::fromMilliseconds(event.timestamp() - otherEvent.timestamp()) > scrollCaptureThreshold;
     });
 
     if (event.isEndOfNonMomentumScroll()) {
