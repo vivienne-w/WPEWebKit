@@ -33,7 +33,6 @@
 #pragma once
 
 #include "ContextDestructionObserver.h"
-#include "DOMHighResTimeStamp.h"
 #include "EventTarget.h"
 #include "ExceptionOr.h"
 #include "GenericTaskQueue.h"
@@ -57,7 +56,7 @@ public:
     static Ref<Performance> create(ScriptExecutionContext& context, MonotonicTime timeOrigin) { return adoptRef(*new Performance(context, timeOrigin)); }
     ~Performance();
 
-    DOMHighResTimeStamp now() const;
+    double now() const;
 
     PerformanceNavigation* navigation();
     PerformanceTiming* timing();
@@ -82,8 +81,6 @@ public:
     void unregisterPerformanceObserver(PerformanceObserver&);
 
     static Seconds reduceTimeResolution(Seconds);
-
-    DOMHighResTimeStamp relativeTimeFromTimeOriginInReducedResolution(MonotonicTime) const;
 
     ScriptExecutionContext* scriptExecutionContext() const final { return ContextDestructionObserver::scriptExecutionContext(); }
 

@@ -48,7 +48,7 @@
 namespace WebCore {
 
 #if ENABLE(DRAG_SUPPORT)
-const Seconds EventHandler::TextDragDelay { 0_s };
+const double EventHandler::TextDragDelay = 0.0;
 #endif
 
 bool EventHandler::passMousePressEventToSubframe(MouseEventWithHitTestResults& mev, Frame* subframe)

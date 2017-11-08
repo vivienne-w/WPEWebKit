@@ -321,9 +321,9 @@ static inline void initializeXEvent(XEvent& event)
     event.xany.window = 0;
 }
 
-static inline uint64_t xTimeStamp(WallTime timestamp)
+static inline uint64_t xTimeStamp(double timestampInSeconds)
 {
-    return timestamp.secondsSinceEpoch().milliseconds();
+    return timestampInSeconds * 1000;
 }
 
 static inline unsigned xKeyModifiers(const WebEvent& event)

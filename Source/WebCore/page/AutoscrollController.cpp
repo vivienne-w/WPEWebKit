@@ -37,11 +37,12 @@
 #include "RenderView.h"
 #include "ScrollView.h"
 #include "Settings.h"
+#include <wtf/CurrentTime.h>
 
 namespace WebCore {
 
 // Delay time in second for start autoscroll if pointer is in border edge of scrollable element.
-static const Seconds autoscrollDelay { 200_ms };
+static const double autoscrollDelay = 0.2;
 
 // When the autoscroll or the panScroll is triggered when do the scroll every 50ms to make it smooth.
 static const Seconds autoscrollInterval { 50_ms };
@@ -58,6 +59,7 @@ AutoscrollController::AutoscrollController()
     : m_autoscrollTimer(*this, &AutoscrollController::autoscrollTimerFired)
     , m_autoscrollRenderer(nullptr)
     , m_autoscrollType(NoAutoscroll)
+    , m_dragAndDropAutoscrollStartTime(0)
 {
 }
 
@@ -138,7 +140,7 @@ void AutoscrollController::updateAutoscrollRenderer()
     m_autoscrollRenderer = is<RenderBox>(renderer) ? downcast<RenderBox>(renderer) : nullptr;
 }
 
-void AutoscrollController::updateDragAndDrop(Node* dropTargetNode, const IntPoint& eventPosition, WallTime eventTime)
+void AutoscrollController::updateDragAndDrop(Node* dropTargetNode, const IntPoint& eventPosition, double eventTime)
 {
     if (!dropTargetNode) {
         stopAutoscrollTimer();
@@ -239,7 +241,7 @@ void AutoscrollController::autoscrollTimerFired()
     Frame& frame = m_autoscrollRenderer->frame();
     switch (m_autoscrollType) {
     case AutoscrollForDragAndDrop:
-        if (WallTime::now() - m_dragAndDropAutoscrollStartTime > autoscrollDelay)
+        if (WTF::currentTime() - m_dragAndDropAutoscrollStartTime > autoscrollDelay)
             m_autoscrollRenderer->autoscroll(m_dragAndDropAutoscrollReferencePosition);
         break;
     case AutoscrollForSelection: {

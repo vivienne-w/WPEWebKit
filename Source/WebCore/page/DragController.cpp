@@ -128,7 +128,7 @@ static PlatformMouseEvent createMouseEvent(const DragData& dragData)
 
     return PlatformMouseEvent(dragData.clientPosition(), dragData.globalPosition(),
                               LeftButton, PlatformEvent::MouseMoved, 0, shiftKey, ctrlKey, altKey,
-                              metaKey, WallTime::now(), ForceAtClick, NoTap);
+                              metaKey, currentTime(), ForceAtClick, NoTap);
 }
 
 DragController::DragController(Page& page, DragClient& client)

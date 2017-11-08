@@ -25,7 +25,7 @@
 
 #pragma once
 
-#include <wtf/MonotonicTime.h>
+#include "DOMTimeStamp.h"
 #include <wtf/text/StringBuilder.h>
 #include <wtf/text/WTFString.h>
 
@@ -58,7 +58,7 @@ public:
 
 private:
     TypeAheadDataSource* m_dataSource;
-    MonotonicTime m_lastTypeTime;
+    DOMTimeStamp m_lastTypeTime;
     UChar m_repeatingChar;
     StringBuilder m_buffer;
 };

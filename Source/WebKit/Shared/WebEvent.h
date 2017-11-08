@@ -34,7 +34,6 @@
 #include <WebCore/FloatSize.h>
 #include <WebCore/IntPoint.h>
 #include <WebCore/IntSize.h>
-#include <wtf/WallTime.h>
 #include <wtf/text/WTFString.h>
 
 namespace IPC {
@@ -105,12 +104,12 @@ public:
 
     Modifiers modifiers() const { return static_cast<Modifiers>(m_modifiers); }
 
-    WallTime timestamp() const { return m_timestamp; }
+    double timestamp() const { return m_timestamp; }
 
 protected:
     WebEvent();
 
-    WebEvent(Type, Modifiers, WallTime timestamp);
+    WebEvent(Type, Modifiers, double timestamp);
 
     void encode(IPC::Encoder&) const;
     static bool decode(IPC::Decoder&, WebEvent&);
@@ -118,7 +117,7 @@ protected:
 private:
     uint32_t m_type; // Type
     uint32_t m_modifiers; // Modifiers
-    WallTime m_timestamp;
+    double m_timestamp;
 };
 
 // FIXME: Move this class to its own header file.
@@ -136,9 +135,9 @@ public:
     WebMouseEvent();
 
 #if PLATFORM(MAC)
-    WebMouseEvent(Type, Button, const WebCore::IntPoint& position, const WebCore::IntPoint& globalPosition, float deltaX, float deltaY, float deltaZ, int clickCount, Modifiers, WallTime timestamp, double force, SyntheticClickType = NoTap, int eventNumber = -1, int menuType = 0);
+    WebMouseEvent(Type, Button, const WebCore::IntPoint& position, const WebCore::IntPoint& globalPosition, float deltaX, float deltaY, float deltaZ, int clickCount, Modifiers, double timestamp, double force, SyntheticClickType = NoTap, int eventNumber = -1, int menuType = 0);
 #else
-    WebMouseEvent(Type, Button, const WebCore::IntPoint& position, const WebCore::IntPoint& globalPosition, float deltaX, float deltaY, float deltaZ, int clickCount, Modifiers, WallTime timestamp, double force = 0, SyntheticClickType = NoTap);
+    WebMouseEvent(Type, Button, const WebCore::IntPoint& position, const WebCore::IntPoint& globalPosition, float deltaX, float deltaY, float deltaZ, int clickCount, Modifiers, double timestamp, double force = 0, SyntheticClickType = NoTap);
 #endif
 
     Button button() const { return static_cast<Button>(m_button); }
@@ -198,11 +197,11 @@ public:
 
     WebWheelEvent() { }
 
-    WebWheelEvent(Type, const WebCore::IntPoint& position, const WebCore::IntPoint& globalPosition, const WebCore::FloatSize& delta, const WebCore::FloatSize& wheelTicks, Granularity, Modifiers, WallTime timestamp);
+    WebWheelEvent(Type, const WebCore::IntPoint& position, const WebCore::IntPoint& globalPosition, const WebCore::FloatSize& delta, const WebCore::FloatSize& wheelTicks, Granularity, Modifiers, double timestamp);
 #if PLATFORM(COCOA)
-    WebWheelEvent(Type, const WebCore::IntPoint& position, const WebCore::IntPoint& globalPosition, const WebCore::FloatSize& delta, const WebCore::FloatSize& wheelTicks, Granularity, bool directionInvertedFromDevice, Phase, Phase momentumPhase, bool hasPreciseScrollingDeltas, uint32_t scrollCount, const WebCore::FloatSize& unacceleratedScrollingDelta, Modifiers, WallTime timestamp);
+    WebWheelEvent(Type, const WebCore::IntPoint& position, const WebCore::IntPoint& globalPosition, const WebCore::FloatSize& delta, const WebCore::FloatSize& wheelTicks, Granularity, bool directionInvertedFromDevice, Phase, Phase momentumPhase, bool hasPreciseScrollingDeltas, uint32_t scrollCount, const WebCore::FloatSize& unacceleratedScrollingDelta, Modifiers, double timestamp);
 #elif PLATFORM(GTK)
-    WebWheelEvent(Type, const WebCore::IntPoint& position, const WebCore::IntPoint& globalPosition, const WebCore::FloatSize& delta, const WebCore::FloatSize& wheelTicks, Phase, Phase momentumPhase, Granularity, Modifiers, WallTime timestamp);
+    WebWheelEvent(Type, const WebCore::IntPoint& position, const WebCore::IntPoint& globalPosition, const WebCore::FloatSize& delta, const WebCore::FloatSize& wheelTicks, Phase, Phase momentumPhase, Granularity, Modifiers, double timestamp);
 #endif
 
     const WebCore::IntPoint position() const { return m_position; }
@@ -251,13 +250,13 @@ public:
     ~WebKeyboardEvent();
 
 #if USE(APPKIT)
-    WebKeyboardEvent(Type, const String& text, const String& unmodifiedText, const String& key, const String& code, const String& keyIdentifier, int windowsVirtualKeyCode, int nativeVirtualKeyCode, int macCharCode, bool handledByInputMethod, const Vector<WebCore::KeypressCommand>&, bool isAutoRepeat, bool isKeypad, bool isSystemKey, Modifiers, WallTime timestamp);
+    WebKeyboardEvent(Type, const String& text, const String& unmodifiedText, const String& key, const String& code, const String& keyIdentifier, int windowsVirtualKeyCode, int nativeVirtualKeyCode, int macCharCode, bool handledByInputMethod, const Vector<WebCore::KeypressCommand>&, bool isAutoRepeat, bool isKeypad, bool isSystemKey, Modifiers, double timestamp);
 #elif PLATFORM(GTK)
-    WebKeyboardEvent(Type, const String& text, const String& key, const String& code, const String& keyIdentifier, int windowsVirtualKeyCode, int nativeVirtualKeyCode, bool handledByInputMethod, Vector<String>&& commands, bool isKeypad, Modifiers, WallTime timestamp);
+    WebKeyboardEvent(Type, const String& text, const String& key, const String& code, const String& keyIdentifier, int windowsVirtualKeyCode, int nativeVirtualKeyCode, bool handledByInputMethod, Vector<String>&& commands, bool isKeypad, Modifiers, double timestamp);
 #elif PLATFORM(IOS)
-    WebKeyboardEvent(Type, const String& text, const String& unmodifiedText, const String& key, const String& code, const String& keyIdentifier, int windowsVirtualKeyCode, int nativeVirtualKeyCode, int macCharCode, bool isAutoRepeat, bool isKeypad, bool isSystemKey, Modifiers, WallTime timestamp);
+    WebKeyboardEvent(Type, const String& text, const String& unmodifiedText, const String& key, const String& code, const String& keyIdentifier, int windowsVirtualKeyCode, int nativeVirtualKeyCode, int macCharCode, bool isAutoRepeat, bool isKeypad, bool isSystemKey, Modifiers, double timestamp);
 #else
-    WebKeyboardEvent(Type, const String& text, const String& unmodifiedText, const String& keyIdentifier, int windowsVirtualKeyCode, int nativeVirtualKeyCode, int macCharCode, bool isAutoRepeat, bool isKeypad, bool isSystemKey, Modifiers, WallTime timestamp);
+    WebKeyboardEvent(Type, const String& text, const String& unmodifiedText, const String& keyIdentifier, int windowsVirtualKeyCode, int nativeVirtualKeyCode, int macCharCode, bool isAutoRepeat, bool isKeypad, bool isSystemKey, Modifiers, double timestamp);
 #endif
 
     const String& text() const { return m_text; }
@@ -383,7 +382,7 @@ private:
 class WebTouchEvent : public WebEvent {
 public:
     WebTouchEvent() { }
-    WebTouchEvent(WebEvent::Type type, Modifiers modifiers, WallTime timestamp, const Vector<WebPlatformTouchPoint>& touchPoints, WebCore::IntPoint position, bool isPotentialTap, bool isGesture, float gestureScale, float gestureRotation)
+    WebTouchEvent(WebEvent::Type type, Modifiers modifiers, double timestamp, const Vector<WebPlatformTouchPoint>& touchPoints, WebCore::IntPoint position, bool isPotentialTap, bool isGesture, float gestureScale, float gestureRotation)
         : WebEvent(type, modifiers, timestamp)
         , m_touchPoints(touchPoints)
         , m_position(position)
@@ -472,7 +471,7 @@ private:
 class WebTouchEvent : public WebEvent {
 public:
     WebTouchEvent() { }
-    WebTouchEvent(Type, Vector<WebPlatformTouchPoint>&&, Modifiers, WallTime timestamp);
+    WebTouchEvent(Type, Vector<WebPlatformTouchPoint>&&, Modifiers, double timestamp);
 
     const Vector<WebPlatformTouchPoint>& touchPoints() const { return m_touchPoints; }
 

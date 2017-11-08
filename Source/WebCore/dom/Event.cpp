@@ -23,21 +23,17 @@
 #include "config.h"
 #include "Event.h"
 
-#include "DOMWindow.h"
-#include "Document.h"
 #include "EventNames.h"
 #include "EventPath.h"
 #include "EventTarget.h"
-#include "Performance.h"
 #include "UserGestureIndicator.h"
-#include "WorkerGlobalScope.h"
 #include <wtf/CurrentTime.h>
 
 namespace WebCore {
 
 Event::Event(IsTrusted isTrusted)
     : m_isTrusted(isTrusted == IsTrusted::Yes)
-    , m_createTime(MonotonicTime::now())
+    , m_createTime(convertSecondsToDOMTimeStamp(currentTime()))
 {
 }
 
@@ -47,17 +43,17 @@ Event::Event(const AtomicString& eventType, bool canBubbleArg, bool cancelableAr
     , m_canBubble(canBubbleArg)
     , m_cancelable(cancelableArg)
     , m_isTrusted(true)
-    , m_createTime(MonotonicTime::now())
+    , m_createTime(convertSecondsToDOMTimeStamp(currentTime()))
 {
 }
 
-Event::Event(const AtomicString& eventType, bool canBubbleArg, bool cancelableArg, MonotonicTime timestamp)
+Event::Event(const AtomicString& eventType, bool canBubbleArg, bool cancelableArg, double timestamp)
     : m_type(eventType)
     , m_isInitialized(true)
     , m_canBubble(canBubbleArg)
     , m_cancelable(cancelableArg)
     , m_isTrusted(true)
-    , m_createTime(timestamp)
+    , m_createTime(convertSecondsToDOMTimeStamp(timestamp))
 {
 }
 
@@ -68,7 +64,7 @@ Event::Event(const AtomicString& eventType, const EventInit& initializer, IsTrus
     , m_cancelable(initializer.cancelable)
     , m_composed(initializer.composed)
     , m_isTrusted(isTrusted == IsTrusted::Yes)
-    , m_createTime(MonotonicTime::now())
+    , m_createTime(convertSecondsToDOMTimeStamp(currentTime()))
 {
 }
 
@@ -218,20 +214,6 @@ void Event::setUnderlyingEvent(Event* underlyingEvent)
             return;
     }
     m_underlyingEvent = underlyingEvent;
-}
-
-DOMHighResTimeStamp Event::timeStampForBindings(ScriptExecutionContext& context) const
-{
-    Performance* performance = nullptr;
-    if (is<WorkerGlobalScope>(context))
-        performance = &downcast<WorkerGlobalScope>(context).performance();
-    else if (auto* window = downcast<Document>(context).domWindow())
-        performance = window->performance();
-
-    if (!performance)
-        return 0;
-
-    return performance->relativeTimeFromTimeOriginInReducedResolution(m_createTime);
 }
 
 } // namespace WebCore
