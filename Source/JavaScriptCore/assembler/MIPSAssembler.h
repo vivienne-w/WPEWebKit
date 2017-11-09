@@ -110,6 +110,14 @@ typedef enum {
 } RegisterID;
 
 typedef enum {
+    fir = 0,
+    fccr = 25,
+    fexr = 26,
+    fenr = 28,
+    fcsr = 31
+} SPRegisterID;
+
+typedef enum {
     f0,
     f1,
     f2,
@@ -149,11 +157,14 @@ typedef enum {
 class MIPSAssembler {
 public:
     typedef MIPSRegisters::RegisterID RegisterID;
+    typedef MIPSRegisters::SPRegisterID SPRegisterID;
     typedef MIPSRegisters::FPRegisterID FPRegisterID;
     typedef SegmentedVector<AssemblerLabel, 64> Jumps;
 
     static constexpr RegisterID firstRegister() { return MIPSRegisters::r0; }
     static constexpr RegisterID lastRegister() { return MIPSRegisters::r31; }
+    static constexpr SPRegisterID lastSPRegister() { return MIPSRegisters::fcsr; }
+    static constexpr unsigned numberOfSPRegisters() { return 5; }
 
     static constexpr FPRegisterID firstFPRegister() { return MIPSRegisters::f0; }
     static constexpr FPRegisterID lastFPRegister() { return MIPSRegisters::f31; }
@@ -176,6 +187,11 @@ public:
         OP_SH_FD = 6,
         OP_SH_FS = 11,
         OP_SH_FT = 16
+    };
+
+    // FCSR Bits
+    enum {
+        FP_CAUSE_INVALID_OPERATION = 1 << 16
     };
 
     void emitInst(MIPSWord op)
@@ -660,6 +676,12 @@ public:
     void cultd(FPRegisterID fs, FPRegisterID ft)
     {
         emitInst(0x46200035 | (fs << OP_SH_FS) | (ft << OP_SH_FT));
+        copDelayNop();
+    }
+
+    void cfc1(RegisterID rt, SPRegisterID fs)
+    {
+        emitInst(0x44400000 | (rt << OP_SH_RT) | (fs << OP_SH_FS));
         copDelayNop();
     }
 
