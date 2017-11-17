@@ -639,6 +639,10 @@ void SourceBuffer::sourceBufferPrivateAppendComplete(AppendResult result)
     if (m_source)
         m_source->monitorSourceBuffers();
 
+    WTFLogAlways("!!! Append complete: %s: buffered: %s",
+        m_trackBufferMap.begin()->key.string().utf8().data(),
+        toString(m_buffered->ranges()).utf8().data());
+
     MediaTime currentMediaTime = m_source->currentTime();
     for (auto& trackBufferPair : m_trackBufferMap) {
         TrackBuffer& trackBuffer = trackBufferPair.value;
@@ -944,6 +948,9 @@ void SourceBuffer::evictCodedFrames(size_t newDataSize)
         // 4. For each range in removal ranges, run the coded frame removal algorithm with start and
         // end equal to the removal range start and end timestamp respectively.
         for (unsigned i = 0; i < removalRange.length(); ++i) {
+            WTFLogAlways("!!! evictCodedFrames(): (A) Removing [%s..%s]",
+                toString(removalRange.start(i)).utf8().data(),
+                toString(removalRange.end(i)).utf8().data());
             removeCodedFrames(removalRange.start(i), removalRange.end(i));
             if (extraMemoryCost() + newDataSize < maximumBufferSize) {
                 LOG(MediaSource, "SourceBuffer::evictCodedFrames(%p) - the buffer is not full anymore.", this);
@@ -997,9 +1004,13 @@ void SourceBuffer::evictCodedFrames(size_t newDataSize)
 
     LOG(MediaSource, "SourceBuffer::evictCodedFrames(%p) - minimumRangeStart: %f, duration: %f", this, minimumRangeStart.toDouble(), m_source->duration().toDouble());
 
-    auto removeFramesWhileFull = [&] (PlatformTimeRanges& ranges) {
+    auto removeFramesWhileFull = [&] (PlatformTimeRanges& ranges, const char* tag) {
         for (int i = ranges.length()-1; i >= 0; --i) {
             LOG(MediaSource, "SourceBuffer::evictCodedFrames(%p) - removing coded frames in range [%f, %f)", this, ranges.start(i).toDouble(), ranges.end(i).toDouble());
+            WTFLogAlways("!!! evictCodedFrames(): %s Removing [%s..%s]",
+                tag,
+                toString(ranges.start(i)).utf8().data(),
+                toString(ranges.end(i)).utf8().data());
             removeCodedFrames(ranges.start(i), ranges.end(i));
             if (extraMemoryCost() + newDataSize < maximumBufferSize) {
                 LOG(MediaSource, "SourceBuffer::evictCodedFrames(%p) - buffer is not full anymore.", this);
@@ -1019,7 +1030,7 @@ void SourceBuffer::evictCodedFrames(size_t newDataSize)
         auto intersectedRanges = removalRange;
         intersectedRanges.intersectWith(buffered);
 
-        removeFramesWhileFull(intersectedRanges);
+        removeFramesWhileFull(intersectedRanges, "(B)");
 
         if (!m_bufferFull)
             break;
@@ -1030,7 +1041,7 @@ void SourceBuffer::evictCodedFrames(size_t newDataSize)
 
     if (m_bufferFull && currentTimeRange == notFound) {
         LOG(MediaSource, "SourceBuffer::evictCodedFrames(%p) - We tried hard to evict, but the buffer is still full and current time is unbuffered, let's try to remove more buffered data.", this);
-        removeFramesWhileFull(buffered);
+        removeFramesWhileFull(buffered, "(C)");
     }
 
     LOG(MediaSource, "SourceBuffer::evictCodedFrames(%p) - evicted %zu bytes%s", this, initialBufferedSize - extraMemoryCost(), m_bufferFull ? " but FAILED to free enough" : "");
@@ -2022,8 +2033,26 @@ void SourceBuffer::provideMediaData(TrackBuffer& trackBuffer, const AtomicString
     LOG(MediaSource, "SourceBuffer::provideMediaData(%p) - Enqueued %u samples", this, enqueuedSamples);
 }
 
+static String printDecodeQueue(DecodeOrderSampleMap::MapType decodeQueue)
+{
+    if (decodeQueue.empty())
+        return "(empty)";
+    String result("[");
+    result.append(toString(decodeQueue.begin()->second->presentationTime()));
+    result.append("..");
+    result.append(toString(decodeQueue.rbegin()->second->presentationTime()));
+    return result;
+}
+
 void SourceBuffer::reenqueueMediaForTime(TrackBuffer& trackBuffer, const AtomicString& trackID, const MediaTime& time)
 {
+    String bufferedBefore = toString(trackBuffer.buffered);
+    String dqBefore = printDecodeQueue(trackBuffer.decodeQueue);
+    String ledetBefore = toString(trackBuffer.lastEnqueuedDecodeEndTime);
+    String dqAfter = "Not reached";
+    String ledetAfter = "Not reached";
+    String earlyReturn = "Not reached";
+
     m_private->flush(trackID);
     trackBuffer.decodeQueue.clear();
 
@@ -2034,41 +2063,65 @@ void SourceBuffer::reenqueueMediaForTime(TrackBuffer& trackBuffer, const AtomicS
         currentSamplePTSIterator = trackBuffer.samples.presentationOrder().findSampleStartingOnOrAfterPresentationTime(time);
 
     if (currentSamplePTSIterator == trackBuffer.samples.presentationOrder().end()
-        || (currentSamplePTSIterator->first - time) > currentTimeFudgeFactor())
-        return;
-
-    // Seach backward for the previous sync sample.
-    DecodeOrderSampleMap::KeyType decodeKey(currentSamplePTSIterator->second->decodeTime(), currentSamplePTSIterator->second->presentationTime());
-    auto currentSampleDTSIterator = trackBuffer.samples.decodeOrder().findSampleWithDecodeKey(decodeKey);
-    ASSERT(currentSampleDTSIterator != trackBuffer.samples.decodeOrder().end());
-
-    auto reverseCurrentSampleIter = --DecodeOrderSampleMap::reverse_iterator(currentSampleDTSIterator);
-    auto reverseLastSyncSampleIter = trackBuffer.samples.decodeOrder().findSyncSamplePriorToDecodeIterator(reverseCurrentSampleIter);
-    if (reverseLastSyncSampleIter == trackBuffer.samples.decodeOrder().rend())
-        return;
-
-    // Fill the decode queue with the non-displaying samples.
-    for (auto iter = reverseLastSyncSampleIter; iter != reverseCurrentSampleIter; --iter) {
-        auto copy = iter->second->createNonDisplayingCopy();
-        DecodeOrderSampleMap::KeyType decodeKey(copy->decodeTime(), copy->presentationTime());
-        trackBuffer.decodeQueue.insert(DecodeOrderSampleMap::MapType::value_type(decodeKey, WTFMove(copy)));
+        || (currentSamplePTSIterator->first - time) > currentTimeFudgeFactor()) {
+        earlyReturn = "(A) ";
+        if (currentSamplePTSIterator == trackBuffer.samples.presentationOrder().end())
+            earlyReturn.append("No sample buffered for time");
+        if ((currentSamplePTSIterator->first - time) > currentTimeFudgeFactor())
+            earlyReturn.append(String::format("First sample available %s is too much beyond requested time %s",
+                    toString(currentSamplePTSIterator->first).utf8().data(), toString(time).utf8().data()));
+        goto end;
     }
 
-    if (!trackBuffer.decodeQueue.empty()) {
-        auto& lastSample = trackBuffer.decodeQueue.rbegin()->second;
-        trackBuffer.lastEnqueuedPresentationTime = lastSample->presentationTime();
-        trackBuffer.lastEnqueuedDecodeEndTime = lastSample->decodeTime();
-    } else {
-        trackBuffer.lastEnqueuedPresentationTime = MediaTime::invalidTime();
-        trackBuffer.lastEnqueuedDecodeEndTime = MediaTime::invalidTime();
+    {
+        // Seach backward for the previous sync sample.
+        DecodeOrderSampleMap::KeyType decodeKey(currentSamplePTSIterator->second->decodeTime(), currentSamplePTSIterator->second->presentationTime());
+        auto currentSampleDTSIterator = trackBuffer.samples.decodeOrder().findSampleWithDecodeKey(decodeKey);
+        ASSERT(currentSampleDTSIterator != trackBuffer.samples.decodeOrder().end());
+
+        auto reverseCurrentSampleIter = --DecodeOrderSampleMap::reverse_iterator(currentSampleDTSIterator);
+        auto reverseLastSyncSampleIter = trackBuffer.samples.decodeOrder().findSyncSamplePriorToDecodeIterator(reverseCurrentSampleIter);
+        if (reverseLastSyncSampleIter == trackBuffer.samples.decodeOrder().rend()) {
+            earlyReturn = "(B) No sync sample found before requested time";
+            goto end;
+        }
+
+        // Fill the decode queue with the non-displaying samples.
+        for (auto iter = reverseLastSyncSampleIter; iter != reverseCurrentSampleIter; --iter) {
+            auto copy = iter->second->createNonDisplayingCopy();
+            DecodeOrderSampleMap::KeyType decodeKey(copy->decodeTime(), copy->presentationTime());
+            trackBuffer.decodeQueue.insert(DecodeOrderSampleMap::MapType::value_type(decodeKey, WTFMove(copy)));
+        }
+
+        if (!trackBuffer.decodeQueue.empty()) {
+            auto& lastSample = trackBuffer.decodeQueue.rbegin()->second;
+            trackBuffer.lastEnqueuedPresentationTime = lastSample->presentationTime();
+            trackBuffer.lastEnqueuedDecodeEndTime = lastSample->decodeTime();
+        } else {
+            trackBuffer.lastEnqueuedPresentationTime = MediaTime::invalidTime();
+            trackBuffer.lastEnqueuedDecodeEndTime = MediaTime::invalidTime();
+        }
+
+        // Fill the decode queue with the remaining samples.
+        for (auto iter = currentSampleDTSIterator; iter != trackBuffer.samples.decodeOrder().end(); ++iter)
+            trackBuffer.decodeQueue.insert(*iter);
+
+        dqAfter = printDecodeQueue(trackBuffer.decodeQueue);
+        provideMediaData(trackBuffer, trackID);
+        ledetAfter = toString(trackBuffer.lastEnqueuedDecodeEndTime);
+
+        trackBuffer.needsReenqueueing = false;
     }
 
-    // Fill the decode queue with the remaining samples.
-    for (auto iter = currentSampleDTSIterator; iter != trackBuffer.samples.decodeOrder().end(); ++iter)
-        trackBuffer.decodeQueue.insert(*iter);
-    provideMediaData(trackBuffer, trackID);
-
-    trackBuffer.needsReenqueueing = false;
+end:
+    WTFLogAlways("!!! reenqueueMediaForTime(): %s: time: %s, trackBuffered: %s; BEFORE: decodeQueue: %s, lastEnqueuedDecodeEndTime: %s; AFTER: decodeQueue: %s, lastEnqueuedDecodeEndTime: %s; EARLY RETURN: %s",
+            trackID.string().utf8().data(), toString(time).utf8().data(),
+            bufferedBefore.utf8().data(),
+            dqBefore.utf8().data(),
+            ledetBefore.utf8().data(),
+            dqAfter.utf8().data(),
+            ledetAfter.utf8().data(),
+            earlyReturn.utf8().data());
 }
 
 
