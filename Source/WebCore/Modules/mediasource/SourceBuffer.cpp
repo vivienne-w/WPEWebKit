@@ -674,6 +674,11 @@ void SourceBuffer::sourceBufferPrivateDidReceiveRenderingError(int error)
         m_source->streamEndedWithError(MediaSource::EndOfStreamError::Decode);
 }
 
+String SourceBuffer::id() const
+{
+    return m_trackBufferMap.begin()->key.string();
+}
+
 static bool decodeTimeComparator(const PresentationOrderSampleMap::MapType::value_type& a, const PresentationOrderSampleMap::MapType::value_type& b)
 {
     return a.second->decodeTime() < b.second->decodeTime();
@@ -681,6 +686,11 @@ static bool decodeTimeComparator(const PresentationOrderSampleMap::MapType::valu
 
 static PlatformTimeRanges removeSamplesFromTrackBuffer(const DecodeOrderSampleMap::MapType& samples, SourceBuffer::TrackBuffer& trackBuffer, const SourceBuffer* buffer, const char* logPrefix)
 {
+    WTFLogAlways("!!! removeSamplesFromTrackBuffer(): %s: Removing [%s..%s]",
+        buffer->id().utf8().data(),
+        toString(samples.begin()->second->presentationTime()).utf8().data(),
+        toString(samples.rbegin()->second->presentationTime()).utf8().data());
+
 #if !LOG_DISABLED
     MediaTime earliestSample = MediaTime::positiveInfiniteTime();
     MediaTime latestSample = MediaTime::zeroTime();
@@ -922,6 +932,10 @@ void SourceBuffer::evictCodedFrames(size_t newDataSize)
     MediaTime currentTime = m_source->currentTime();
     MediaTime maximumRangeEnd = currentTime - thirtySeconds;
 
+    WTFLogAlways("!!! evictCodedFrames(): %s: (A) maximumRangeEnd: %s",
+        id().utf8().data(),
+        toString(maximumRangeEnd).utf8().data());
+
 #if defined(METROLOGICAL)
     MediaTime microSecond = MediaTime(1, 1000000);
     for (auto& trackBuffer : m_trackBufferMap.values()) {
@@ -930,6 +944,9 @@ void SourceBuffer::evictCodedFrames(size_t newDataSize)
         if (prevSync != trackBuffer.samples.decodeOrder().rend()) {
             // Don't include the sync frame in the range, just finish right before it.
             maximumRangeEnd = prevSync->second->presentationTime() - microSecond;
+            WTFLogAlways("!!! evictCodedFrames(): %s: (B) maximumRangeEnd: %s",
+                id().utf8().data(),
+                toString(maximumRangeEnd).utf8().data());
         }
     }
 #endif
@@ -948,7 +965,8 @@ void SourceBuffer::evictCodedFrames(size_t newDataSize)
         // 4. For each range in removal ranges, run the coded frame removal algorithm with start and
         // end equal to the removal range start and end timestamp respectively.
         for (unsigned i = 0; i < removalRange.length(); ++i) {
-            WTFLogAlways("!!! evictCodedFrames(): (A) Removing [%s..%s]",
+            WTFLogAlways("!!! evictCodedFrames(): %s: (A) Removing [%s..%s]",
+                id().utf8().data(),
                 toString(removalRange.start(i)).utf8().data(),
                 toString(removalRange.end(i)).utf8().data());
             removeCodedFrames(removalRange.start(i), removalRange.end(i));
@@ -1030,7 +1048,7 @@ void SourceBuffer::evictCodedFrames(size_t newDataSize)
         auto intersectedRanges = removalRange;
         intersectedRanges.intersectWith(buffered);
 
-        removeFramesWhileFull(intersectedRanges, "(B)");
+        removeFramesWhileFull(intersectedRanges, String::format("%s: (B)", id().utf8().data()).utf8().data());
 
         if (!m_bufferFull)
             break;
@@ -1041,7 +1059,7 @@ void SourceBuffer::evictCodedFrames(size_t newDataSize)
 
     if (m_bufferFull && currentTimeRange == notFound) {
         LOG(MediaSource, "SourceBuffer::evictCodedFrames(%p) - We tried hard to evict, but the buffer is still full and current time is unbuffered, let's try to remove more buffered data.", this);
-        removeFramesWhileFull(buffered, "(C)");
+        removeFramesWhileFull(buffered, String::format("%s: (C)", id().utf8().data()).utf8().data());
     }
 
     LOG(MediaSource, "SourceBuffer::evictCodedFrames(%p) - evicted %zu bytes%s", this, initialBufferedSize - extraMemoryCost(), m_bufferFull ? " but FAILED to free enough" : "");
@@ -1559,6 +1577,11 @@ void SourceBuffer::sourceBufferPrivateDidReceiveSample(MediaSample& sample)
         }
         TrackBuffer& trackBuffer = it->value;
 
+        if (sample.isSync() && hasVideo()) {
+            WTFLogAlways("!!! sourceBufferPrivateDidReceiveSample(): %s: Sync frame %s",
+                id().utf8().data(), toString(sample.presentationTime()).utf8().data());
+        }
+
         // 1.6 ↳ If last decode timestamp for track buffer is set and decode timestamp is less than last
         // decode timestamp:
         // OR
@@ -1731,6 +1754,10 @@ void SourceBuffer::sourceBufferPrivateDidReceiveSample(MediaSample& sample)
             auto lastDecodeIter = trackBuffer.samples.decodeOrder().findSampleWithDecodeKey(erasedSamples.decodeOrder().rbegin()->first);
             auto nextSyncIter = trackBuffer.samples.decodeOrder().findSyncSampleAfterDecodeIterator(lastDecodeIter);
             dependentSamples.insert(firstDecodeIter, nextSyncIter);
+
+            WTFLogAlways("!!! sourceBufferPrivateDidReceiveSample(): %s Removing dependent samples [%s..%s]",
+                id().utf8().data(), toString(dependentSamples.begin()->second->presentationTime()).utf8().data(),
+                toString(dependentSamples.rbegin()->second->presentationTime()).utf8().data());
 
             PlatformTimeRanges erasedRanges = removeSamplesFromTrackBuffer(dependentSamples, trackBuffer, this, "sourceBufferPrivateDidReceiveSample");
 
