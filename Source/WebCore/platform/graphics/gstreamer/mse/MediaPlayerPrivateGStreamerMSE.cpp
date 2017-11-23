@@ -215,7 +215,7 @@ void MediaPlayerPrivateGStreamerMSE::seek(const MediaTime& time)
     }
 
     m_isEndReached = false;
-    GST_DEBUG("m_seeking=%s, m_seekTime=%f", boolForPrinting(m_seeking), m_seekTime);
+    GST_DEBUG("m_seeking=%s, m_seekTime=%s", boolForPrinting(m_seeking), toString(m_seekTime).utf8().data());
 }
 
 void MediaPlayerPrivateGStreamerMSE::configurePlaySink()
@@ -351,7 +351,7 @@ bool MediaPlayerPrivateGStreamerMSE::doSeek()
             }
             return true;
         }
-        GST_DEBUG("[Seek] The target seek time is not buffered yet, but media source says OK to continue the seek, seekTime=%f", seekTime.toDouble());
+        GST_DEBUG("[Seek] The target seek time is not buffered yet, but media source says OK to continue the seek, seekTime=%s", toString(seekTime).utf8().data());
     }
 
     // Complete previous MSE seek if needed.
