@@ -1075,6 +1075,7 @@ set(WebCore_SOURCES
 
     bindings/js/ArrayValue.cpp
     bindings/js/CallbackFunction.cpp
+    bindings/js/CommonVM.cpp
     bindings/js/DOMWrapperWorld.cpp
     bindings/js/Dictionary.cpp
     bindings/js/GCController.cpp
