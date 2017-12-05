@@ -36,6 +36,7 @@
 #include "WebPageGroup.h"
 #include "WebProcessPool.h"
 #include <stdlib.h>
+#include <wpe/input.h>
 #include <wpe/view-backend.h>
 
 using namespace WebKit;
