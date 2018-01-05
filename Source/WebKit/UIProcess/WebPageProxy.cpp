@@ -5483,7 +5483,8 @@ void WebPageProxy::processDidBecomeResponsive()
 
     if (m_navigationClient)
         m_navigationClient->processDidBecomeResponsive(*this);
-    else
+
+    if (m_loaderClient)
         m_loaderClient->processDidBecomeResponsive(*this);
 }
 
