@@ -151,6 +151,7 @@
 #include <wpe/extensions/video-plane-display-dmabuf.h>
 #endif
 
+GST_DEBUG_CATEGORY(webkit_unaffiliated_debug);
 GST_DEBUG_CATEGORY(webkit_media_player_debug);
 #define GST_CAT_DEFAULT webkit_media_player_debug
 
@@ -190,6 +191,7 @@ static void initializeDebugCategory()
     static std::once_flag onceFlag;
     std::call_once(onceFlag, [] {
         GST_DEBUG_CATEGORY_INIT(webkit_media_player_debug, "webkitmediaplayer", 0, "WebKit media player");
+        GST_DEBUG_CATEGORY_INIT(webkit_unaffiliated_debug, "webkitdefault", 0, "WebKit unaffiliated debug");
     });
 }
 
