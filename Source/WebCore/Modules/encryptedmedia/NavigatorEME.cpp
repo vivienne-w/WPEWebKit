@@ -34,6 +34,10 @@
 #include "CDM.h"
 #include "Document.h"
 #include "JSMediaKeySystemAccess.h"
+#include <gst/gst.h>
+
+GST_DEBUG_CATEGORY_EXTERN(webkit_unaffiliated_debug);
+#define GST_CAT_DEFAULT webkit_unaffiliated_debug
 
 namespace WebCore {
 
@@ -47,11 +51,14 @@ void NavigatorEME::requestMediaKeySystemAccess(Navigator&, Document& document, c
     // When this method is invoked, the user agent must run the following steps:
     // 1. If keySystem is the empty string, return a promise rejected with a newly created TypeError.
     // 2. If supportedConfigurations is empty, return a promise rejected with a newly created TypeError.
+    GST_TRACE("key system %s, supported configurations empty %s", keySystem.utf8().data(), boolForPrinting(supportedConfigurations.isEmpty()));
     if (keySystem.isEmpty() || supportedConfigurations.isEmpty()) {
+        GST_ERROR("rejecting promise");
         promise->reject(TypeError);
         return;
     }
 
+    GST_TRACE("posting task");
     document.postTask([keySystem, supportedConfigurations = WTFMove(supportedConfigurations), promise = WTFMove(promise), &document] (ScriptExecutionContext&) mutable {
         // 3. Let document be the calling context's Document.
         // 4. Let origin be the origin of document.
@@ -59,12 +66,15 @@ void NavigatorEME::requestMediaKeySystemAccess(Navigator&, Document& document, c
         // 6. Run the following steps in parallel:
         // 6.1. If keySystem is not one of the Key Systems supported by the user agent, reject promise with a NotSupportedError.
         //      String comparison is case-sensitive.
+        GST_TRACE("checking CDM suppport for %s", keySystem.utf8().data());
         if (!CDM::supportsKeySystem(keySystem)) {
+            GST_ERROR("key system %s not supported, rejecting promise", keySystem.utf8().data());
             promise->reject(NotSupportedError);
             return;
         }
 
         // 6.2. Let implementation be the implementation of keySystem.
+        GST_TRACE("creating CDM for %s", keySystem.utf8().data());
         RefPtr<CDM> implementation = CDM::create(document, keySystem);
         tryNextSupportedConfiguration(WTFMove(implementation), WTFMove(supportedConfigurations), WTFMove(promise));
     });
@@ -73,6 +83,7 @@ void NavigatorEME::requestMediaKeySystemAccess(Navigator&, Document& document, c
 static void tryNextSupportedConfiguration(RefPtr<CDM>&& implementation, Vector<MediaKeySystemConfiguration>&& supportedConfigurations, RefPtr<DeferredPromise>&& promise)
 {
     // 6.3. For each value in supportedConfigurations:
+    GST_TRACE("entering");
     if (!supportedConfigurations.isEmpty()) {
         // 6.3.1. Let candidate configuration be the value.
         // 6.3.2. Let supported configuration be the result of executing the Get Supported Configuration
@@ -90,21 +101,26 @@ static void tryNextSupportedConfiguration(RefPtr<CDM>&& implementation, Vector<M
 
                 // Obtain reference to the key system string before the `implementation` RefPtr<> is cleared out.
                 const String& keySystem = implementation->keySystem();
+                GST_TRACE("supported, creating system access for %s", keySystem.utf8().data());
                 auto access = MediaKeySystemAccess::create(keySystem, WTFMove(supportedConfiguration.value()), implementation.releaseNonNull());
 
                 // 6.3.3.2. Resolve promise with access and abort the parallel steps of this algorithm.
+                GST_TRACE("resolving promise for %s", keySystem.utf8().data());
                 promise->resolveWithNewlyCreated<IDLInterface<MediaKeySystemAccess>>(WTFMove(access));
                 return;
             }
 
+            GST_TRACE("not supported, trying next");
             tryNextSupportedConfiguration(WTFMove(implementation), WTFMove(supportedConfigurations), WTFMove(promise));
         };
+        GST_TRACE("trying %s", candidateCofiguration.label.utf8().data());
         implementation->getSupportedConfiguration(WTFMove(candidateCofiguration), WTFMove(callback));
         return;
     }
 
 
     // 6.4. Reject promise with a NotSupportedError.
+    GST_TRACE("empty configurations, rejecting promise");
     promise->reject(NotSupportedError);
 }
 
