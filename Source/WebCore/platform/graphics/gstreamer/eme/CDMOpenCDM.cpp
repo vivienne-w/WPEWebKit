@@ -475,8 +475,8 @@ String CDMInstanceOpenCDM::sessionIdByInitData(const InitData& initData) const
     }
 
     for (auto& sessionIdInitDataMap : sessionIdMap) {
-        if (sessionIdInitDataMap.value->size() == initData.size()) {
-            if (!memcmp(sessionIdInitDataMap.value->data(), initData.data(), sessionIdInitDataMap.value->size()))
+        if (sessionIdInitDataMap.value->size() == initData.sizeInBytes()) {
+            if (!memcmp(sessionIdInitDataMap.value->data(), initData.latin1().data(), sessionIdInitDataMap.value->size()))
                 return sessionIdInitDataMap.key;
         }
     }

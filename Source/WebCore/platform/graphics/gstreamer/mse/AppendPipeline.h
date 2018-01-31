@@ -65,7 +65,7 @@ public:
     void dispatchDecryptionStructure(GUniquePtr<GstStructure>&&);
 #endif
 #if USE(OPENCDM)
-    using InitData = Vector<uint8_t>;
+    using InitData = String;
     InitData initData() { return m_initData; }
     HashMap<String, unsigned> keySystemProtectionEventMap() { return m_keySystemProtectionEventMap; }
 #endif

@@ -424,10 +424,10 @@ bool MediaPlayerPrivateGStreamerBase::handleSyncMessage(GstMessage* message)
                 break;
             }
             GST_TRACE("appending init data for %s of size %" G_GSIZE_FORMAT, eventKeySystemId, mapInfo.size);
-            GST_MEMDUMP("init data", reinterpret_cast<const unsigned char *>(mapInfo.data), mapInfo.size);
-            concatenatedInitDataChunks.append(mapInfo.data, mapInfo.size);
+            GST_MEMDUMP("init data", reinterpret_cast<const uint8_t*>(mapInfo.data), mapInfo.size);
+            concatenatedInitDataChunks.append(reinterpret_cast<const uint8_t*>(mapInfo.data), mapInfo.size);
 #if USE(OPENCDM)
-            initDataChunks.append(mapInfo.data, mapInfo.size);
+            initDataChunks.append(reinterpret_cast<const uint8_t*>(mapInfo.data), mapInfo.size);
 #endif
             ++concatenatedInitDataChunksNumber;
             eventKeySystemIdString = eventKeySystemId;
@@ -451,9 +451,9 @@ bool MediaPlayerPrivateGStreamerBase::handleSyncMessage(GstMessage* message)
             if (!weakThis)
                 return;
 
-            GST_DEBUG("scheduling initializationDataEncountered event for %s with concatenated init datas size of %" G_GSIZE_FORMAT, eventKeySystemIdString.utf8().data(), initData.size());
-            GST_MEMDUMP("init datas", initData.data(), initData.size());
-            weakThis->m_player->initializationDataEncountered(ASCIILiteral("cenc"), ArrayBuffer::create(initData.data(), initData.size()));
+            GST_DEBUG("scheduling initializationDataEncountered event for %s with concatenated init datas size of %" G_GSIZE_FORMAT, eventKeySystemIdString.utf8().data(), initData.sizeInBytes());
+            GST_MEMDUMP("init datas", reinterpret_cast<const uint8_t*>(initData.latin1().data()), initData.sizeInBytes());
+            weakThis->m_player->initializationDataEncountered(ASCIILiteral("cenc"), ArrayBuffer::create(reinterpret_cast<const uint8_t*>(initData.latin1().data()), initData.sizeInBytes()));
         });
 
         GST_INFO("waiting for a CDM instance");

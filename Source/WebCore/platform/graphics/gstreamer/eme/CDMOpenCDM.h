@@ -70,7 +70,7 @@ public:
     const String& keySystem() const override { return m_keySystem; }
 
     // FIXME: Session handling needs a lot of love here.
-    using InitData = Vector<uint8_t>;
+    using InitData = String;
     String currentSessionId() const;
     String sessionIdByInitData(const InitData&) const;
 

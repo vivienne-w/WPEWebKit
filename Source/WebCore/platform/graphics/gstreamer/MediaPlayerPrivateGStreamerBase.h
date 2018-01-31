@@ -153,7 +153,7 @@ public:
     void attemptToDecryptWithLocalInstance();
     void attemptToDecryptWithInstance(const CDMInstance&) override;
 #if USE(OPENCDM)
-    using InitData = Vector<uint8_t>;
+    using InitData = String;
     void addPendingProtectionEventToInitDataMapping(const InitData&, GstEventSeqNum);
 #endif
 #endif
