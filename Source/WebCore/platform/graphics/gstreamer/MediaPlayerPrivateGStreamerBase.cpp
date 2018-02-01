@@ -413,7 +413,6 @@ bool MediaPlayerPrivateGStreamerBase::handleSyncMessage(GstMessage* message)
         String eventKeySystemIdString;
 #if USE(OPENCDM)
         HashMap<String, GstEventSeqNum> keySystemProtectionEventMap;
-        InitData initDataChunks;
 #endif
 
         for (auto& event : streamEncryptionInformation.first) {
@@ -430,9 +429,6 @@ bool MediaPlayerPrivateGStreamerBase::handleSyncMessage(GstMessage* message)
             GST_TRACE("appending init data for %s of size %" G_GSIZE_FORMAT, eventKeySystemId, mapInfo.size);
             GST_MEMDUMP("init data", reinterpret_cast<const uint8_t*>(mapInfo.data), mapInfo.size);
             concatenatedInitDataChunks.append(reinterpret_cast<const uint8_t*>(mapInfo.data), mapInfo.size);
-#if USE(OPENCDM)
-            initDataChunks.append(reinterpret_cast<const uint8_t*>(mapInfo.data), mapInfo.size);
-#endif
             ++concatenatedInitDataChunksNumber;
             eventKeySystemIdString = eventKeySystemId;
             if (streamEncryptionInformation.second.contains(eventKeySystemId)) {
@@ -452,7 +448,7 @@ bool MediaPlayerPrivateGStreamerBase::handleSyncMessage(GstMessage* message)
         if (concatenatedInitDataChunksNumber > 1)
             eventKeySystemIdString = emptyString();
 
-        RunLoop::main().dispatch([weakThis = m_weakPtrFactory.createWeakPtr(*this), eventKeySystemIdString, initData = WTFMove(concatenatedInitDataChunks)] {
+        RunLoop::main().dispatch([weakThis = m_weakPtrFactory.createWeakPtr(*this), eventKeySystemIdString, initData = concatenatedInitDataChunks] {
             if (!weakThis)
                 return;
 
@@ -474,7 +470,7 @@ bool MediaPlayerPrivateGStreamerBase::handleSyncMessage(GstMessage* message)
             gst_structure_set(contextStructure, "decryption-system-id", G_TYPE_STRING, preferredKeySystemUuid, nullptr);
             gst_element_set_context(GST_ELEMENT(GST_MESSAGE_SRC(message)), context.get());
 #if USE(OPENCDM)
-            addPendingProtectionEventToInitDataMapping(initDataChunks, keySystemProtectionEventMap.get(preferredKeySystemUuid));
+            addPendingProtectionEventToInitDataMapping(concatenatedInitDataChunks, keySystemProtectionEventMap.get(preferredKeySystemUuid));
 #endif
         } else
             GST_WARNING("no proper CDM instance attached");
