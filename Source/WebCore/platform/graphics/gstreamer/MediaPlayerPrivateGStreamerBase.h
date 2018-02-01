@@ -278,7 +278,7 @@ protected:
     Lock m_protectionMutex;
     Condition m_protectionCondition;
     RefPtr<const CDMInstance> m_cdmInstance;
-    HashSet<GstEventSeqNum> m_reportedProtectionEvents;
+    Vector<GstEventSeqNum> m_reportedProtectionEvents;
     bool m_needToResendCredentials { false };
 
 #if USE(OPENCDM)

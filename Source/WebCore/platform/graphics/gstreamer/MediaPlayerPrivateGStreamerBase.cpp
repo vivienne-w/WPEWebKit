@@ -295,6 +295,10 @@ MediaPlayerPrivateGStreamerBase::MediaPlayerPrivateGStreamerBase(MediaPlayer* pl
 #endif
 #endif
 
+#if ENABLE(ENCRYPTED_MEDIA)
+    // We usually have have two.
+    m_reportedProtectionEvents.reserveInitialCapacity(2);
+#endif
 }
 
 MediaPlayerPrivateGStreamerBase::~MediaPlayerPrivateGStreamerBase()
@@ -433,7 +437,8 @@ bool MediaPlayerPrivateGStreamerBase::handleSyncMessage(GstMessage* message)
             eventKeySystemIdString = eventKeySystemId;
             if (streamEncryptionInformation.second.contains(eventKeySystemId)) {
                 GST_TRACE("considering init data reported for %s", eventKeySystemId);
-                m_reportedProtectionEvents.add(GST_EVENT_SEQNUM(event.get()));
+                ASSERT(!m_reportedProtectionEvents.contains(GST_EVENT_SEQNUM(event.get())));
+                m_reportedProtectionEvents.append(GST_EVENT_SEQNUM(event.get()));
 #if USE(OPENCDM)
                 keySystemProtectionEventMap.add(eventKeySystemId, GST_EVENT_SEQNUM(event.get()));
 #endif
@@ -1429,9 +1434,10 @@ void MediaPlayerPrivateGStreamerBase::dispatchOrStoreDecryptionSession(const Str
 
 void MediaPlayerPrivateGStreamerBase::handleProtectionEvent(GstEvent* event)
 {
-    if (m_reportedProtectionEvents.contains(GST_EVENT_SEQNUM(event))) {
+    size_t eventPosition = m_reportedProtectionEvents.find(GST_EVENT_SEQNUM(event));
+    if (eventPosition != notFound) {
         GST_DEBUG("event %u already handled", GST_EVENT_SEQNUM(event));
-        m_reportedProtectionEvents.remove(GST_EVENT_SEQNUM(event));
+        m_reportedProtectionEvents.remove(eventPosition);
         if (m_needToResendCredentials) {
             GST_DEBUG("resending credentials");
             attemptToDecryptWithLocalInstance();
