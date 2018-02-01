@@ -265,9 +265,12 @@ struct RenderLayerCompositor::OverlapExtent {
     bool knownToBeHaveExtentUncertainty() const { return extentComputed && animationCausesExtentUncertainty; }
 };
 
-#if !LOG_DISABLED
+#if !LOG_DISABLED || ENABLE(RESOURCE_USAGE)
 static inline bool compositingLogEnabled()
 {
+#if ENABLE(RESOURCE_USAGE)
+    return true;
+#endif
     return LogCompositing.state == WTFLogChannelOn;
 }
 #endif
@@ -717,7 +720,7 @@ bool RenderLayerCompositor::updateCompositingLayers(CompositingUpdateType update
 
     LOG(Compositing, " checkForHierarchyUpdate %d, needGeometryUpdate %d", checkForHierarchyUpdate, needHierarchyUpdate);
 
-#if !LOG_DISABLED
+#if !LOG_DISABLED || ENABLE(RESOURCE_USAGE)
     double startTime = 0;
     if (compositingLogEnabled()) {
         ++m_rootLayerUpdateCount;
@@ -738,7 +741,7 @@ bool RenderLayerCompositor::updateCompositingLayers(CompositingUpdateType update
         needHierarchyUpdate |= layersChanged;
     }
 
-#if !LOG_DISABLED
+#if !LOG_DISABLED || ENABLE(RESOURCE_USAGE)
     if (compositingLogEnabled() && isFullUpdate && (needHierarchyUpdate || needGeometryUpdate)) {
         m_obligateCompositedLayerCount = 0;
         m_secondaryCompositedLayerCount = 0;
@@ -775,7 +778,7 @@ bool RenderLayerCompositor::updateCompositingLayers(CompositingUpdateType update
         ASSERT(!isFullUpdate || !m_subframeScrollLayersNeedReattach);
     }
     
-#if !LOG_DISABLED
+#if !LOG_DISABLED || ENABLE(RESOURCE_USAGE)
     if (compositingLogEnabled() && isFullUpdate && (needHierarchyUpdate || needGeometryUpdate)) {
         double endTime = monotonicallyIncreasingTime();
         LOG(Compositing, "Total layers   primary   secondary   obligatory backing (KB)   secondary backing(KB)   total backing (KB)  update time (ms)\n");
@@ -783,7 +786,10 @@ bool RenderLayerCompositor::updateCompositingLayers(CompositingUpdateType update
         LOG(Compositing, "%8d %11d %9d %20.2f %22.2f %22.2f %18.2f\n",
             m_obligateCompositedLayerCount + m_secondaryCompositedLayerCount, m_obligateCompositedLayerCount,
             m_secondaryCompositedLayerCount, m_obligatoryBackingStoreBytes / 1024, m_secondaryBackingStoreBytes / 1024, (m_obligatoryBackingStoreBytes + m_secondaryBackingStoreBytes) / 1024, 1000.0 * (endTime - startTime));
+#if ENABLE(RESOURCE_USAGE)
+        // set the total layer memory into ResourceUsageThread for Inspector layers memorytimeline.
         WebCore::ResourceUsageThread::setTotalLayerInfo(m_obligatoryBackingStoreBytes + m_secondaryBackingStoreBytes);
+#endif
     }
 #endif
     ASSERT(updateRoot || !m_compositingLayersNeedRebuild);
@@ -821,7 +827,7 @@ void RenderLayerCompositor::layerBecameNonComposited(const RenderLayer& layer)
     --m_compositedLayerCount;
 }
 
-#if !LOG_DISABLED
+#if !LOG_DISABLED || ENABLE(RESOURCE_USAGE)
 void RenderLayerCompositor::logLayerInfo(const RenderLayer& layer, int depth)
 {
     if (!compositingLogEnabled())
@@ -1613,7 +1619,7 @@ void RenderLayerCompositor::rebuildCompositingLayerTree(RenderLayer& layer, Vect
         if (!layer.parent())
             updateRootLayerPosition();
 
-#if !LOG_DISABLED
+#if !LOG_DISABLED || ENABLE(RESOURCE_USAGE)
         logLayerInfo(layer, depth);
 #else
         UNUSED_PARAM(depth);
@@ -1900,7 +1906,7 @@ void RenderLayerCompositor::updateLayerTreeGeometry(RenderLayer& layer, int dept
         if (!layer.parent())
             updateRootLayerPosition();
 
-#if !LOG_DISABLED
+#if !LOG_DISABLED || ENABLE(RESOURCE_USAGE)
         logLayerInfo(layer, depth);
 #else
         UNUSED_PARAM(depth);
@@ -2342,7 +2348,7 @@ CompositingReasons RenderLayerCompositor::reasonsForCompositing(const RenderLaye
     return reasons;
 }
 
-#if !LOG_DISABLED
+#if !LOG_DISABLED || ENABLE(RESOURCE_USAGE)
 const char* RenderLayerCompositor::logReasonsForCompositing(const RenderLayer& layer)
 {
     CompositingReasons reasons = reasonsForCompositing(layer);
