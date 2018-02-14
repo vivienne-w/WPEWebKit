@@ -87,7 +87,6 @@ static void appendPipelineDemuxerNoMorePads(GstElement*, AppendPipeline* appendP
 
 static void appendPipelineNeedContextMessageCallback(GstBus*, GstMessage* message, AppendPipeline* appendPipeline)
 {
-    GST_TRACE("received callback");
     appendPipeline->handleNeedContextSyncMessage(message);
 }
 
@@ -339,13 +338,15 @@ void AppendPipeline::handleNeedContextSyncMessage(GstMessage* message)
     if (m_appendState == AppendState::Invalid)
         return;
 
-    if (!g_strcmp0(contextType, "drm-preferred-decryption-system-id")) {
+     if (!g_strcmp0(contextType, "drm-preferred-decryption-system-id")) {
+
 #if USE(OPENCDM)
         std::pair<Vector<GRefPtr<GstEvent>>, Vector<String>> streamEncryptionInformation = GStreamerEMEUtilities::extractEventsAndSystemsFromMessage(message);
         for (auto& event : streamEncryptionInformation.first) {
             const char* eventKeySystemId = nullptr;
             GstBuffer* data = nullptr;
             gst_event_parse_protection(event.get(), &eventKeySystemId, &data, nullptr);
+            GST_INFO("drm-preferred-decryption-system-id for: %s\n", eventKeySystemId);
 
             GstMapInfo mapInfo;
             if (!gst_buffer_map(data, &mapInfo, GST_MAP_READ)) {
@@ -353,13 +354,17 @@ void AppendPipeline::handleNeedContextSyncMessage(GstMessage* message)
                 break;
             }
 
-            m_initData.append(mapInfo.data, mapInfo.size);
+            if (m_initDataCache.contains(eventKeySystemId)) {
+                GST_WARNING("Seems we received twice a initData for keysystem %s ", eventKeySystemId);
+                m_initDataCache.remove(eventKeySystemId);
+            }
+            m_initDataCache.add(eventKeySystemId, String(mapInfo.data, mapInfo.size));
+            
             // Keeping all eventKeySystemId and protection events received, since
             // Appendpipeline does not know which CDM instance is actually selected.
-            if (streamEncryptionInformation.second.contains(eventKeySystemId))
-                m_keySystemProtectionEventMap.add(eventKeySystemId, GST_EVENT_SEQNUM(event.get()));
 
             gst_buffer_unmap(data, &mapInfo);
+            m_playerPrivate->handleProtectionEvent(event.get());
         }
 #endif
         if (WTF::isMainThread())
@@ -372,11 +377,7 @@ void AppendPipeline::handleNeedContextSyncMessage(GstMessage* message)
                 m_appendStateTransitionCondition.wait(m_appendStateTransitionLock);
             }
         }
-    }
-
-    // MediaPlayerPrivateGStreamerBase will take care of setting up encryption.
-    if (m_playerPrivate)
-        m_playerPrivate->handleSyncMessage(message);
+     }
 }
 
 void AppendPipeline::handleApplicationMessage(GstMessage* message)
@@ -447,16 +448,12 @@ void AppendPipeline::demuxerNoMorePads()
 void AppendPipeline::handleElementMessage(GstMessage* message)
 {
     ASSERT(WTF::isMainThread());
-
     const GstStructure* structure = gst_message_get_structure(message);
     GST_TRACE("%s message from %s", gst_structure_get_name(structure), GST_MESSAGE_SRC_NAME(message));
     if (m_playerPrivate && gst_structure_has_name(structure, "drm-key-needed")) {
-        if (m_appendState != AppendPipeline::AppendState::KeyNegotiation)
-            setAppendState(AppendPipeline::AppendState::KeyNegotiation);
-
-        GST_DEBUG("sending drm-key-needed message from %s to the player", GST_MESSAGE_SRC_NAME(message));
         GRefPtr<GstEvent> event;
         gst_structure_get(structure, "event", GST_TYPE_EVENT, &event.outPtr(), nullptr);
+        GST_TRACE("Forward message to Base");
         m_playerPrivate->handleProtectionEvent(event.get());
     }
 }
@@ -1360,7 +1357,6 @@ void AppendPipeline::dispatchPendingDecryptionStructure()
     // Release the m_pendingDecryptionStructure object since
     // gst_event_new_custom() takes over ownership of it.
     gst_element_send_event(m_pipeline.get(), gst_event_new_custom(GST_EVENT_CUSTOM_DOWNSTREAM_OOB, m_pendingDecryptionStructure.release()));
-    m_keySystemProtectionEventMap.clear();
 
     if (WTF::isMainThread()) {
         transitionTo(AppendState::Ongoing, true);

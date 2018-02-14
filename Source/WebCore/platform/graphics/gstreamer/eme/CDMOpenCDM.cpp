@@ -259,6 +259,7 @@ CDMInstanceOpenCDM::Session::Session(const media::OpenCdm& source, Ref<WebCore::
 
         m_needIndividualisation = ((requestType.size() == 1) && ((WebCore::MediaKeyMessageType)std::stoi(requestType) == CDMInstance::MessageType::IndividualizationRequest));
     }
+
 }
 
 CDMInstanceOpenCDM::Session::~Session() {
@@ -454,12 +455,11 @@ void CDMInstanceOpenCDM::storeRecordOfKeyUsage(const String&)
 {
 }
 
-
-
 String CDMInstanceOpenCDM::sessionIdByInitData(const String& initData, const bool firstInLine) const
 {
     String result;
 
+    GST_TRACE("Look for session by initData. Size: %d ", initData.sizeInBytes());
     if (m_sessionIdMap.size() == 0) {
         GST_WARNING("no sessions");
     }
@@ -484,10 +484,9 @@ String CDMInstanceOpenCDM::sessionIdByInitData(const String& initData, const boo
                 GST_WARNING("Unknown session, Nothing will be returned!!!");
             }
         }
-        else {
-            GST_DEBUG("Found session for initdata: %s", result.utf8().data());
-        }
+
     }
+    
 
     return result;
 }

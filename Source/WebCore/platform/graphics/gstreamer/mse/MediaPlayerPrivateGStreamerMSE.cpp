@@ -1057,22 +1057,15 @@ void MediaPlayerPrivateGStreamerMSE::attemptToDecryptWithInstance(const CDMInsta
         //  ClearKey for some reason.
 
         LockHolder lock(m_protectionMutex);
-
         auto& cdmInstanceOpenCDM = downcast<CDMInstanceOpenCDM>(instance);
         GST_TRACE("instance is OpenCDM, continuing with %s", cdmInstanceOpenCDM.keySystem().utf8().data());
-
         for (const auto& it : m_appendPipelinesMap) {
-            unsigned protectionEvent = it.value->keySystemProtectionEventMap().get(GStreamerEMEUtilities::keySystemToUuid(cdmInstanceOpenCDM.keySystem()));
-            String sessionId = cdmInstanceOpenCDM.sessionIdByInitData(it.value->initData(), (m_initDataToProtectionEventsMap.size() == 1));
+            String uuid = GStreamerEMEUtilities::keySystemToUuid(cdmInstanceOpenCDM.keySystem());
+            String sessionId = cdmInstanceOpenCDM.sessionIdByInitData(it.value->GetInitDataByKeySystem(uuid), false);
             if (!sessionId.isEmpty()) {
-                GST_TRACE("using %s", sessionId.utf8().data());
-                if (m_reportedProtectionEvents.contains(protectionEvent)) {
-                    m_protectionEventToSessionCache.add(protectionEvent, sessionId);
-                    it.value->setAppendState(AppendPipeline::AppendState::Ongoing);
-                } else {
-                    GUniquePtr<GstStructure> structure(gst_structure_new("drm-session", "session", G_TYPE_STRING, sessionId.utf8().data(), "protection-event", G_TYPE_UINT, protectionEvent, nullptr));
-                    it.value->dispatchDecryptionStructure(GUniquePtr<GstStructure>(gst_structure_copy(structure.get())));
-                }
+                GST_TRACE("Found session %s", sessionId.utf8().data());
+                GUniquePtr<GstStructure> structure(gst_structure_new("drm-session", "session", G_TYPE_STRING, sessionId.utf8().data(), nullptr));
+                it.value->dispatchDecryptionStructure(GUniquePtr<GstStructure>(gst_structure_copy(structure.get())));
             } else
                 GST_WARNING("found no session id to dispatch");
         }
@@ -1087,7 +1080,7 @@ void MediaPlayerPrivateGStreamerMSE::dispatchDecryptionSession(const String& ses
         GUniquePtr<GstStructure> structure(gst_structure_new("drm-session", "session", G_TYPE_STRING, sessionId.utf8().data(), "protection-event", G_TYPE_UINT, eventId, nullptr));
         it.value->dispatchDecryptionStructure(GUniquePtr<GstStructure>(gst_structure_copy(structure.get())));
     }
-    m_protectionEventToSessionCache.remove(eventId);
+    //m_protectionEventToSessionCache.remove(eventId);
 }
 #endif
 

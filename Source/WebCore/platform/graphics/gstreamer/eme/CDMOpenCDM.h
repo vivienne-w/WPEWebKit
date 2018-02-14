@@ -100,13 +100,13 @@ private:
         inline bool operator!= (const String& data) const {
             return (!operator== (data));
         }
-
     private:
         media::OpenCdm m_session;
         std::string m_message;
         std::string m_url;
         bool m_needIndividualisation;
         Ref<WebCore::SharedBuffer> m_buffer;
+        
     };
 
 public:
