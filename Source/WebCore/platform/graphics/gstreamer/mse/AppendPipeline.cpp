@@ -153,7 +153,7 @@ public:
             // If the first sample (DTS=0) doesn't start with PTS=0, compute a negative offset.
             if (!GST_BUFFER_DTS(buffer) && GST_BUFFER_PTS(buffer) && !m_ptsOffset.isValid()) {
                 m_ptsOffset = MediaTime(GST_BUFFER_DTS(buffer), GST_SECOND) - MediaTime(GST_BUFFER_PTS(buffer), GST_SECOND);
-                printf("### %s: Setting an offset of %s\n", __PRETTY_FUNCTION__, m_ptsOffset.toString().utf8().data()); fflush(stdout);
+                GST_TRACE("Setting an offset of %s\n", m_ptsOffset.toString().utf8().data());
             }
 
             // Apply the offset to zero-align the first sample and also correct the next ones.
@@ -849,6 +849,8 @@ void AppendPipeline::appsinkNewSample(GstSample* sample)
         return;
     }
 
+    // This increases sample refcount, as GStreamerMediaSample manages its own reference.
+    // We must still unref our own current ref before exiting this method.
     RefPtr<GStreamerMediaSample> mediaSample = WebCore::GStreamerMediaSample::create(sample, m_presentationSize, trackId());
 
     GST_TRACE("append: trackId=%s PTS=%s DTS=%s DUR=%s presentationSize=%.0fx%.0f %s%s",
@@ -865,6 +867,7 @@ void AppendPipeline::appsinkNewSample(GstSample* sample)
     if (duration.isValid() && !duration.isIndefinite() && mediaSample->presentationTime() > duration) {
         GST_DEBUG("Detected sample (%f) beyond the duration (%f), declaring LastSample", mediaSample->presentationTime().toFloat(), duration.toFloat());
         setAppendState(AppendState::LastSample);
+        gst_sample_unref(sample);
         return;
     }
 
@@ -878,6 +881,7 @@ void AppendPipeline::appsinkNewSample(GstSample* sample)
 
     m_sourceBufferPrivate->didReceiveSample(*mediaSample);
     setAppendState(AppendState::Sampling);
+    gst_sample_unref(sample);
 }
 
 void AppendPipeline::appsinkEOS()
