@@ -38,6 +38,7 @@
 #include "ResourceRequest.h"
 #include "ResourceResponse.h"
 #include "SharedBuffer.h"
+#include <cstdint> // uint64_t and friends, PRIxy
 #include <gst/app/gstappsrc.h>
 #include <gst/gst.h>
 #include <gst/pbutils/missing-plugins.h>
@@ -368,6 +369,8 @@ static void webKitWebSrcStop(WebKitWebSrc* src)
     }
 
     bool wasSeeking = std::exchange(priv->isSeeking, false);
+
+    GST_INFO_OBJECT(src, "Stop request received");
 
     if (priv->buffer) {
         unmapGstBuffer(priv->buffer.get());
@@ -950,7 +953,8 @@ void CachedResourceStreamingClient::dataReceived(PlatformMediaResource&, const c
     else
         gst_buffer_set_size(priv->buffer.get(), static_cast<gssize>(length));
 
-    GST_BUFFER_OFFSET(priv->buffer.get()) = priv->offset;
+    uint64_t startingOffset = priv->offset;
+
     if (priv->requestedOffset == priv->offset)
         priv->requestedOffset += length;
     priv->offset += length;
@@ -959,11 +963,41 @@ void CachedResourceStreamingClient::dataReceived(PlatformMediaResource&, const c
         GST_DEBUG_OBJECT(src, "Updating internal size from %" G_GUINT64_FORMAT " to %" G_GUINT64_FORMAT, priv->size, priv->offset);
         priv->size = priv->offset;
     }
-    GST_BUFFER_OFFSET_END(priv->buffer.get()) = priv->offset;
 
-    GstFlowReturn ret = gst_app_src_push_buffer(priv->appsrc, priv->buffer.leakRef());
-    if (ret != GST_FLOW_OK && ret != GST_FLOW_EOS && ret != GST_FLOW_FLUSHING)
-        GST_ELEMENT_ERROR(src, CORE, FAILED, (nullptr), (nullptr));
+    // Split the recieved buffer into smaller buffers of a size consistent with the basesrc. It is important not
+    // to push large buffers into the appsrc (where large is relative to the appsrc's configured byte size). If
+    // large buffers are pushed, then when they are internally dequeued by the appsrc, the buffering percentage
+    // can dramatically plumit due to a large amount of bytes being removed after a single downstream pull. This
+    // can in turn trick the media player into thinking it needs to buffer, and then issuing a spurious
+    // playing->paused then paused->playing transitions, which by the time the buffering logic completes, data
+    // is already available.
+    uint64_t bufferSize = gst_buffer_get_size(priv->buffer.get());
+    uint64_t blockSize = static_cast<guint64>(GST_BASE_SRC_CAST (priv->appsrc)->blocksize);
+    GST_LOG_OBJECT(src, "Splitting the recieved buffer into %" PRIu64 " blocks", bufferSize / blockSize);
+
+    for (uint64_t currentOffset = 0; currentOffset < bufferSize; currentOffset += blockSize) {
+        uint64_t subBufferOffset = startingOffset + currentOffset;
+        uint64_t currentOffsetSize = std::min(blockSize, bufferSize - currentOffset);
+
+        GST_LOG_OBJECT(src, "Create sub-buffer from [%" PRIu64 ", %" PRIu64 "]", currentOffset, currentOffset + currentOffsetSize);
+        GstBuffer *subBuffer = gst_buffer_copy_region (priv->buffer.get(), GST_BUFFER_COPY_ALL, currentOffset, currentOffsetSize);
+        if (UNLIKELY(!subBuffer))
+            GST_ELEMENT_ERROR(src, CORE, FAILED, ("Failed to allocate sub-buffer"), (nullptr));
+        // FIXME: These buffer offsets don't seem to be needed, but the original code was adding offsets
+        //   I assumed they're useful for seeking, but seeking works fine without them
+        //   Comitting this in a rush...
+        GST_BUFFER_OFFSET(subBuffer) = subBufferOffset;
+        GST_BUFFER_OFFSET_END(subBuffer) = subBufferOffset + currentOffsetSize;
+        GST_LOG_OBJECT(src, "Set sub-buffer offset bounds [%" PRIu64 ", %" PRIu64 "]", GST_BUFFER_OFFSET(subBuffer), GST_BUFFER_OFFSET_END(subBuffer));
+
+        GST_LOG_OBJECT(src, "Pushing buffer of size %" G_GSIZE_FORMAT " bytes", gst_buffer_get_size(subBuffer));
+        GstFlowReturn ret = gst_app_src_push_buffer(priv->appsrc, subBuffer);
+
+        if (UNLIKELY(ret != GST_FLOW_OK && ret != GST_FLOW_EOS && ret != GST_FLOW_FLUSHING))
+            GST_ELEMENT_ERROR(src, CORE, FAILED, (nullptr), (nullptr));
+    }
+
+    priv->buffer.clear();
 }
 
 void CachedResourceStreamingClient::accessControlCheckFailed(PlatformMediaResource&, const ResourceError& error)
