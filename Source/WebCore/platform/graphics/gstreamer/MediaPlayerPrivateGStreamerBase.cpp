@@ -1294,7 +1294,7 @@ void MediaPlayerPrivateGStreamerBase::attemptToDecryptWithLocalInstance()
                 break;
             } else {
                 GST_INFO("Session not found in cache, look in OpenCDM");
-                sessionId = cdmInstanceOpenCDM.sessionIdByInitData(entry.key, false);
+                sessionId = cdmInstanceOpenCDM.sessionIdByInitData(entry.key);
                 if (!sessionId.isEmpty()) {
                     GST_INFO("Found session in OpenCDM %s", sessionId.utf8().data());
                     entry.value.second = sessionId;
@@ -1393,7 +1393,7 @@ void MediaPlayerPrivateGStreamerBase::handleProtectionEvent(GstEvent* event)
         } else if(m_cdmInstance) {
             GST_TRACE("not found in cache, look for CDM session \n");
             auto& cdmInstanceOpenCDM = downcast<CDMInstanceOpenCDM>(*this->m_cdmInstance);
-            String session = cdmInstanceOpenCDM.sessionIdByInitData(concatenatedInitDataChunks, false);
+            String session = cdmInstanceOpenCDM.sessionIdByInitData(concatenatedInitDataChunks);
             if (!session.isEmpty()) {
                 GST_TRACE("Session found in CDM ignore request \n");
                 //TODO: Should we dispatch here?

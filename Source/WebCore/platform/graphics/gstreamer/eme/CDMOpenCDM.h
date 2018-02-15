@@ -151,7 +151,7 @@ public:
     void storeRecordOfKeyUsage(const String&) override;
 
     // The initial Data, is the only way to find a proper SessionId.
-    String sessionIdByInitData(const String&, const bool firstInLine) const;
+    String sessionIdByInitData(const String&) const;
 
 private:
     media::OpenCdm m_openCdm;

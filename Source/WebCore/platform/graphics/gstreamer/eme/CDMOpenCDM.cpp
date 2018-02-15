@@ -455,15 +455,14 @@ void CDMInstanceOpenCDM::storeRecordOfKeyUsage(const String&)
 {
 }
 
-String CDMInstanceOpenCDM::sessionIdByInitData(const String& initData, const bool firstInLine) const
+String CDMInstanceOpenCDM::sessionIdByInitData(const String& initData) const
 {
     String result;
 
     GST_TRACE("Look for session by initData. Size: %d ", initData.sizeInBytes());
     if (m_sessionIdMap.size() == 0) {
         GST_WARNING("no sessions");
-    }
-    else {
+    } else {
 
         std::map<std::string, Session>::const_iterator index (m_sessionIdMap.begin());
 
@@ -476,13 +475,7 @@ String CDMInstanceOpenCDM::sessionIdByInitData(const String& initData, const boo
             index++;
         }
         if (result.isEmpty() == true) {
-            if (firstInLine == true) {
-                result = String::fromUTF8(m_sessionIdMap.begin()->first.c_str());
-                GST_WARNING("Unknown session, grabbing the first in line [%s]!!!", result.utf8().data());
-            }
-            else {
-                GST_WARNING("Unknown session, Nothing will be returned!!!");
-            }
+	    GST_WARNING("Unknown session, Nothing will be returned!!!");
         }
 
     }

@@ -1061,7 +1061,7 @@ void MediaPlayerPrivateGStreamerMSE::attemptToDecryptWithInstance(const CDMInsta
         GST_TRACE("instance is OpenCDM, continuing with %s", cdmInstanceOpenCDM.keySystem().utf8().data());
         for (const auto& it : m_appendPipelinesMap) {
             String uuid = GStreamerEMEUtilities::keySystemToUuid(cdmInstanceOpenCDM.keySystem());
-            String sessionId = cdmInstanceOpenCDM.sessionIdByInitData(it.value->GetInitData(), false);
+            String sessionId = cdmInstanceOpenCDM.sessionIdByInitData(it.value->GetInitData());
             if (!sessionId.isEmpty()) {
                 GST_TRACE("Found session %s", sessionId.utf8().data());
                 GUniquePtr<GstStructure> structure(gst_structure_new("drm-session", "session", G_TYPE_STRING, sessionId.utf8().data(), nullptr));
