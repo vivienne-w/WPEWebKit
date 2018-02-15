@@ -156,6 +156,7 @@ public:
 #if USE(OPENCDM)
     using InitData = String;
     virtual void dispatchDecryptionSession(const String&, GstEventSeqNum);
+    void handleInitData(unsigned int gstEventSeq, InitData& concatenatedInitDataChunks);
 #endif
 #endif
 

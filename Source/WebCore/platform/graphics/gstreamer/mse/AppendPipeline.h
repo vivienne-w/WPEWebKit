@@ -65,9 +65,9 @@ public:
     void dispatchDecryptionStructure(GUniquePtr<GstStructure>&&);
 #endif
 #if USE(OPENCDM)
-    inline const String GetInitDataByKeySystem(const String& keySystem) const 
+    inline const String& GetInitData() const 
     {
-        return m_initDataCache.get(keySystem);
+        return m_initData;
     }
 #endif
 
@@ -178,8 +178,8 @@ private:
 
 #endif
 #if USE(OPENCDM)
+    String m_initData;
     
-    HashMap<String, String> m_initDataCache;
 #endif
 };
 

@@ -315,13 +315,13 @@ void AppendPipeline::clearPlayerPrivate()
     // Make sure that AppendPipeline won't process more data from now on and
     // instruct handleNewSample to abort itself from now on as well.
     setAppendState(AppendState::Invalid);
-
+    
     {
         LockHolder locker(m_padAddRemoveLock);
         m_playerPrivate = nullptr;
         m_padAddRemoveCondition.notifyOne();
+        
     }
-
     // And now that no handleNewSample operations will remain stalled waiting
     // for the main thread, stop the pipeline.
     if (m_pipeline)
@@ -342,8 +342,11 @@ void AppendPipeline::handleNeedContextSyncMessage(GstMessage* message)
 
 #if USE(OPENCDM)
         std::pair<Vector<GRefPtr<GstEvent>>, Vector<String>> streamEncryptionInformation = GStreamerEMEUtilities::extractEventsAndSystemsFromMessage(message);
+        unsigned int gstEventSeq;
+        String tempInit = String();
         for (auto& event : streamEncryptionInformation.first) {
             const char* eventKeySystemId = nullptr;
+            gstEventSeq = GST_EVENT_SEQNUM(event.get());
             GstBuffer* data = nullptr;
             gst_event_parse_protection(event.get(), &eventKeySystemId, &data, nullptr);
             GST_INFO("drm-preferred-decryption-system-id for: %s\n", eventKeySystemId);
@@ -354,20 +357,24 @@ void AppendPipeline::handleNeedContextSyncMessage(GstMessage* message)
                 break;
             }
 
-            if (m_initDataCache.contains(eventKeySystemId)) {
-                GST_WARNING("Seems we received twice a initData for keysystem %s ", eventKeySystemId);
-                m_initDataCache.remove(eventKeySystemId);
-            }
-            m_initDataCache.add(eventKeySystemId, String(mapInfo.data, mapInfo.size));
-            
+            tempInit.append(reinterpret_cast<const uint8_t*>(mapInfo.data), mapInfo.size);
             // Keeping all eventKeySystemId and protection events received, since
             // Appendpipeline does not know which CDM instance is actually selected.
 
             gst_buffer_unmap(data, &mapInfo);
-            m_playerPrivate->handleProtectionEvent(event.get());
         }
+
+        if (tempInit.isEmpty() || tempInit == m_initData) {
+            GST_INFO("InitData empty or allready handled, ignoring. Size: %d", tempInit.sizeInBytes());
+            return;
+        }
+
+        m_initData = tempInit;
+        m_playerPrivate->handleInitData(gstEventSeq, m_initData);    
 #endif
-        if (WTF::isMainThread())
+        if (m_abortPending) {
+            GST_INFO("m_abortPending stop KeyNegotiation");
+        } else if (WTF::isMainThread())
             transitionTo(AppendState::KeyNegotiation, true);
         else {
             GstStructure* structure = gst_structure_new("transition-main-thread", "transition", G_TYPE_INT, AppendState::KeyNegotiation, nullptr);
@@ -377,6 +384,8 @@ void AppendPipeline::handleNeedContextSyncMessage(GstMessage* message)
                 m_appendStateTransitionCondition.wait(m_appendStateTransitionLock);
             }
         }
+
+
      }
 }
 
@@ -450,12 +459,6 @@ void AppendPipeline::handleElementMessage(GstMessage* message)
     ASSERT(WTF::isMainThread());
     const GstStructure* structure = gst_message_get_structure(message);
     GST_TRACE("%s message from %s", gst_structure_get_name(structure), GST_MESSAGE_SRC_NAME(message));
-    if (m_playerPrivate && gst_structure_has_name(structure, "drm-key-needed")) {
-        GRefPtr<GstEvent> event;
-        gst_structure_get(structure, "event", GST_TYPE_EVENT, &event.outPtr(), nullptr);
-        GST_TRACE("Forward message to Base");
-        m_playerPrivate->handleProtectionEvent(event.get());
-    }
 }
 #endif
 
@@ -1018,8 +1021,9 @@ void AppendPipeline::abort()
         return;
 
     m_abortPending = true;
-    if (m_appendState == AppendState::NotStarted)
+    if (m_appendState == AppendState::NotStarted){
         setAppendState(AppendState::Aborting);
+    }
     // Else, the automatic state transitions will take care when the ongoing append finishes.
 }
 

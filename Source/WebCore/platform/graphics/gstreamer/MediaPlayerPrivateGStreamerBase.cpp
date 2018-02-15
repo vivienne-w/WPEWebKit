@@ -303,6 +303,7 @@ MediaPlayerPrivateGStreamerBase::MediaPlayerPrivateGStreamerBase(MediaPlayer* pl
 
 MediaPlayerPrivateGStreamerBase::~MediaPlayerPrivateGStreamerBase()
 {
+    GST_INFO("clean up");
 #if ENABLE(ENCRYPTED_MEDIA)
     m_protectionCondition.notifyAll();
 #endif
@@ -1329,17 +1330,45 @@ void MediaPlayerPrivateGStreamerBase::dispatchDecryptionSession(const String& se
  }
 #endif
 
-void MediaPlayerPrivateGStreamerBase::handleProtectionEvent(GstEvent* event)
+
+void MediaPlayerPrivateGStreamerBase::handleInitData(unsigned int gstEventSeq, InitData& concatenatedInitDataChunks)
 {
     LockHolder lock(m_protectionMutex);
+    RunLoop::main().dispatch([weakThis = m_weakPtrFactory.createWeakPtr(*this), initData = concatenatedInitDataChunks] {
+        if (!weakThis)
+            return;
+
+        GST_MEMDUMP("init datas", reinterpret_cast<const uint8_t*>(initData.latin1().data()), initData.sizeInBytes());
+
+        weakThis->m_player->initializationDataEncountered(ASCIILiteral("cenc"), ArrayBuffer::create(reinterpret_cast<const uint8_t*>(initData.latin1().data()), initData.sizeInBytes()));
+    });
+    m_protectionCondition.waitFor(m_protectionMutex, Seconds(4), [this] {
+        return this->m_cdmInstance;
+    });
+
+    if (m_cdmInstance && !m_cdmInstance->keySystem().isEmpty()) {
+        const char* preferredKeySystemUuid = GStreamerEMEUtilities::keySystemToUuid(m_cdmInstance->keySystem());
+        GST_INFO("working with %s, continuing with %s ", m_cdmInstance->keySystem().utf8().data(), preferredKeySystemUuid);
+
+        GST_TRACE("Cache initData and gstSeqNr: %d ", gstEventSeq);
+        auto& cdmInstanceOpenCDM = downcast<CDMInstanceOpenCDM>(*this->m_cdmInstance);
+        m_initSessionCache.add(concatenatedInitDataChunks, std::pair<unsigned int, String>(gstEventSeq, String()));
+
+        GRefPtr<GstContext> context = adoptGRef(gst_context_new("drm-preferred-decryption-system-id", FALSE));
+        GstStructure* contextStructure = gst_context_writable_structure(context.get());
+        gst_structure_set(contextStructure, "decryption-system-id", G_TYPE_STRING, preferredKeySystemUuid, nullptr);
+        gst_element_set_context(m_pipeline.get(), context.get());
+    } else
+        GST_WARNING("no proper CDM instance attached");
+}
+
+void MediaPlayerPrivateGStreamerBase::handleProtectionEvent(GstEvent* event)
+{
+
     const gchar* eventKeySystemId = nullptr;
     GstBuffer* data = nullptr;
     InitData concatenatedInitDataChunks;
     gst_event_parse_protection(event, &eventKeySystemId, &data, nullptr);
-    if (::strcmp(eventKeySystemId, WEBCORE_GSTREAMER_EME_UTILITIES_PLAYREADY_UUID) != 0) {
-        GST_WARNING("Ignoring all but playready: %s", eventKeySystemId);
-        return;
-    }
 
     GstMapInfo mapInfo;
     if (!gst_buffer_map(data, &mapInfo, GST_MAP_READ)) {
@@ -1376,36 +1405,7 @@ void MediaPlayerPrivateGStreamerBase::handleProtectionEvent(GstEvent* event)
             
         }
     }
-
-    RunLoop::main().dispatch([weakThis = m_weakPtrFactory.createWeakPtr(*this), initData = concatenatedInitDataChunks, eventKeySystemIdString = eventKeySystemId] {
-        if (!weakThis)
-            return;
-
-        GST_DEBUG("scheduling initializationDataEncountered event for %s with concatenated init datas size of %" G_GSIZE_FORMAT, eventKeySystemIdString);
-        GST_MEMDUMP("init datas", reinterpret_cast<const uint8_t*>(initData.latin1().data()), initData.sizeInBytes());
-
-        weakThis->m_player->initializationDataEncountered(ASCIILiteral("cenc"), ArrayBuffer::create(reinterpret_cast<const uint8_t*>(initData.latin1().data()), initData.sizeInBytes()));
-    });
-
-    
-    m_protectionCondition.waitFor(m_protectionMutex, Seconds(4), [this] {
-        return this->m_cdmInstance;
-    });
-
-    if (m_cdmInstance && !m_cdmInstance->keySystem().isEmpty()) {
-        const char* preferredKeySystemUuid = GStreamerEMEUtilities::keySystemToUuid(m_cdmInstance->keySystem());
-        GST_INFO("working with %s, continuing with %s ", m_cdmInstance->keySystem().utf8().data(), preferredKeySystemUuid);
-
-        GST_TRACE("Cache initData and gstSeqNr: %d ", gstEventSeq);
-        auto& cdmInstanceOpenCDM = downcast<CDMInstanceOpenCDM>(*this->m_cdmInstance);
-        m_initSessionCache.add(concatenatedInitDataChunks, std::pair<unsigned int, String>(gstEventSeq, String()));
-
-        GRefPtr<GstContext> context = adoptGRef(gst_context_new("drm-preferred-decryption-system-id", FALSE));
-        GstStructure* contextStructure = gst_context_writable_structure(context.get());
-        gst_structure_set(contextStructure, "decryption-system-id", G_TYPE_STRING, preferredKeySystemUuid, nullptr);
-        gst_element_set_context(m_pipeline.get(), context.get());
-    } else
-        GST_WARNING("no proper CDM instance attached");
+    handleInitData(gstEventSeq, concatenatedInitDataChunks);
 }
 #endif
 
