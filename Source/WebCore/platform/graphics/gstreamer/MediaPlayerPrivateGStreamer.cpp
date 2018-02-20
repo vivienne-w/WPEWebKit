@@ -189,6 +189,8 @@ MediaPlayerPrivateGStreamer::MediaPlayerPrivateGStreamer(MediaPlayer* player)
 
 MediaPlayerPrivateGStreamer::~MediaPlayerPrivateGStreamer()
 {
+    GST_DEBUG("Disposing player");
+
 #if ENABLE(VIDEO_TRACK)
     for (size_t i = 0; i < m_audioTracks.size(); ++i)
         m_audioTracks[i]->disconnect();
@@ -431,6 +433,7 @@ GstSeekFlags MediaPlayerPrivateGStreamer::hardwareDependantSeekFlags()
 
 void MediaPlayerPrivateGStreamer::readyTimerFired()
 {
+    GST_DEBUG("In READY for too long. Releasing pipeline resources.");
     changePipelineState(GST_STATE_NULL);
 }
 
@@ -450,6 +453,11 @@ bool MediaPlayerPrivateGStreamer::changePipelineState(GstState newState)
 
     GST_DEBUG("Changing state change to %s from %s with %s pending", gst_element_state_get_name(newState),
         gst_element_state_get_name(currentState), gst_element_state_get_name(pending));
+
+#if USE(GSTREAMER_GL)
+    if (currentState == GST_STATE_READY && newState == GST_STATE_PAUSED)
+        ensureGLVideoSinkContext();
+#endif
 
     GstStateChangeReturn setStateResult = gst_element_set_state(m_pipeline.get(), newState);
     GstState pausedOrPlaying = newState == GST_STATE_PLAYING ? GST_STATE_PAUSED : GST_STATE_PLAYING;
@@ -1797,6 +1805,8 @@ void MediaPlayerPrivateGStreamer::timeChanged()
 
 void MediaPlayerPrivateGStreamer::didEnd()
 {
+    GST_INFO("Playback ended");
+
     // Synchronize position and duration values to not confuse the
     // HTMLMediaElement. In some cases like reverse playback the
     // position is not always reported as 0 for instance.

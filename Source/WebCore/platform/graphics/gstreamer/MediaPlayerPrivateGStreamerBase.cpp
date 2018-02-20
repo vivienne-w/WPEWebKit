@@ -391,9 +391,10 @@ bool MediaPlayerPrivateGStreamerBase::handleSyncMessage(GstMessage* message)
     if (GST_MESSAGE_TYPE(message) == GST_MESSAGE_NEED_CONTEXT) {
         const gchar* contextType;
         gst_message_parse_context_type(message, &contextType);
+        GST_DEBUG("Handling %s need-context message for %s", contextType, GST_MESSAGE_SRC_NAME(message));
 
 #if USE(GSTREAMER_GL)
-        GRefPtr<GstContext> elementContext = adoptGRef(requestGLContext(contextType, this));
+        GRefPtr<GstContext> elementContext = adoptGRef(requestGLContext(contextType));
         if (elementContext) {
             gst_element_set_context(GST_ELEMENT(message->src), elementContext.get());
             return true;
@@ -572,21 +573,21 @@ bool MediaPlayerPrivateGStreamerBase::handleSyncMessage(GstMessage* message)
 }
 
 #if USE(GSTREAMER_GL)
-GstContext* MediaPlayerPrivateGStreamerBase::requestGLContext(const gchar* contextType, MediaPlayerPrivateGStreamerBase* player)
+GstContext* MediaPlayerPrivateGStreamerBase::requestGLContext(const char* contextType)
 {
-    if (!player->ensureGstGLContext())
+    if (!ensureGstGLContext())
         return nullptr;
 
     if (!g_strcmp0(contextType, GST_GL_DISPLAY_CONTEXT_TYPE)) {
         GstContext* displayContext = gst_context_new(GST_GL_DISPLAY_CONTEXT_TYPE, TRUE);
-        gst_context_set_gl_display(displayContext, player->gstGLDisplay());
+        gst_context_set_gl_display(displayContext, gstGLDisplay());
         return displayContext;
     }
 
     if (!g_strcmp0(contextType, "gst.gl.app_context")) {
         GstContext* appContext = gst_context_new("gst.gl.app_context", TRUE);
         GstStructure* structure = gst_context_writable_structure(appContext);
-        gst_structure_set(structure, "context", GST_GL_TYPE_CONTEXT, player->gstGLContext(), nullptr);
+        gst_structure_set(structure, "context", GST_GL_TYPE_CONTEXT, gstGLContext(), nullptr);
         return appContext;
     }
 
@@ -1021,6 +1022,7 @@ GstFlowReturn MediaPlayerPrivateGStreamerBase::newPrerollCallback(GstElement* si
 
 void MediaPlayerPrivateGStreamerBase::clearCurrentBuffer()
 {
+    GST_DEBUG("Flushing video sample");
     WTF::GMutexLocker<GMutex> lock(m_sampleMutex);
 
     // Replace by a new sample having only the caps, so this dummy sample is still useful to get the dimensions.
@@ -1360,10 +1362,6 @@ gboolean appSinkSinkQuery(GstPad* pad, GstObject* parent, GstQuery* query)
 
 GstElement* MediaPlayerPrivateGStreamerBase::createVideoSinkGL()
 {
-    // FIXME: Currently it's not possible to get the video frames and caps using this approach until
-    // the pipeline gets into playing state. Due to this, trying to grab a frame and painting it by some
-    // other mean (canvas or webgl) before playing state can result in a crash.
-    // This is being handled in https://bugs.webkit.org/show_bug.cgi?id=159460.
     if (!webkitGstCheckVersion(1, 8, 0))
         return nullptr;
 
@@ -1416,6 +1414,21 @@ GstElement* MediaPlayerPrivateGStreamerBase::createVideoSinkGL()
         videoSink = nullptr;
     }
     return videoSink;
+}
+
+void MediaPlayerPrivateGStreamerBase::ensureGLVideoSinkContext()
+{
+    if (!m_glDisplayElementContext)
+        m_glDisplayElementContext = adoptGRef(requestGLContext(GST_GL_DISPLAY_CONTEXT_TYPE));
+
+    if (m_glDisplayElementContext)
+        gst_element_set_context(m_videoSink.get(), m_glDisplayElementContext.get());
+
+    if (!m_glAppElementContext)
+        m_glAppElementContext = adoptGRef(requestGLContext("gst.gl.app_context"));
+
+    if (m_glAppElementContext)
+        gst_element_set_context(m_videoSink.get(), m_glAppElementContext.get());
 }
 #endif
 

@@ -83,7 +83,7 @@ public:
 
 #if USE(GSTREAMER_GL)
     bool ensureGstGLContext();
-    static GstContext* requestGLContext(const gchar* contextType, MediaPlayerPrivateGStreamerBase*);
+    GstContext* requestGLContext(const char* contextType);
 #endif
 
     bool supportsMuting() const override { return true; }
@@ -211,6 +211,7 @@ protected:
 #if USE(CAIRO) && ENABLE(ACCELERATED_2D_CANVAS)
     GLContext* prepareContextForCairoPaint(GstVideoInfo&, IntSize&, IntSize&);
     bool paintToCairoSurface(cairo_surface_t*, cairo_device_t*, GstVideoInfo&, const IntSize&, const IntSize&, bool);
+    void ensureGLVideoSinkContext();
 #endif
 #endif
 
@@ -274,6 +275,8 @@ protected:
 #if USE(GSTREAMER_GL)
     GRefPtr<GstGLContext> m_glContext;
     GRefPtr<GstGLDisplay> m_glDisplay;
+    GRefPtr<GstContext> m_glDisplayElementContext;
+    GRefPtr<GstContext> m_glAppElementContext;
 #endif
 
 #if USE(COORDINATED_GRAPHICS_THREADED)
