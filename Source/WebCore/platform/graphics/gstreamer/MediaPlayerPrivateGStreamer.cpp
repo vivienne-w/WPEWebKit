@@ -407,6 +407,7 @@ MediaTime MediaPlayerPrivateGStreamer::playbackPosition() const
 
 GstSeekFlags MediaPlayerPrivateGStreamer::hardwareDependantSeekFlags()
 {
+/*
 #if USE(FUSION_SINK)
     // With Fusion we use a decoder+renderer sink which can't be fed with samples not starting
     // in a key frame.
@@ -414,6 +415,8 @@ GstSeekFlags MediaPlayerPrivateGStreamer::hardwareDependantSeekFlags()
 #else
     return GST_SEEK_FLAG_ACCURATE;
 #endif
+*/
+    return static_cast<GstSeekFlags>(GST_SEEK_FLAG_KEY_UNIT | GST_SEEK_FLAG_SNAP_AFTER);
 }
 
 void MediaPlayerPrivateGStreamer::readyTimerFired()
