@@ -214,11 +214,25 @@ void MediaSource::seekToTime(const MediaTime& time)
 
     m_pendingSeekTime = time;
 
+    bool waitBecauseNoSyncSampleAvailable = !hasBufferedTime(time);
+    //#if PLATFORM(BCM_NEXUS)
+    if (!waitBecauseNoSyncSampleAvailable) {
+        MediaTime negativeThreshold = MediaTime::zeroTime();
+        MediaTime positiveThreshold = MediaTime(10, 1); // Find sync sample in the next 5 seconds
+        for (auto& sourceBuffer : *m_activeSourceBuffers) {
+            MediaTime previousPendingSeekTime = m_pendingSeekTime;
+            m_pendingSeekTime = sourceBuffer->findVideoSyncSampleMediaTime(time, negativeThreshold, positiveThreshold);
+            printf("### %s: Changing m_pendingSeekTime %s --> %s\n", __PRETTY_FUNCTION__, toString(previousPendingSeekTime).utf8().data(), toString(m_pendingSeekTime).utf8().data()); fflush(stdout);
+        }
+        waitBecauseNoSyncSampleAvailable |= (m_pendingSeekTime != time && !hasBufferedTime(m_pendingSeekTime));
+    }
+    //#endif
+
     // Run the following steps as part of the "Wait until the user agent has established whether or not the
     // media data for the new playback position is available, and, if it is, until it has decoded enough data
     // to play back that position" step of the seek algorithm:
     // ↳ If new playback position is not in any TimeRange of HTMLMediaElement.buffered
-    if (!hasBufferedTime(time)) {
+    if (waitBecauseNoSyncSampleAvailable) {
         // 1. If the HTMLMediaElement.readyState attribute is greater than HAVE_METADATA,
         // then set the HTMLMediaElement.readyState attribute to HAVE_METADATA.
         m_private->setReadyState(MediaPlayer::HaveMetadata);
@@ -227,21 +241,12 @@ void MediaSource::seekToTime(const MediaTime& time)
         // frame processing algorithm to set the HTMLMediaElement.readyState attribute to a value greater
         // than HAVE_METADATA.
         LOG(MediaSource, "MediaSource::seekToTime(%p) - waitForSeekCompleted()", this);
+        printf("### %s: waitForSeekCompleted()\n", __PRETTY_FUNCTION__); fflush(stdout);
         m_private->waitForSeekCompleted();
         return;
     }
     // ↳ Otherwise
     // Continue
-
-//#if PLATFORM(BCM_NEXUS)
-    MediaTime negativeThreshold = MediaTime::zeroTime();
-    MediaTime positiveThreshold = MediaTime(10, 1); // Find sync sample in the next 5 seconds
-    for (auto& sourceBuffer : *m_activeSourceBuffers) {
-        MediaTime previousPendingSeekTime = m_pendingSeekTime;
-        m_pendingSeekTime = sourceBuffer->findVideoSyncSampleMediaTime(time, negativeThreshold, positiveThreshold);
-        printf("### %s: Changing m_pendingSeekTime %s --> %s\n", __PRETTY_FUNCTION__, toString(previousPendingSeekTime).utf8().data(), toString(m_pendingSeekTime).utf8().data()); fflush(stdout);
-    }
-//#endif
 
 // https://bugs.webkit.org/show_bug.cgi?id=125157 broke seek on MediaPlayerPrivateGStreamerMSE
 #if !USE(GSTREAMER)
