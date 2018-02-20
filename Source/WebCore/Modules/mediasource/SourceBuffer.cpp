@@ -435,7 +435,7 @@ void SourceBuffer::seekToTime(const MediaTime& time)
     }
 }
 
-#if PLATFORM(BCM_NEXUS)
+//#if PLATFORM(BCM_NEXUS)
 MediaTime SourceBuffer::findVideoSyncSampleMediaTime(const MediaTime& targetTime, const MediaTime& negativeThreshold, const MediaTime& positiveThreshold)
 {
     MediaTime seekTime = targetTime;
@@ -476,7 +476,7 @@ MediaTime SourceBuffer::findVideoSyncSampleMediaTime(const MediaTime& targetTime
 
     return seekTime;
 }
-#endif
+//#endif
 
 MediaTime SourceBuffer::sourceBufferPrivateFastSeekTimeForMediaTime(const MediaTime& targetTime, const MediaTime& negativeThreshold, const MediaTime& positiveThreshold)
 {
