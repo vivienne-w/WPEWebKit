@@ -34,6 +34,7 @@
 
 #if ENABLE(MEDIA_SOURCE)
 
+#include "wtf/StringPrintStream.h"
 #include "AudioTrackList.h"
 #include "ContentType.h"
 #include "Event.h"
@@ -236,7 +237,9 @@ void MediaSource::seekToTime(const MediaTime& time)
     MediaTime negativeThreshold = MediaTime::zeroTime();
     MediaTime positiveThreshold = MediaTime(10, 1); // Find sync sample in the next 5 seconds
     for (auto& sourceBuffer : *m_activeSourceBuffers) {
+        MediaTime previousPendingSeekTime = m_pendingSeekTime;
         m_pendingSeekTime = sourceBuffer->findVideoSyncSampleMediaTime(time, negativeThreshold, positiveThreshold);
+        printf("### %s: Changing m_pendingSeekTime %s --> %s\n", __PRETTY_FUNCTION__, toString(previousPendingSeekTime).utf8().data(), toString(m_pendingSeekTime).utf8().data()); fflush(stdout);
     }
 //#endif
 
