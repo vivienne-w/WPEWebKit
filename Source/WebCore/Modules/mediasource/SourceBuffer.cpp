@@ -435,6 +435,49 @@ void SourceBuffer::seekToTime(const MediaTime& time)
     }
 }
 
+#if PLATFORM(BCM_NEXUS)
+MediaTime SourceBuffer::findVideoSyncSampleMediaTime(const MediaTime& targetTime, const MediaTime& negativeThreshold, const MediaTime& positiveThreshold)
+{
+    MediaTime seekTime = targetTime;
+    MediaTime lowerBoundTime = targetTime - negativeThreshold;
+    MediaTime upperBoundTime = targetTime + positiveThreshold;
+
+    for (auto& trackBufferPair : m_trackBufferMap) {
+        const auto& trackID = trackBufferPair.key;
+        if (trackID.startsWith("V")) {
+            TrackBuffer& trackBuffer = trackBufferPair.value;
+
+            // Find the sample which contains the target time.
+            auto futureSyncSampleIterator = trackBuffer.samples.decodeOrder().findSyncSampleAfterPresentationTime(targetTime, positiveThreshold);
+            auto pastSyncSampleIterator = trackBuffer.samples.decodeOrder().findSyncSamplePriorToPresentationTime(targetTime, negativeThreshold);
+            auto upperBound = trackBuffer.samples.decodeOrder().end();
+            auto lowerBound = trackBuffer.samples.decodeOrder().rend();
+
+            if (futureSyncSampleIterator == upperBound && pastSyncSampleIterator == lowerBound)
+                continue;
+
+            MediaTime futureSeekTime = MediaTime::positiveInfiniteTime();
+            if (futureSyncSampleIterator != upperBound) {
+                RefPtr<MediaSample>& sample = futureSyncSampleIterator->second;
+                futureSeekTime = sample->presentationTime();
+            }
+
+            MediaTime pastSeekTime = MediaTime::negativeInfiniteTime();
+            if (pastSyncSampleIterator != lowerBound) {
+                RefPtr<MediaSample>& sample = pastSyncSampleIterator->second;
+                pastSeekTime = sample->presentationTime();
+            }
+
+            MediaTime trackSeekTime = abs(targetTime - futureSeekTime) < abs(targetTime - pastSeekTime) ? futureSeekTime : pastSeekTime;
+            if (abs(targetTime - trackSeekTime) > abs(targetTime - seekTime))
+                seekTime = trackSeekTime;
+        }
+    }
+
+    return seekTime;
+}
+#endif
+
 MediaTime SourceBuffer::sourceBufferPrivateFastSeekTimeForMediaTime(const MediaTime& targetTime, const MediaTime& negativeThreshold, const MediaTime& positiveThreshold)
 {
     MediaTime seekTime = targetTime;

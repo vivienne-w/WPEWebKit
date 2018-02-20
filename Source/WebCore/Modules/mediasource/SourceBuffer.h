@@ -86,7 +86,9 @@ public:
     void abortIfUpdating();
     void removedFromMediaSource();
     void seekToTime(const MediaTime&);
-
+#if PLATFORM(BCM_NEXUS)
+    MediaTime findVideoSyncSampleMediaTime(const MediaTime&, const MediaTime& negativeThreshold, const MediaTime& positiveThreshold);
+#endif
     bool canPlayThroughRange(PlatformTimeRanges&);
 
     bool hasVideo() const;

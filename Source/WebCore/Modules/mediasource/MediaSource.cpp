@@ -232,6 +232,14 @@ void MediaSource::seekToTime(const MediaTime& time)
     // ↳ Otherwise
     // Continue
 
+#if PLATFORM(BCM_NEXUS)
+    MediaTime negativeThreshold = MediaTime::zeroTime();
+    MediaTime positiveThreshold = MediaTime(10, 1); // Find sync sample in the next 5 seconds
+    for (auto& sourceBuffer : *m_activeSourceBuffers) {
+        m_pendingSeekTime = sourceBuffer->findVideoSyncSampleMediaTime(time, negativeThreshold, positiveThreshold);
+    }
+#endif
+
 // https://bugs.webkit.org/show_bug.cgi?id=125157 broke seek on MediaPlayerPrivateGStreamerMSE
 #if !USE(GSTREAMER)
     m_private->waitForSeekCompleted();
