@@ -69,6 +69,7 @@
 #include "RenderBox.h"
 #include "RuntimeEnabledFeatures.h"
 #include "Settings.h"
+#include "TextureMapperPlatformLayerProxyProvider.h"
 #include "WebGL2RenderingContext.h"
 #include "WebGLActiveInfo.h"
 #include "WebGLBuffer.h"
