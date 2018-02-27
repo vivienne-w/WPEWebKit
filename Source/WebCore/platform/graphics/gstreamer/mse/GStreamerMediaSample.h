@@ -55,6 +55,7 @@ public:
     bool isDivisable() const override { return true; }
     std::pair<RefPtr<MediaSample>, RefPtr<MediaSample>> divide(const MediaTime&) override;
     Ref<MediaSample> createNonDisplayingCopy() const override;
+    Ref<MediaSample> createDeepCopy() const;
     SampleFlags flags() const override { return m_flags; }
     PlatformSample platformSample() override  { return PlatformSample(); }
     void dump(PrintStream& out) const override { out.print("{PTS(", presentationTime(), "), DTS(", decodeTime(), "), duration(", duration(), ")}"); }

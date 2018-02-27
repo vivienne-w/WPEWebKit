@@ -751,6 +751,15 @@ void webKitMediaSrcPrepareSeek(WebKitMediaSrc* source, const MediaTime& time)
     GST_OBJECT_UNLOCK(source);
 }
 
+MediaTime webKitMediaSrcGetSeekTime(WebKitMediaSrc* source)
+{
+    GST_OBJECT_LOCK(source);
+    MediaTime result = source->priv->seekTime;
+    GST_OBJECT_UNLOCK(source);
+
+    return result;
+}
+
 namespace WTF {
 template <> GRefPtr<WebKitMediaSrc> adoptGRef(WebKitMediaSrc* ptr)
 {

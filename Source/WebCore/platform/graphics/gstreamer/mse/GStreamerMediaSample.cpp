@@ -22,6 +22,8 @@
 #include "GStreamerMediaSample.h"
 
 #include "GStreamerUtilities.h"
+#include "GUniquePtrGStreamer.h"
+#include <wtf/glib/GUniquePtr.h>
 
 #if ENABLE(VIDEO) && USE(GSTREAMER) && ENABLE(MEDIA_SOURCE)
 
@@ -131,6 +133,28 @@ Ref<MediaSample> GStreamerMediaSample::createNonDisplayingCopy() const
     const GstStructure* originalInfo = gst_sample_get_info(m_sample.get());
     GstStructure* info = originalInfo ? gst_structure_copy(originalInfo) : nullptr;
     GRefPtr<GstSample> sample = adoptGRef(gst_sample_new(buffer, caps, segment, info));
+
+    return adoptRef(*new GStreamerMediaSample(sample.get(), m_presentationSize, m_trackId));
+}
+
+Ref<MediaSample> GStreamerMediaSample::createDeepCopy() const
+{
+    if (!m_sample)
+        return createFakeSample(nullptr, m_pts, m_dts, m_duration, m_presentationSize, m_trackId);
+
+    const GstBuffer* originalBuffer = gst_sample_get_buffer(m_sample.get());
+
+    GRefPtr<GstBuffer> buffer = originalBuffer ? adoptGRef(gst_buffer_copy(originalBuffer)) : nullptr;
+    const GstCaps* originalCaps = gst_sample_get_caps(m_sample.get());
+
+    GRefPtr<GstCaps> caps = originalCaps ? adoptGRef(gst_caps_copy(originalCaps)) : nullptr;
+    const GstSegment* originalSegment = gst_sample_get_segment(m_sample.get());
+
+    GUniquePtr<GstSegment> segment(originalSegment ? gst_segment_copy(originalSegment) : nullptr);
+    const GstStructure* originalInfo = gst_sample_get_info(m_sample.get());
+
+    GstStructure* info = originalInfo ? gst_structure_copy(originalInfo) : nullptr;
+    GRefPtr<GstSample> sample = adoptGRef(gst_sample_new(buffer.get(), caps.get(), segment.get(), info));
 
     return adoptRef(*new GStreamerMediaSample(sample.get(), m_presentationSize, m_trackId));
 }

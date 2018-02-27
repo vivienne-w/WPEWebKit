@@ -507,6 +507,14 @@ void PlaybackPipeline::enqueueSample(Ref<MediaSample>&& mediaSample)
     // Only modified by the main thread, no need to lock.
     MediaTime lastEnqueuedTime = stream->lastEnqueuedTime;
 
+    // ### DEBUG - HACK FOR BCM_NEXUS
+    MediaTime seekTime = webKitMediaSrcGetSeekTime(m_webKitMediaSrc.get());
+    bool applyZeroDurationHack = seekTime.isValid() && mediaSample->presentationTime() < seekTime;
+    if (applyZeroDurationHack) {
+        // This is a non-displaying sample. We duplicate it and later set a near-zero duration, so it's quickly skipped.
+        mediaSample = static_cast<GStreamerMediaSample&>(mediaSample.get()).createDeepCopy();
+    }
+
     GStreamerMediaSample* sample = static_cast<GStreamerMediaSample*>(mediaSample.ptr());
     if (sample->sample() && gst_sample_get_buffer(sample->sample())) {
         GRefPtr<GstSample> gstSample = sample->sample();
@@ -514,6 +522,14 @@ void PlaybackPipeline::enqueueSample(Ref<MediaSample>&& mediaSample)
         lastEnqueuedTime = sample->presentationTime();
 
         GST_BUFFER_FLAG_UNSET(buffer, GST_BUFFER_FLAG_DECODE_ONLY);
+
+        if (applyZeroDurationHack) {
+            printf("### %s: %s Applying zero duration hack to PTS %" GST_TIME_FORMAT " < %" GST_TIME_FORMAT"\n", __PRETTY_FUNCTION__,
+                trackId.string().utf8().data(), GST_TIME_ARGS(GST_BUFFER_PTS(buffer)), GST_TIME_ARGS(WebCore::toGstClockTime(seekTime))); fflush(stdout);
+            GST_BUFFER_PTS(buffer) = WebCore::toGstClockTime(seekTime);
+            GST_BUFFER_DURATION(buffer) = 0;
+        }
+
         pushSample(GST_APP_SRC(appsrc), gstSample.get());
         // gst_app_src_push_sample() uses transfer-none for gstSample.
 
