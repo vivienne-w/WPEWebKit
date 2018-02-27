@@ -2359,8 +2359,6 @@ void MediaPlayerPrivateGStreamer::createGSTPlayBin()
         return GST_BUS_PASS;
     }, this, nullptr);
 
-    // Let also other listeners subscribe to (application) messages in this bus.
-    GRefPtr<GstBus> bus = adoptGRef(gst_pipeline_get_bus(GST_PIPELINE(m_pipeline.get())));
     gst_bus_add_signal_watch_full(bus.get(), RunLoopSourcePriority::RunLoopDispatcher);
     g_signal_connect(bus.get(), "message", G_CALLBACK(busMessageCallback), this);
 

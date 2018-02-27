@@ -117,6 +117,8 @@ private:
 
     MediaTime m_initialDuration;
 
+    GstFlowReturn m_flowReturn;
+
     GRefPtr<GstElement> m_pipeline;
     GRefPtr<GstBus> m_bus;
     GRefPtr<GstElement> m_appsrc;
@@ -138,6 +140,8 @@ private:
 
     Lock m_padAddRemoveLock;
     Condition m_padAddRemoveCondition;
+    Lock m_newSampleLock;
+    Condition m_newSampleCondition;
     Lock m_appendStateTransitionLock;
     Condition m_appendStateTransitionCondition;
 

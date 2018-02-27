@@ -1013,30 +1013,6 @@ createOptionalParserForFormat(GstPad* demuxerSrcPad)
     return nullptr;
 }
 
-static GRefPtr<GstElement>
-createOptionalParserForFormat(GstPad* demuxerSrcPad)
-{
-    GRefPtr<GstCaps> padCaps = adoptGRef(gst_pad_get_current_caps(demuxerSrcPad));
-    GstStructure* structure = gst_caps_get_structure(padCaps.get(), 0);
-    const char* mediaType = gst_structure_get_name(structure);
-
-    GUniquePtr<char> demuxerPadName(gst_pad_get_name(demuxerSrcPad));
-    GUniquePtr<char> parserName(g_strdup_printf("%s_parser", demuxerPadName.get()));
-
-    if (!g_strcmp0(mediaType, "audio/x-opus")) {
-        GstElement* opusparse = gst_element_factory_make("opusparse", parserName.get());
-        RELEASE_ASSERT(opusparse);
-        return GRefPtr<GstElement>(opusparse);
-    }
-    if (!g_strcmp0(mediaType, "audio/x-vorbis")) {
-        GstElement* vorbisparse = gst_element_factory_make("vorbisparse", parserName.get());
-        RELEASE_ASSERT(vorbisparse);
-        return GRefPtr<GstElement>(vorbisparse);
-    }
-
-    return nullptr;
-}
-
 void AppendPipeline::connectDemuxerSrcPadToAppsinkFromAnyThread(GstPad* demuxerSrcPad)
 {
     if (!m_appsink)
