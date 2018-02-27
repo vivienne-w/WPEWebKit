@@ -358,7 +358,6 @@ MediaTime MediaPlayerPrivateGStreamer::playbackPosition() const
             return m_seekTime;
 
         MediaTime duration = durationMediaTime();
->>>>>>> 106bd92af7f04fe4adda0599559bb43574550350
         return duration.isInvalid() ? MediaTime::zeroTime() : duration;
     }
 

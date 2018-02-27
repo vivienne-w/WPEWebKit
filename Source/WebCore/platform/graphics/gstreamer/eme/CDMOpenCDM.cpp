@@ -29,15 +29,12 @@
 #include "GStreamerEMEUtilities.h"
 #include "MediaKeyMessageType.h"
 #include "MediaKeysRequirement.h"
-#include "inspector/InspectorValues.h"
 
 #include <gst/gst.h>
 #include <wtf/text/Base64.h>
 
 GST_DEBUG_CATEGORY_EXTERN(webkit_media_opencdm_decrypt_debug_category);
 #define GST_CAT_DEFAULT webkit_media_opencdm_decrypt_debug_category
-
-using namespace Inspector;
 
 namespace WebCore {
 
@@ -432,6 +429,12 @@ void CDMInstanceOpenCDM::removeSessionData(const String& sessionId, LicenseType,
             callback(WTFMove(keys), std::nullopt, SuccessValue::Failed);
         }
     }
+}
+
+CDMInstance::SuccessValue CDMInstanceOpenCDM::setStorageDirectory(const String& storageDirectory)
+{
+	// Reject any persistent state storage.
+    return storageDirectory.isEmpty() ? Succeeded : Failed;
 }
 
 void CDMInstanceOpenCDM::closeSession(const String& session, CloseSessionCallback callback)

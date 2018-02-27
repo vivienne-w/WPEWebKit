@@ -136,7 +136,9 @@ public:
     // Operations on the DRM system
     // -----------------------------------------------------------------------------------------
     virtual SuccessValue setServerCertificate(Ref<SharedBuffer>&&) override; 
-    
+
+    SuccessValue setStorageDirectory(const String&) override;
+
     // Request Licnese will automagically create a Session. The session is later on referred to with
     // its SessionId
     virtual void requestLicense(LicenseType, const AtomicString&, Ref<SharedBuffer>&&, LicenseCallback) override;
