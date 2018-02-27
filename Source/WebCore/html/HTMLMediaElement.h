@@ -661,7 +661,7 @@ private:
 
     // CDMClient
     void cdmClientAttemptToResumePlaybackIfNecessary() final;
-    void cdmClientAttemptToDecryptWithInstance(const CDMInstance&) final;
+    void cdmClientAttemptToDecryptWithInstance(CDMInstance&) final;
 #endif
     
 #if ENABLE(WIRELESS_PLAYBACK_TARGET)

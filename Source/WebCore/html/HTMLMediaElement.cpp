@@ -2801,7 +2801,7 @@ void HTMLMediaElement::cdmClientAttemptToResumePlaybackIfNecessary()
     attemptToResumePlaybackIfNecessary();
 }
 
-void HTMLMediaElement::cdmClientAttemptToDecryptWithInstance(const CDMInstance& instance)
+void HTMLMediaElement::cdmClientAttemptToDecryptWithInstance(CDMInstance& instance)
 {
     if (m_player)
         m_player->attemptToDecryptWithInstance(instance);
