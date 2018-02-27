@@ -36,10 +36,10 @@ WI.LayerDetailsSidebarPanel = class LayerDetailsSidebarPanel extends WI.DetailsS
         this._dataGridNodesByLayerId = new Map;
 
         this._dataGrid = null;
+        this._hoveredDataGridNode = null;
         this._bottomBar = null;
         this._layersCountLabel = null;
         this._layersMemoryLabel = null;
-        this._popover = null;
     }
 
     // Public
@@ -50,9 +50,22 @@ WI.LayerDetailsSidebarPanel = class LayerDetailsSidebarPanel extends WI.DetailsS
             objects = [objects];
 
         let layers = objects.filter((object) => object instanceof WI.Layer);
-        this._updateDisplayWithLayers(layers);
+        this._updateLayers(layers);
 
         return !!layers.length;
+    }
+
+    selectNodeByLayerId(layerId)
+    {
+        let node = this._dataGridNodesByLayerId.get(layerId);
+        if (node === this._dataGrid.selectedNode)
+            return;
+
+        const suppressEvent = true;
+        if (node)
+            node.revealAndSelect(suppressEvent);
+        else if (this._dataGrid.selectedNode)
+            this._dataGrid.selectedNode.deselect(suppressEvent);
     }
 
     // Private
@@ -86,9 +99,13 @@ WI.LayerDetailsSidebarPanel = class LayerDetailsSidebarPanel extends WI.DetailsS
         this._dataGrid.sortOrder = WI.DataGrid.SortOrder.Descending;
         this._dataGrid.createSettings("layer-details-sidebar-panel");
 
-        this._dataGrid.element.addEventListener("focus", this._dataGridFocused.bind(this), false);
-        this._dataGrid.element.addEventListener("blur", this._dataGridBlurred.bind(this), false);
-        this._dataGrid.element.addEventListener("click", this._dataGridClicked.bind(this), false);
+        this._dataGrid.element.addEventListener("mousemove", this._dataGridMouseMove.bind(this));
+        this._dataGrid.element.addEventListener("mouseleave", this._dataGridMouseLeave.bind(this));
+
+        // FIXME: We can't use virtualized rows until DataGrid is able to scroll them programmatically.
+        //        See TreeElement#reveal -> TreeOutline#updateVirtualizedElements for an analogy.
+        this._dataGrid.inline = true;
+        this._dataGrid.element.classList.remove("inline");
 
         this.contentView.addSubview(this._dataGrid);
     }
@@ -116,248 +133,92 @@ WI.LayerDetailsSidebarPanel = class LayerDetailsSidebarPanel extends WI.DetailsS
         }
 
         this._dataGrid.sortNodes(comparator);
-        this._updatePopoverForSelectedNode();
     }
 
     _dataGridSelectedNodeChanged()
     {
-        if (this._dataGrid.selectedNode) {
-            this._highlightSelectedNode();
-            this._showPopoverForSelectedNode();
-        } else {
-            WI.domTreeManager.hideDOMNodeHighlight();
-            this._hidePopover();
-        }
+        let layerId = this._dataGrid.selectedNode ? this._dataGrid.selectedNode.layer.layerId : null;
+        this.dispatchEventToListeners(WI.LayerDetailsSidebarPanel.Event.SelectedLayerChanged, {layerId});
     }
 
-    _dataGridFocused(event)
+    _dataGridMouseMove(event)
     {
-        this._highlightSelectedNode();
-        this._showPopoverForSelectedNode();
-    }
-
-    _dataGridBlurred(event)
-    {
-        WI.domTreeManager.hideDOMNodeHighlight();
-        this._hidePopover();
-    }
-
-    _dataGridClicked(event)
-    {
-        if (this._dataGrid.selectedNode && event.target.parentNode.classList.contains("filler"))
-            this._dataGrid.selectedNode.deselect();
-    }
-
-    _highlightSelectedNode()
-    {
-        if (!this._dataGrid.selectedNode)
+        let node = this._dataGrid.dataGridNodeFromNode(event.target);
+        if (node === this._hoveredDataGridNode)
             return;
 
-        let layer = this._dataGrid.selectedNode.layer;
-        if (layer.isGeneratedContent || layer.isReflection || layer.isAnonymous) {
+        if (!node) {
+            this._hideDOMNodeHighlight();
+            return;
+        }
+
+        this._hoveredDataGridNode = node;
+
+        if (node.layer.isGeneratedContent || node.layer.isReflection || node.layer.isAnonymous) {
             const usePageCoordinates = true;
-            WI.domTreeManager.highlightRect(layer.bounds, usePageCoordinates);
+            WI.domTreeManager.highlightRect(node.layer.bounds, usePageCoordinates);
         } else
-            WI.domTreeManager.highlightDOMNode(layer.nodeId);
+            WI.domTreeManager.highlightDOMNode(node.layer.nodeId);
     }
 
-    _updateDisplayWithLayers(newLayers)
+    _dataGridMouseLeave(event)
     {
-        let previousLayers = this._layers;
-        this._layers = newLayers;
-
-        this._updateDataGrid(previousLayers);
-        this._updateBottomBar();
+        this._hideDOMNodeHighlight();
     }
 
-    _updateDataGrid(previousLayers)
+    _hideDOMNodeHighlight()
+    {
+        WI.domTreeManager.hideDOMNodeHighlight();
+        this._hoveredDataGridNode = null;
+    }
+
+    _updateLayers(newLayers)
+    {
+        this._updateDataGrid(newLayers);
+        this._updateBottomBar(newLayers);
+
+        this._layers = newLayers;
+    }
+
+    _updateDataGrid(newLayers)
     {
         if (!this._dataGrid)
             this._buildDataGrid();
 
-        let mutations = WI.layerTreeManager.layerTreeMutations(previousLayers, this._layers);
+        let {removals, additions, preserved} = WI.layerTreeManager.layerTreeMutations(this._layers, newLayers);
 
-        mutations.removals.forEach((layer) => {
+        removals.forEach((layer) => {
             let node = this._dataGridNodesByLayerId.get(layer.layerId);
-            if (!node)
-                return;
-
             this._dataGrid.removeChild(node);
             this._dataGridNodesByLayerId.delete(layer.layerId);
         });
 
-        mutations.additions.forEach((layer) => {
-            let node = this._dataGridNodeForLayer(layer);
+        additions.forEach((layer) => {
+            let node = new WI.LayerTreeDataGridNode(layer);
+            this._dataGridNodesByLayerId.set(layer.layerId, node);
             this._dataGrid.appendChild(node);
         });
 
-        mutations.preserved.forEach((layer) => {
+        preserved.forEach((layer) => {
             let node = this._dataGridNodesByLayerId.get(layer.layerId);
-            if (!node)
-                return;
-
             node.layer = layer;
         });
 
         this._sortDataGrid();
     }
 
-    _dataGridNodeForLayer(layer)
-    {
-        let node = new WI.LayerTreeDataGridNode(layer);
-        this._dataGridNodesByLayerId.set(layer.layerId, node);
-
-        return node;
-    }
-
-    _updateBottomBar()
+    _updateBottomBar(newLayers)
     {
         if (!this._bottomBar)
             this._buildBottomBar();
 
-        this._layersCountLabel.textContent = WI.UIString("Layer Count: %d").format(this._layers.length);
+        this._layersCountLabel.textContent = WI.UIString("Layer Count: %d").format(newLayers.length);
 
-        let totalMemory = this._layers.reduce((total, layer) => total + (layer.memory || 0), 0);
+        let totalMemory = newLayers.reduce((total, layer) => total + (layer.memory || 0), 0);
         this._layersMemoryLabel.textContent = WI.UIString("Memory: %s").format(Number.bytesToString(totalMemory));
     }
+};
 
-    _showPopoverForSelectedNode()
-    {
-        let dataGridNode = this._dataGrid.selectedNode;
-        if (!dataGridNode)
-            return;
-
-        this._contentForPopover(dataGridNode.layer, (content) => {
-            if (dataGridNode === this._dataGrid.selectedNode)
-                this._updatePopoverForSelectedNode(content);
-        });
-    }
-
-    _updatePopoverForSelectedNode(content)
-    {
-        if (!this._dataGrid.selectedNode)
-            return;
-
-        if (!this._popover) {
-            this._popover = new WI.Popover;
-            this._popover.windowResizeHandler = () => { this._updatePopoverForSelectedNode(); };
-        }
-
-        let targetFrame = WI.Rect.rectFromClientRect(this._dataGrid.selectedNode.element.getBoundingClientRect());
-
-        if (content)
-            this._popover.content = content;
-
-        this._popover.present(targetFrame.pad(2), [WI.RectEdge.MIN_X]);
-    }
-
-    _hidePopover()
-    {
-        if (this._popover)
-            this._popover.dismiss();
-    }
-
-    _contentForPopover(layer, callback)
-    {
-        let content = document.createElement("div");
-        content.className = "layer-popover";
-
-        let dimensionsTitle = content.appendChild(document.createElement("div"));
-        dimensionsTitle.textContent = WI.UIString("Dimensions");
-
-        let dimensionsTable = content.appendChild(document.createElement("table"));
-
-        let compositedRow = dimensionsTable.appendChild(document.createElement("tr"));
-        let compositedLabel = compositedRow.appendChild(document.createElement("td"));
-        let compositedValue = compositedRow.appendChild(document.createElement("td"));
-        compositedLabel.textContent = WI.UIString("Composited");
-        compositedValue.textContent = `${layer.compositedBounds.width}px ${multiplicationSign} ${layer.compositedBounds.height}px`;
-
-        let visibleRow = dimensionsTable.appendChild(document.createElement("tr"));
-        let visibleLabel = visibleRow.appendChild(document.createElement("td"));
-        let visibleValue = visibleRow.appendChild(document.createElement("td"));
-        visibleLabel.textContent = WI.UIString("Visible");
-        visibleValue.textContent = `${layer.bounds.width}px ${multiplicationSign} ${layer.bounds.height}px`;
-
-        let reasonsTitle = content.appendChild(document.createElement("div"));
-        reasonsTitle.textContent = WI.UIString("Reasons for compositing:");
-
-        let list = content.appendChild(document.createElement("ul"));
-
-        WI.layerTreeManager.reasonsForCompositingLayer(layer, (compositingReasons) => {
-            if (isEmptyObject(compositingReasons)) {
-                callback(content);
-                return;
-            }
-
-            this._populateListOfCompositingReasons(list, compositingReasons);
-
-            callback(content);
-        });
-
-        return content;
-    }
-
-    _populateListOfCompositingReasons(list, compositingReasons)
-    {
-        function addReason(reason) {
-            let item = list.appendChild(document.createElement("li"));
-            item.textContent = reason;
-        }
-
-        if (compositingReasons.transform3D)
-            addReason(WI.UIString("Element has a 3D transform"));
-        if (compositingReasons.video)
-            addReason(WI.UIString("Element is <video>"));
-        if (compositingReasons.canvas)
-            addReason(WI.UIString("Element is <canvas>"));
-        if (compositingReasons.plugin)
-            addReason(WI.UIString("Element is a plug-in"));
-        if (compositingReasons.iFrame)
-            addReason(WI.UIString("Element is <iframe>"));
-        if (compositingReasons.backfaceVisibilityHidden)
-            addReason(WI.UIString("Element has “backface-visibility: hidden” style"));
-        if (compositingReasons.clipsCompositingDescendants)
-            addReason(WI.UIString("Element clips compositing descendants"));
-        if (compositingReasons.animation)
-            addReason(WI.UIString("Element is animated"));
-        if (compositingReasons.filters)
-            addReason(WI.UIString("Element has CSS filters applied"));
-        if (compositingReasons.positionFixed)
-            addReason(WI.UIString("Element has “position: fixed” style"));
-        if (compositingReasons.positionSticky)
-            addReason(WI.UIString("Element has “position: sticky” style"));
-        if (compositingReasons.overflowScrollingTouch)
-            addReason(WI.UIString("Element has “-webkit-overflow-scrolling: touch” style"));
-        if (compositingReasons.stacking)
-            addReason(WI.UIString("Element may overlap another compositing element"));
-        if (compositingReasons.overlap)
-            addReason(WI.UIString("Element overlaps other compositing element"));
-        if (compositingReasons.negativeZIndexChildren)
-            addReason(WI.UIString("Element has children with a negative z-index"));
-        if (compositingReasons.transformWithCompositedDescendants)
-            addReason(WI.UIString("Element has a 2D transform and composited descendants"));
-        if (compositingReasons.opacityWithCompositedDescendants)
-            addReason(WI.UIString("Element has opacity applied and composited descendants"));
-        if (compositingReasons.maskWithCompositedDescendants)
-            addReason(WI.UIString("Element is masked and composited descendants"));
-        if (compositingReasons.reflectionWithCompositedDescendants)
-            addReason(WI.UIString("Element has a reflection and composited descendants"));
-        if (compositingReasons.filterWithCompositedDescendants)
-            addReason(WI.UIString("Element has CSS filters applied and composited descendants"));
-        if (compositingReasons.blendingWithCompositedDescendants)
-            addReason(WI.UIString("Element has CSS blending applied and composited descendants"));
-        if (compositingReasons.isolatesCompositedBlendingDescendants)
-            addReason(WI.UIString("Element is a stacking context and has composited descendants with CSS blending applied"));
-        if (compositingReasons.perspective)
-            addReason(WI.UIString("Element has perspective applied"));
-        if (compositingReasons.preserve3D)
-            addReason(WI.UIString("Element has “transform-style: preserve-3d” style"));
-        if (compositingReasons.willChange)
-            addReason(WI.UIString("Element has “will-change” style with includes opacity, transform, transform-style, perspective, filter or backdrop-filter"));
-        if (compositingReasons.root)
-            addReason(WI.UIString("Element is the root element"));
-        if (compositingReasons.blending)
-            addReason(WI.UIString("Element has “blend-mode” style"));
-    }
+WI.LayerDetailsSidebarPanel.Event = {
+    SelectedLayerChanged: "selected-layer-changed"
 };

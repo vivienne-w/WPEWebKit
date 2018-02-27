@@ -68,7 +68,7 @@ public:
     void deleteCookie(PAL::SessionID, const WebCore::Cookie&, Function<void (CallbackBase::Error)>&&);
     void deleteCookiesForHostname(PAL::SessionID, const String& hostname);
     void deleteAllCookies(PAL::SessionID);
-    void deleteAllCookiesModifiedSince(PAL::SessionID, std::chrono::system_clock::time_point, Function<void (CallbackBase::Error)>&&);
+    void deleteAllCookiesModifiedSince(PAL::SessionID, WallTime, Function<void (CallbackBase::Error)>&&);
 
     void setCookie(PAL::SessionID, const WebCore::Cookie&, Function<void (CallbackBase::Error)>&&);
     void setCookies(PAL::SessionID, const Vector<WebCore::Cookie>&, const WebCore::URL&, const WebCore::URL& mainDocumentURL, Function<void (CallbackBase::Error)>&&);
@@ -80,6 +80,7 @@ public:
     void getHTTPCookieAcceptPolicy(PAL::SessionID, Function<void (HTTPCookieAcceptPolicy, CallbackBase::Error)>&&);
 
     void setCookieStoragePartitioningEnabled(bool);
+    void setStorageAccessAPIEnabled(bool);
 
     void setCookies2(PAL::SessionID, const Vector<WebCore::Cookie>& cookies);
     void getCookies2(PAL::SessionID, Function<void (API::Array*, CallbackBase::Error)>&&);

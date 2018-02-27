@@ -183,10 +183,10 @@ void NetworkProcess::clearCacheForAllOrigins(uint32_t cachesToClear)
     if (cachesToClear == InMemoryResourceCachesOnly)
         return;
 
-    clearDiskCache(std::chrono::system_clock::time_point::min(), [] { });
+    clearDiskCache(-WallTime::infinity(), [] { });
 }
 
-void NetworkProcess::clearDiskCache(std::chrono::system_clock::time_point modifiedSince, Function<void ()>&& completionHandler)
+void NetworkProcess::clearDiskCache(WallTime modifiedSince, Function<void ()>&& completionHandler)
 {
 #if ENABLE(NETWORK_CACHE)
     if (!m_cache)

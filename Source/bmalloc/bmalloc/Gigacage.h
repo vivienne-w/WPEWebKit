@@ -25,6 +25,7 @@
 
 #pragma once
 
+#include "Algorithm.h"
 #include "BAssert.h"
 #include "BExport.h"
 #include "BInline.h"
@@ -32,9 +33,21 @@
 #include <cstddef>
 #include <inttypes.h>
 
+#if BCPU(ARM64)
+#define PRIMITIVE_GIGACAGE_SIZE 0x80000000llu
+#define JSVALUE_GIGACAGE_SIZE 0x40000000llu
+#define STRING_GIGACAGE_SIZE 0x40000000llu
+#define GIGACAGE_ALLOCATION_CAN_FAIL 1
+#else
 #define PRIMITIVE_GIGACAGE_SIZE 0x800000000llu
 #define JSVALUE_GIGACAGE_SIZE 0x400000000llu
 #define STRING_GIGACAGE_SIZE 0x400000000llu
+#define GIGACAGE_ALLOCATION_CAN_FAIL 0
+#endif
+
+static_assert(bmalloc::isPowerOfTwo(PRIMITIVE_GIGACAGE_SIZE), "");
+static_assert(bmalloc::isPowerOfTwo(JSVALUE_GIGACAGE_SIZE), "");
+static_assert(bmalloc::isPowerOfTwo(STRING_GIGACAGE_SIZE), "");
 
 #define GIGACAGE_SIZE_TO_MASK(size) ((size) - 1)
 
@@ -42,32 +55,39 @@
 #define JSVALUE_GIGACAGE_MASK GIGACAGE_SIZE_TO_MASK(JSVALUE_GIGACAGE_SIZE)
 #define STRING_GIGACAGE_MASK GIGACAGE_SIZE_TO_MASK(STRING_GIGACAGE_SIZE)
 
-// FIXME: Consider making this 32GB, in case unsigned 32-bit indices find their way into indexed accesses.
-// https://bugs.webkit.org/show_bug.cgi?id=175062
-#define PRIMITIVE_GIGACAGE_RUNWAY (16llu * 1024 * 1024 * 1024)
-
-// FIXME: Reconsider this.
-// https://bugs.webkit.org/show_bug.cgi?id=175921
-#define JSVALUE_GIGACAGE_RUNWAY 0
-#define STRING_GIGACAGE_RUNWAY 0
-
-#if BOS(DARWIN) && BCPU(X86_64)
+#if ((BOS(DARWIN) || BOS(LINUX)) && \
+    (BCPU(X86_64) || (BCPU(ARM64) && !defined(__ILP32__) && (!BPLATFORM(IOS) || __IPHONE_OS_VERSION_MIN_REQUIRED >= 110300))))
 #define GIGACAGE_ENABLED 1
 #else
 #define GIGACAGE_ENABLED 0
 #endif
 
-extern "C" BEXPORT void* g_primitiveGigacageBasePtr;
-extern "C" BEXPORT void* g_jsValueGigacageBasePtr;
-extern "C" BEXPORT void* g_stringGigacageBasePtr;
+#if BCPU(ARM64)
+#define GIGACAGE_BASE_PTRS_SIZE 16384
+#else
+#define GIGACAGE_BASE_PTRS_SIZE 4096
+#endif
+
+extern "C" BEXPORT char g_gigacageBasePtrs[GIGACAGE_BASE_PTRS_SIZE] __attribute__((aligned(GIGACAGE_BASE_PTRS_SIZE)));
 
 namespace Gigacage {
+
+extern BEXPORT bool g_wasEnabled;
+BINLINE bool wasEnabled() { return g_wasEnabled; }
+
+struct BasePtrs {
+    void* primitive;
+    void* jsValue;
+    void* string;
+};
 
 enum Kind {
     Primitive,
     JSValue,
     String
 };
+
+static constexpr unsigned numKinds = 3;
 
 BEXPORT void ensureGigacage();
 
@@ -97,18 +117,33 @@ BINLINE const char* name(Kind kind)
     return nullptr;
 }
 
-BINLINE void*& basePtr(Kind kind)
+BINLINE void*& basePtr(BasePtrs& basePtrs, Kind kind)
 {
     switch (kind) {
     case Primitive:
-        return g_primitiveGigacageBasePtr;
+        return basePtrs.primitive;
     case JSValue:
-        return g_jsValueGigacageBasePtr;
+        return basePtrs.jsValue;
     case String:
-        return g_stringGigacageBasePtr;
+        return basePtrs.string;
     }
     BCRASH();
-    return g_primitiveGigacageBasePtr;
+    return basePtrs.primitive;
+}
+
+BINLINE BasePtrs& basePtrs()
+{
+    return *reinterpret_cast<BasePtrs*>(g_gigacageBasePtrs);
+}
+
+BINLINE void*& basePtr(Kind kind)
+{
+    return basePtr(basePtrs(), kind);
+}
+
+BINLINE bool isEnabled(Kind kind)
+{
+    return !!basePtr(kind);
 }
 
 BINLINE size_t size(Kind kind)
@@ -133,25 +168,6 @@ BINLINE size_t alignment(Kind kind)
 BINLINE size_t mask(Kind kind)
 {
     return GIGACAGE_SIZE_TO_MASK(size(kind));
-}
-
-BINLINE size_t runway(Kind kind)
-{
-    switch (kind) {
-    case Primitive:
-        return static_cast<size_t>(PRIMITIVE_GIGACAGE_RUNWAY);
-    case JSValue:
-        return static_cast<size_t>(JSVALUE_GIGACAGE_RUNWAY);
-    case String:
-        return static_cast<size_t>(STRING_GIGACAGE_RUNWAY);
-    }
-    BCRASH();
-    return 0;
-}
-
-BINLINE size_t totalSize(Kind kind)
-{
-    return size(kind) + runway(kind);
 }
 
 template<typename Func>

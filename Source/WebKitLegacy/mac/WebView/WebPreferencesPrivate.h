@@ -423,9 +423,6 @@ extern NSString *WebPreferencesCacheModelChangedInternalNotification;
 - (void)setAVFoundationNSURLSessionEnabled:(BOOL)flag;
 - (BOOL)isAVFoundationNSURLSessionEnabled;
 
-- (void)setQTKitEnabled:(BOOL)flag;
-- (BOOL)isQTKitEnabled;
-
 // Deprecated, has no effect.
 - (void)setVideoPluginProxyEnabled:(BOOL)flag;
 - (BOOL)isVideoPluginProxyEnabled;
@@ -537,6 +534,9 @@ extern NSString *WebPreferencesCacheModelChangedInternalNotification;
 - (void)setDataTransferItemsEnabled:(BOOL)flag;
 - (BOOL)dataTransferItemsEnabled;
 
+- (void)setCustomPasteboardDataEnabled:(BOOL)flag;
+- (BOOL)customPasteboardDataEnabled;
+
 - (BOOL)cacheAPIEnabled;
 - (void)setCacheAPIEnabled:(BOOL)enabled;
 
@@ -561,16 +561,20 @@ extern NSString *WebPreferencesCacheModelChangedInternalNotification;
 - (void)setWebAnimationsEnabled:(BOOL)flag;
 - (BOOL)webAnimationsEnabled;
 
+- (void)setFetchAPIKeepAliveEnabled:(BOOL)flag;
+- (BOOL)fetchAPIKeepAliveEnabled;
+
 - (void)setModernMediaControlsEnabled:(BOOL)flag;
 - (BOOL)modernMediaControlsEnabled;
 
-- (void)setCredentialManagementEnabled:(BOOL)flag;
-- (BOOL)credentialManagementEnabled;
+- (void)setWebAuthenticationEnabled:(BOOL)flag;
+- (BOOL)webAuthenticationEnabled;
 
 - (void)setIsSecureContextAttributeEnabled:(BOOL)flag;
 - (BOOL)isSecureContextAttributeEnabled;
 
 @property (nonatomic) BOOL visualViewportEnabled;
+@property (nonatomic) BOOL visualViewportAPIEnabled;
 @property (nonatomic) BOOL largeImageAsyncDecodingEnabled;
 @property (nonatomic) BOOL animatedImageAsyncDecodingEnabled;
 @property (nonatomic) BOOL javaScriptMarkupEnabled;
@@ -578,18 +582,22 @@ extern NSString *WebPreferencesCacheModelChangedInternalNotification;
 @property (nonatomic) BOOL attachmentElementEnabled;
 @property (nonatomic) BOOL allowsInlineMediaPlaybackAfterFullscreen;
 @property (nonatomic) BOOL intersectionObserverEnabled;
+@property (nonatomic) BOOL menuItemElementEnabled;
 @property (nonatomic) BOOL displayContentsEnabled;
 @property (nonatomic) BOOL userTimingEnabled;
 @property (nonatomic) BOOL resourceTimingEnabled;
 @property (nonatomic) BOOL linkPreloadEnabled;
-@property (nonatomic) BOOL credentialManagementEnabled;
+@property (nonatomic) BOOL webAuthenticationEnabled;
 @property (nonatomic) BOOL mediaUserGestureInheritsFromDocument;
 @property (nonatomic) BOOL isSecureContextAttributeEnabled;
 @property (nonatomic) BOOL legacyEncryptedMediaAPIEnabled;
+@property (nonatomic) BOOL encryptedMediaAPIEnabled;
 @property (nonatomic) BOOL viewportFitEnabled;
 @property (nonatomic) BOOL constantPropertiesEnabled;
 @property (nonatomic) BOOL inspectorAdditionsEnabled;
 @property (nonatomic) BOOL allowMediaContentTypesRequiringHardwareSupportAsFallback;
+@property (nonatomic) BOOL accessibilityObjectModelEnabled;
+@property (nonatomic) BOOL mediaCapabilitiesEnabled;
 
 #if TARGET_OS_IPHONE
 @property (nonatomic) BOOL quickLookDocumentSavingEnabled;

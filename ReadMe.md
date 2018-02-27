@@ -1,144 +1,32 @@
-# WebKit
+WPEWebKit
+======
+[![HTML5 score](https://img.shields.io/badge/HTML5%20score-440-blue.svg)](https://html5test.com/)
+[![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=55UJZHTXW8VTE)
 
-WebKit is a cross-platform web browser engine. On iOS and macOS, it powers Safari, Mail, iBooks, and many other applications.
+## Building prerequisites
 
-## Feature Status
+For **Ubuntu 16.04 LTS (Xenial Xerus)**, please type:
 
-Visit [WebKit Feature Status](https://webkit.org/status/) page to see which Web API has been implemented, in development, or under consideration.
+    $ sudo apt-get install intltool libtool-bin autoconf automake autopoint cmake gcc g++ bison flex gawk gperf ruby git libversion-perl libgnutls-dev libexpat-dev libxml2-dev libxslt-dev libsqlite3-dev libjpeg9-dev libfreetype6-dev libharfbuzz-dev libxcb-xkb-dev libwayland-dev libgbm-dev libgles2-mesa-dev libgstreamer1.0-dev libwebp-dev yasm ninja-build luajit libluajit-5.1-dev weston
 
-## Trying the Latest
 
-[Downloading Safari Technology Preview](https://webkit.org/downloads/) to test the latest version of WebKit.
+## Building
 
-## Reporting Bugs
+From the root directory, please type:
 
-1. [Search WebKit Bugzilla](https://bugs.webkit.org/query.cgi?format=specific&product=WebKit) to see if there is an existing report for the bug you've encountered.
-2. [Create a Bugzilla account](https://bugs.webkit.org/createaccount.cgi) to to report bugs (and to comment on them) if you haven't done so already.
-3. File a bug in accordance with [our guidelines](https://webkit.org/bug-report-guidelines/).
+    $ Tools/Scripts/update-webkitwpe-libs
+    $ Tools/Scripts/build-webkit --wpe
 
-Once your bug is filed, you will receive email when it is updated at each stage in the [bug life cycle](https://webkit.org/bug-life-cycle). After the bug is considered fixed, you may be asked to download the [latest nightly](https://webkit.org/nightly) and confirm that the fix works for you.
 
-## Getting the Code
+## Running
 
-On Windows, follow the [instructions on our website](https://webkit.org/webkit-on-windows/).
+If it is not already the case, you will need to execute a **Wayland compositor**.
 
-### Cloning the Git SVN Repository
+To do this quickly under **Ubuntu 16.04 LTS (Xenial Xerus)**, please type:
 
-Run the following command to clone WebKit's Git SVN repository:
+    $ weston --socket=wpe
 
-```
-git clone git://git.webkit.org/WebKit.git WebKit
-```
+Then, to run WPEWebKit:
 
-If you want to be able to commit changes to the repository, or just want to check out branches that aren’t contained in WebKit.git, you will need track WebKit's Subversion repository. You can run the following command to configure this and other options of the new Git clone for WebKit development.
-
-```
-Tools/Scripts/webkit-patch setup-git-clone
-```
-
-For information about this, and other aspects of using Git with WebKit, read [the wiki page](https://trac.webkit.org/wiki/UsingGitWithWebKit).
-
-### Checking out the Subversion Repository
-
-Run the following command to check out WebKit's subversion repository:
-
-```
-svn checkout https://svn.webkit.org/repository/webkit/trunk WebKit
-```
-
-## Building WebKit
-
-### Building Mac Port
-
-Install Xcode and its command line tools if you haven't done so already:
-
-1. **Install Xcode** Get Xcode from https://developer.apple.com/downloads. To build WebKit for OS X, Xcode 5.1.1 or later is required. To build WebKit for iOS Simulator, Xcode 7 or later is required.
-2. **Install the Xcode Command Line Tools** In Terminal, run the command: `xcode-select --install`
-
-Run the following command to build a debug build with debugging symbols and assertions:
-
-```
-Tools/Scripts/build-webkit --debug
-```
-
-For performance testing, and other purposes, use `--release` instead.
-
-### Using Xcode
-
-You can open `WebKit.xcworkspace` to build and debug WebKit within WebKit.
-
-If you don't use a custom build location in Xcode preferences, you have to update the workspace settings to use `WebKitBuild` directory.  In menu bar, choose File > Workspace Settings, then click the Advanced button, select "Custom", "Relative to Workspace", and enter `WebKitBuild` for both Products and Intermediates.
-
-### Building iOS Port
-
-The first time after you install a new Xcode, you will need to run the following command to enable Xcode to build command line tools for iOS Simulator:
-
-```
- sudo Tools/Scripts/configure-xcode-for-ios-development
-```
-
-Without this step, you will see the error message: "`target specifies product type ‘com.apple.product-type.tool’, but there’s no such product type for the ‘iphonesimulator’ platform.`" when building target `JSCLLIntOffsetsExtractor` of project `JavaScriptCore`.
-
-Run the following command to build a debug build with debugging symbols and assertions for iOS:
-
-```
-Tools/Scripts/build-webkit --debug --ios-simulator.
-```
-
-### Building GTK+ Port
-
-Install the dependencies by running the following command:
-```
-Tools/gtk/install-dependencies
-```
-
-Then run the following command to build additional dependencies:
-```
-Tools/Scripts/update-webkitgtk-libs
-```
-
-Run the following command to build WebKit with debugging symbols for GTK+ port:
-
-```
-Tools/Scripts/build-webkit --debug --gtk
-```
-
-Note that the procedure for building a release tarball is different.
-For more information, see the [wiki page](https://trac.webkit.org/wiki/BuildingGtk).
-
-### Building Windows Port
-
-For building WebKit on Windows, see the [wiki page](https://webkit.org/webkit-on-windows/).
-
-## Running WebKit
-
-### With Safari and Other macOS Applications
-
-Run the following command to launch Safari with your local build of WebKit:
-
-```
-Tools/Scripts/run-safari --debug
-```
-
-The `run-safari` script sets the `DYLD_FRAMEWORK_PATH` environment variable to point to your build products, and then launches `/Applications/Safari.app`. `DYLD_FRAMEWORK_PATH` tells the system loader to prefer your build products over the frameworks installed in `/System/Library/Frameworks`.
-
-To run other applications with your local build of WebKit, run the following command:
-
-```
-Tools/Scripts/run-webkit-app <application-path>
-```
-
-### iOS Simulator
-
-Run the following command to launch iOS simulator with your local build of WebKit:
-
-```
-run-safari --debug --ios-simulator
-```
-
-In both cases, if you have built release builds instead, use `--release` instead of `--debug`.
-
-## Contribute
-
-Congratulations! You’re up and running. Now you can begin coding in WebKit and contribute your fixes and new features to the project. For details on submitting your code to the project, read [Contributing Code](https://webkit.org/contributing-code/).
-
+    $ WAYLAND_DISPLAY=wpe Tools/Scripts/run-minibrowser --wpe
+    $ WAYLAND_DISPLAY=wpe Tools/Scripts/run-minibrowser --wpe http://www.bouncyballs.org

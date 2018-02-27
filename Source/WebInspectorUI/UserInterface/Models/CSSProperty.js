@@ -70,6 +70,11 @@ WI.CSSProperty = class CSSProperty extends WI.Object
 
     update(text, name, value, priority, enabled, overridden, implicit, anonymous, valid, styleSheetTextRange, dontFireEvents)
     {
+        // Locked CSSProperty can still be updated from the back-end when the text matches.
+        // We need to do this to keep attributes such as valid and overridden up to date.
+        if (this._ownerStyle && this._ownerStyle.locked && text !== this._text)
+            return;
+
         text = text || "";
         name = name || "";
         value = value || "";
@@ -116,6 +121,19 @@ WI.CSSProperty = class CSSProperty extends WI.Object
 
         if (changed)
             this.dispatchEventToListeners(WI.CSSProperty.Event.Changed);
+    }
+
+    remove()
+    {
+        // Setting name or value to an empty string removes the entire CSSProperty.
+        this._name = "";
+        const forceRemove = true;
+        this._updateStyleText(forceRemove);
+    }
+
+    replaceWithText(text)
+    {
+        this._updateOwnerStyleText(this._text, text, true);
     }
 
     commentOut(disabled)
@@ -167,7 +185,7 @@ WI.CSSProperty = class CSSProperty extends WI.Object
             return;
 
         this._name = name;
-        this._updateStyle();
+        this._updateStyleText();
     }
 
     get canonicalName()
@@ -201,7 +219,7 @@ WI.CSSProperty = class CSSProperty extends WI.Object
 
         this._rawValue = value;
         this._value = undefined;
-        this._updateStyle();
+        this._updateStyleText();
     }
 
     get important()
@@ -258,7 +276,7 @@ WI.CSSProperty = class CSSProperty extends WI.Object
 
     get editable()
     {
-        return this._styleSheetTextRange && this._ownerStyle && this._ownerStyle.styleSheetTextRange;
+        return !!(this._styleSheetTextRange && this._ownerStyle && this._ownerStyle.styleSheetTextRange);
     }
 
     get styleDeclarationTextRange()
@@ -319,28 +337,58 @@ WI.CSSProperty = class CSSProperty extends WI.Object
 
     // Private
 
-    _updateStyle()
+    _updateStyleText(forceRemove = false)
     {
-        let text = this._name + ": " + this._rawValue + ";";
-        this._updateOwnerStyleText(this._text, text);
+        let text = "";
+
+        if (this._name && this._rawValue)
+            text = this._name + ": " + this._rawValue + ";";
+
+        let oldText = this._text;
+        this._text = text;
+        this._updateOwnerStyleText(oldText, this._text, forceRemove);
     }
 
-    _updateOwnerStyleText(oldText, newText)
+    _updateOwnerStyleText(oldText, newText, forceRemove = false)
     {
-        console.assert(oldText !== newText, `Style text did not change ${oldText}`);
-        if (oldText === newText)
+        if (oldText === newText) {
+            if (forceRemove) {
+                const lineDelta = 0;
+                const columnDelta = 0;
+                this._ownerStyle.shiftPropertiesAfter(this, lineDelta, columnDelta, forceRemove);
+            }
             return;
+        }
 
         let styleText = this._ownerStyle.text || "";
 
         // _styleSheetTextRange is the position of the property within the stylesheet.
         // range is the position of the property within the rule.
         let range = this._styleSheetTextRange.relativeTo(this._ownerStyle.styleSheetTextRange.startLine, this._ownerStyle.styleSheetTextRange.startColumn);
-        range.resolveOffsets(styleText);
 
-        let newStyleText = styleText.slice(0, range.startOffset) + newText + styleText.slice(range.endOffset);
-        this._styleSheetTextRange = this._styleSheetTextRange.cloneAndModify(0, 0, newText.lineCount - oldText.lineCount, newText.lastLine.length - oldText.lastLine.length);
+        // Append a line break to count the last line of styleText towards endOffset.
+        range.resolveOffsets(styleText + "\n");
+
+        console.assert(oldText === styleText.slice(range.startOffset, range.endOffset), "_styleSheetTextRange data is invalid.");
+
+        let newStyleText = this._appendSemicolonIfNeeded(styleText.slice(0, range.startOffset)) + newText + styleText.slice(range.endOffset);
+
+        let lineDelta = newText.lineCount - oldText.lineCount;
+        let columnDelta = newText.lastLine.length - oldText.lastLine.length;
+        this._styleSheetTextRange = this._styleSheetTextRange.cloneAndModify(0, 0, lineDelta, columnDelta);
+
         this._ownerStyle.text = newStyleText;
+
+        let propertyWasRemoved = !newText;
+        this._ownerStyle.shiftPropertiesAfter(this, lineDelta, columnDelta, propertyWasRemoved);
+    }
+
+    _appendSemicolonIfNeeded(styleText)
+    {
+        if (/[^;\s]\s*$/.test(styleText))
+            return styleText.trimRight() + "; ";
+
+        return styleText;
     }
 };
 

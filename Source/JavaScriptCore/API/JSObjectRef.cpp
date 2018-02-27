@@ -142,6 +142,7 @@ JSObjectRef JSObjectMakeFunction(JSContextRef ctx, JSStringRef name, unsigned pa
     ExecState* exec = toJS(ctx);
     VM& vm = exec->vm();
     JSLockHolder locker(vm);
+    auto scope = DECLARE_CATCH_SCOPE(vm);
 
     startingLineNumber = std::max(1, startingLineNumber);
     Identifier nameID = name ? name->identifier(&vm) : Identifier::fromString(exec, "anonymous");
@@ -150,10 +151,16 @@ JSObjectRef JSObjectMakeFunction(JSContextRef ctx, JSStringRef name, unsigned pa
     for (unsigned i = 0; i < parameterCount; i++)
         args.append(jsString(exec, parameterNames[i]->string()));
     args.append(jsString(exec, body->string()));
+    if (UNLIKELY(args.hasOverflowed())) {
+        auto throwScope = DECLARE_THROW_SCOPE(vm);
+        throwOutOfMemoryError(exec, throwScope);
+        handleExceptionIfNeeded(scope, exec, exception);
+        return 0;
+    }
 
     auto sourceURLString = sourceURL ? sourceURL->string() : String();
     JSObject* result = constructFunction(exec, exec->lexicalGlobalObject(), args, nameID, SourceOrigin { sourceURLString }, sourceURLString, TextPosition(OrdinalNumber::fromOneBasedInt(startingLineNumber), OrdinalNumber()));
-    if (handleExceptionIfNeeded(exec, exception) == ExceptionStatus::DidThrow)
+    if (handleExceptionIfNeeded(scope, exec, exception) == ExceptionStatus::DidThrow)
         result = 0;
     return toRef(result);
 }
@@ -165,19 +172,27 @@ JSObjectRef JSObjectMakeArray(JSContextRef ctx, size_t argumentCount, const JSVa
         return 0;
     }
     ExecState* exec = toJS(ctx);
-    JSLockHolder locker(exec);
+    VM& vm = exec->vm();
+    JSLockHolder locker(vm);
+    auto scope = DECLARE_CATCH_SCOPE(vm);
 
     JSObject* result;
     if (argumentCount) {
         MarkedArgumentBuffer argList;
         for (size_t i = 0; i < argumentCount; ++i)
             argList.append(toJS(exec, arguments[i]));
+        if (UNLIKELY(argList.hasOverflowed())) {
+            auto throwScope = DECLARE_THROW_SCOPE(vm);
+            throwOutOfMemoryError(exec, throwScope);
+            handleExceptionIfNeeded(scope, exec, exception);
+            return 0;
+        }
 
         result = constructArray(exec, static_cast<ArrayAllocationProfile*>(0), argList);
     } else
         result = constructEmptyArray(exec, 0);
 
-    if (handleExceptionIfNeeded(exec, exception) == ExceptionStatus::DidThrow)
+    if (handleExceptionIfNeeded(scope, exec, exception) == ExceptionStatus::DidThrow)
         result = 0;
 
     return toRef(result);
@@ -190,14 +205,22 @@ JSObjectRef JSObjectMakeDate(JSContextRef ctx, size_t argumentCount, const JSVal
         return 0;
     }
     ExecState* exec = toJS(ctx);
-    JSLockHolder locker(exec);
+    VM& vm = exec->vm();
+    JSLockHolder locker(vm);
+    auto scope = DECLARE_CATCH_SCOPE(vm);
 
     MarkedArgumentBuffer argList;
     for (size_t i = 0; i < argumentCount; ++i)
         argList.append(toJS(exec, arguments[i]));
+    if (UNLIKELY(argList.hasOverflowed())) {
+        auto throwScope = DECLARE_THROW_SCOPE(vm);
+        throwOutOfMemoryError(exec, throwScope);
+        handleExceptionIfNeeded(scope, exec, exception);
+        return 0;
+    }
 
     JSObject* result = constructDate(exec, exec->lexicalGlobalObject(), JSValue(), argList);
-    if (handleExceptionIfNeeded(exec, exception) == ExceptionStatus::DidThrow)
+    if (handleExceptionIfNeeded(scope, exec, exception) == ExceptionStatus::DidThrow)
         result = 0;
 
     return toRef(result);
@@ -210,13 +233,15 @@ JSObjectRef JSObjectMakeError(JSContextRef ctx, size_t argumentCount, const JSVa
         return 0;
     }
     ExecState* exec = toJS(ctx);
-    JSLockHolder locker(exec);
+    VM& vm = exec->vm();
+    JSLockHolder locker(vm);
+    auto scope = DECLARE_CATCH_SCOPE(vm);
 
     JSValue message = argumentCount ? toJS(exec, arguments[0]) : jsUndefined();
     Structure* errorStructure = exec->lexicalGlobalObject()->errorStructure();
     JSObject* result = ErrorInstance::create(exec, errorStructure, message);
 
-    if (handleExceptionIfNeeded(exec, exception) == ExceptionStatus::DidThrow)
+    if (handleExceptionIfNeeded(scope, exec, exception) == ExceptionStatus::DidThrow)
         result = 0;
 
     return toRef(result);
@@ -229,14 +254,22 @@ JSObjectRef JSObjectMakeRegExp(JSContextRef ctx, size_t argumentCount, const JSV
         return 0;
     }
     ExecState* exec = toJS(ctx);
-    JSLockHolder locker(exec);
+    VM& vm = exec->vm();
+    JSLockHolder locker(vm);
+    auto scope = DECLARE_CATCH_SCOPE(vm);
 
     MarkedArgumentBuffer argList;
     for (size_t i = 0; i < argumentCount; ++i)
         argList.append(toJS(exec, arguments[i]));
+    if (UNLIKELY(argList.hasOverflowed())) {
+        auto throwScope = DECLARE_THROW_SCOPE(vm);
+        throwOutOfMemoryError(exec, throwScope);
+        handleExceptionIfNeeded(scope, exec, exception);
+        return 0;
+    }
 
     JSObject* result = constructRegExp(exec, exec->lexicalGlobalObject(), argList);
-    if (handleExceptionIfNeeded(exec, exception) == ExceptionStatus::DidThrow)
+    if (handleExceptionIfNeeded(scope, exec, exception) == ExceptionStatus::DidThrow)
         result = 0;
     
     return toRef(result);
@@ -252,7 +285,7 @@ JSValueRef JSObjectGetPrototype(JSContextRef ctx, JSObjectRef object)
     JSLockHolder locker(exec);
 
     JSObject* jsObject = toJS(object); 
-    return toRef(exec, jsObject->getPrototypeDirect());
+    return toRef(exec, jsObject->getPrototypeDirect(exec->vm()));
 }
 
 void JSObjectSetPrototype(JSContextRef ctx, JSObjectRef object, JSValueRef value)
@@ -264,11 +297,12 @@ void JSObjectSetPrototype(JSContextRef ctx, JSObjectRef object, JSValueRef value
     ExecState* exec = toJS(ctx);
     VM& vm = exec->vm();
     JSLockHolder locker(vm);
+    auto scope = DECLARE_CATCH_SCOPE(vm);
 
     JSObject* jsObject = toJS(object);
     JSValue jsValue = toJS(exec, value);
     jsObject->setPrototype(vm, exec, jsValue.isObject() ? jsValue : jsNull());
-    handleExceptionIfNeeded(exec, nullptr);
+    handleExceptionIfNeeded(scope, exec, nullptr);
 }
 
 bool JSObjectHasProperty(JSContextRef ctx, JSObjectRef object, JSStringRef propertyName)
@@ -295,11 +329,12 @@ JSValueRef JSObjectGetProperty(JSContextRef ctx, JSObjectRef object, JSStringRef
     ExecState* exec = toJS(ctx);
     VM& vm = exec->vm();
     JSLockHolder locker(vm);
+    auto scope = DECLARE_CATCH_SCOPE(vm);
 
     JSObject* jsObject = toJS(object);
 
     JSValue jsValue = jsObject->get(exec, propertyName->identifier(&vm));
-    handleExceptionIfNeeded(exec, exception);
+    handleExceptionIfNeeded(scope, exec, exception);
     return toRef(exec, jsValue);
 }
 
@@ -328,7 +363,7 @@ void JSObjectSetProperty(JSContextRef ctx, JSObjectRef object, JSStringRef prope
             jsObject->methodTable(vm)->put(jsObject, exec, name, jsValue, slot);
         }
     }
-    handleExceptionIfNeeded(exec, exception);
+    handleExceptionIfNeeded(scope, exec, exception);
 }
 
 JSValueRef JSObjectGetPropertyAtIndex(JSContextRef ctx, JSObjectRef object, unsigned propertyIndex, JSValueRef* exception)
@@ -338,12 +373,14 @@ JSValueRef JSObjectGetPropertyAtIndex(JSContextRef ctx, JSObjectRef object, unsi
         return 0;
     }
     ExecState* exec = toJS(ctx);
-    JSLockHolder locker(exec);
+    VM& vm = exec->vm();
+    JSLockHolder locker(vm);
+    auto scope = DECLARE_CATCH_SCOPE(vm);
 
     JSObject* jsObject = toJS(object);
 
     JSValue jsValue = jsObject->get(exec, propertyIndex);
-    handleExceptionIfNeeded(exec, exception);
+    handleExceptionIfNeeded(scope, exec, exception);
     return toRef(exec, jsValue);
 }
 
@@ -357,12 +394,13 @@ void JSObjectSetPropertyAtIndex(JSContextRef ctx, JSObjectRef object, unsigned p
     ExecState* exec = toJS(ctx);
     VM& vm = exec->vm();
     JSLockHolder locker(vm);
+    auto scope = DECLARE_CATCH_SCOPE(vm);
 
     JSObject* jsObject = toJS(object);
     JSValue jsValue = toJS(exec, value);
     
     jsObject->methodTable(vm)->putByIndex(jsObject, exec, propertyIndex, jsValue, false);
-    handleExceptionIfNeeded(exec, exception);
+    handleExceptionIfNeeded(scope, exec, exception);
 }
 
 bool JSObjectDeleteProperty(JSContextRef ctx, JSObjectRef object, JSStringRef propertyName, JSValueRef* exception)
@@ -374,11 +412,12 @@ bool JSObjectDeleteProperty(JSContextRef ctx, JSObjectRef object, JSStringRef pr
     ExecState* exec = toJS(ctx);
     VM& vm = exec->vm();
     JSLockHolder locker(vm);
+    auto scope = DECLARE_CATCH_SCOPE(vm);
 
     JSObject* jsObject = toJS(object);
 
     bool result = jsObject->methodTable(vm)->deleteProperty(jsObject, exec, propertyName->identifier(&vm));
-    handleExceptionIfNeeded(exec, exception);
+    handleExceptionIfNeeded(scope, exec, exception);
     return result;
 }
 
@@ -392,7 +431,7 @@ static const ClassInfo* classInfoPrivate(JSObject* jsObject)
     if (vm.currentlyDestructingCallbackObject != jsObject)
         return jsObject->classInfo(vm);
 
-    return vm.currentlyDestructingCallbackObjectClassInfo;
+    return vm.currentlyDestructingCallbackObjectClassInfo.unpoisoned();
 }
 
 void* JSObjectGetPrivate(JSObjectRef object)
@@ -552,6 +591,7 @@ JSValueRef JSObjectCallAsFunction(JSContextRef ctx, JSObjectRef object, JSObject
     ExecState* exec = toJS(ctx);
     VM& vm = exec->vm();
     JSLockHolder locker(vm);
+    auto scope = DECLARE_CATCH_SCOPE(vm);
 
     if (!object)
         return 0;
@@ -565,6 +605,12 @@ JSValueRef JSObjectCallAsFunction(JSContextRef ctx, JSObjectRef object, JSObject
     MarkedArgumentBuffer argList;
     for (size_t i = 0; i < argumentCount; i++)
         argList.append(toJS(exec, arguments[i]));
+    if (UNLIKELY(argList.hasOverflowed())) {
+        auto throwScope = DECLARE_THROW_SCOPE(vm);
+        throwOutOfMemoryError(exec, throwScope);
+        handleExceptionIfNeeded(scope, exec, exception);
+        return 0;
+    }
 
     CallData callData;
     CallType callType = jsObject->methodTable(vm)->getCallData(jsObject, callData);
@@ -572,7 +618,7 @@ JSValueRef JSObjectCallAsFunction(JSContextRef ctx, JSObjectRef object, JSObject
         return 0;
 
     JSValueRef result = toRef(exec, profiledCall(exec, ProfilingReason::API, jsObject, callType, callData, jsThisObject, argList));
-    if (handleExceptionIfNeeded(exec, exception) == ExceptionStatus::DidThrow)
+    if (handleExceptionIfNeeded(scope, exec, exception) == ExceptionStatus::DidThrow)
         result = 0;
     return result;
 }
@@ -591,6 +637,7 @@ JSObjectRef JSObjectCallAsConstructor(JSContextRef ctx, JSObjectRef object, size
     ExecState* exec = toJS(ctx);
     VM& vm = exec->vm();
     JSLockHolder locker(vm);
+    auto scope = DECLARE_CATCH_SCOPE(vm);
 
     if (!object)
         return 0;
@@ -605,9 +652,15 @@ JSObjectRef JSObjectCallAsConstructor(JSContextRef ctx, JSObjectRef object, size
     MarkedArgumentBuffer argList;
     for (size_t i = 0; i < argumentCount; i++)
         argList.append(toJS(exec, arguments[i]));
+    if (UNLIKELY(argList.hasOverflowed())) {
+        auto throwScope = DECLARE_THROW_SCOPE(vm);
+        throwOutOfMemoryError(exec, throwScope);
+        handleExceptionIfNeeded(scope, exec, exception);
+        return 0;
+    }
 
     JSObjectRef result = toRef(profiledConstruct(exec, ProfilingReason::API, jsObject, constructType, constructData, argList));
-    if (handleExceptionIfNeeded(exec, exception) == ExceptionStatus::DidThrow)
+    if (handleExceptionIfNeeded(scope, exec, exception) == ExceptionStatus::DidThrow)
         result = 0;
     return result;
 }

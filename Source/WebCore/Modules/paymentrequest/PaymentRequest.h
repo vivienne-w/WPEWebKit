@@ -33,12 +33,17 @@
 #include "JSDOMPromiseDeferred.h"
 #include "PaymentDetailsInit.h"
 #include "PaymentOptions.h"
+#include "URL.h"
+#include <wtf/Variant.h>
 
 namespace WebCore {
 
 class Document;
+class Event;
 class PaymentAddress;
+class PaymentHandler;
 class PaymentResponse;
+enum class PaymentComplete;
 enum class PaymentShippingType;
 struct PaymentMethodData;
 
@@ -51,38 +56,54 @@ public:
     static ExceptionOr<Ref<PaymentRequest>> create(Document&, Vector<PaymentMethodData>&&, PaymentDetailsInit&&, PaymentOptions&&);
     ~PaymentRequest();
 
-    void show(ShowPromise&&);
+    void show(Document&, ShowPromise&&);
     ExceptionOr<void> abort(AbortPromise&&);
-    void canMakePayment(CanMakePaymentPromise&&);
+    void canMakePayment(Document&, CanMakePaymentPromise&&);
 
     const String& id() const;
     PaymentAddress* shippingAddress() const { return m_shippingAddress.get(); }
     const String& shippingOption() const { return m_shippingOption; }
     std::optional<PaymentShippingType> shippingType() const;
 
-    using RefCounted<PaymentRequest>::ref;
-    using RefCounted<PaymentRequest>::deref;
-
-private:
     enum class State {
         Created,
         Interactive,
         Closed,
     };
 
+    State state() const { return m_state; }
+
+    const PaymentOptions& paymentOptions() const { return m_options; }
+    const PaymentDetailsInit& paymentDetails() const { return m_details; }
+    const Vector<String>& serializedModifierData() const { return m_serializedModifierData; }
+
+    void shippingAddressChanged(Ref<PaymentAddress>&&);
+    void shippingOptionChanged(const String& shippingOption);
+    ExceptionOr<void> updateWith(Event&, Ref<DOMPromise>&&);
+    ExceptionOr<void> completeMerchantValidation(Event&, Ref<DOMPromise>&&);
+    void accept(const String& methodName, JSC::Strong<JSC::JSObject>&& details, Ref<PaymentAddress>&& shippingAddress, const String& payerName, const String& payerEmail, const String& payerPhone);
+    void complete(std::optional<PaymentComplete>&&);
+    void cancel();
+
+    using MethodIdentifier = Variant<String, URL>;
+    using RefCounted<PaymentRequest>::ref;
+    using RefCounted<PaymentRequest>::deref;
+
+private:
     struct Method {
-        String supportedMethods;
+        MethodIdentifier identifier;
         String serializedData;
     };
 
     PaymentRequest(Document&, PaymentOptions&&, PaymentDetailsInit&&, Vector<String>&& serializedModifierData, Vector<Method>&& serializedMethodData, String&& selectedShippingOption);
 
-    void finishShowing();
+    void settleDetailsPromise(const AtomicString& type);
+    void abortWithException(Exception&&);
 
     // ActiveDOMObject
     const char* activeDOMObjectName() const final { return "PaymentRequest"; }
-    bool canSuspendForDocumentSuspension() const final { return true; }
-    void stop() final { }
+    bool canSuspendForDocumentSuspension() const final;
+    void stop() final;
 
     // EventTarget
     EventTargetInterface eventTargetInterface() const final { return PaymentRequestEventTargetInterfaceType; }
@@ -98,9 +119,13 @@ private:
     RefPtr<PaymentAddress> m_shippingAddress;
     State m_state { State::Created };
     std::optional<ShowPromise> m_showPromise;
-    std::optional<AbortPromise> m_abortPromise;
-    std::optional<CanMakePaymentPromise> m_canMakePaymentPromise;
+    RefPtr<PaymentHandler> m_activePaymentHandler;
+    RefPtr<DOMPromise> m_detailsPromise;
+    RefPtr<DOMPromise> m_merchantSessionPromise;
+    bool m_isUpdating { false };
 };
+
+std::optional<PaymentRequest::MethodIdentifier> convertAndValidatePaymentMethodIdentifier(const String& identifier);
 
 } // namespace WebCore
 

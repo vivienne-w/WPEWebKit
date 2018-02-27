@@ -40,7 +40,7 @@ class HTMLSelectElement;
 class RenderText;
 
 class RenderMenuList final : public RenderFlexibleBox, private PopupMenuClient {
-
+    WTF_MAKE_ISO_ALLOCATED(RenderMenuList);
 public:
     RenderMenuList(HTMLSelectElement&, RenderStyle&&);
     virtual ~RenderMenuList();
@@ -59,6 +59,9 @@ public:
 
     String text() const;
 
+    RenderBlock* innerRenderer() const { return m_innerBlock.get(); }
+    void setInnerRenderer(RenderBlock&);
+
 private:
     void willBeDestroyed() override;
 
@@ -66,8 +69,8 @@ private:
 
     bool isMenuList() const override { return true; }
 
-    void addChild(RenderObject* newChild, RenderObject* beforeChild = 0) override;
-    void removeChild(RenderObject&) override;
+    void addChild(RenderTreeBuilder&, RenderPtr<RenderObject> newChild, RenderObject* beforeChild = 0) override;
+    RenderPtr<RenderObject> takeChild(RenderTreeBuilder&, RenderObject&) override;
     bool createsAnonymousWrapper() const override { return true; }
 
     void updateFromElement() override;
@@ -127,7 +130,6 @@ private:
 
     void getItemBackgroundColor(unsigned listIndex, Color&, bool& itemHasCustomBackgroundColor) const;
 
-    void createInnerBlock();
     void adjustInnerStyle();
     void setText(const String&);
     void setTextFromOption(int optionIndex);
@@ -137,13 +139,13 @@ private:
 
     bool isFlexibleBoxImpl() const override { return true; }
 
-    RenderText* m_buttonText;
-    RenderBlock* m_innerBlock;
+    WeakPtr<RenderText> m_buttonText;
+    WeakPtr<RenderBlock> m_innerBlock;
 
     bool m_needsOptionsWidthUpdate;
     int m_optionsWidth;
 
-    int m_lastActiveIndex;
+    std::optional<int> m_lastActiveIndex;
 
     std::unique_ptr<RenderStyle> m_optionStyle;
 

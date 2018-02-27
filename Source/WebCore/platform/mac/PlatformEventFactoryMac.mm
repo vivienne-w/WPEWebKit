@@ -30,7 +30,6 @@
 #import "Logging.h"
 #import "PlatformScreen.h"
 #import "Scrollbar.h"
-#import "WebCoreSystemInterface.h"
 #import "WindowsKeyboardCodes.h"
 #import <HIToolbox/CarbonEvents.h>
 #import <HIToolbox/Events.h>
@@ -128,6 +127,11 @@ static MouseButton mouseButtonForEvent(NSEvent *event)
     default:
         return NoButton;
     }
+}
+
+static unsigned short currentlyPressedMouseButtons()
+{
+    return static_cast<unsigned short>([NSEvent pressedMouseButtons]);
 }
 
 static PlatformEvent::Type mouseEventTypeForEvent(NSEvent* event)
@@ -741,6 +745,7 @@ public:
         m_position = pointForEvent(event, windowView);
         m_globalPosition = IntPoint(globalPointForEvent(event));
         m_button = mouseButtonForEvent(event);
+        m_buttons = currentlyPressedMouseButtons();
         m_clickCount = clickCountForEvent(event);
 #if ENABLE(POINTER_LOCK)
         m_movementDelta = IntPoint(event.deltaX, event.deltaY);

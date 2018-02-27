@@ -44,8 +44,39 @@ DocumentRuleSets::DocumentRuleSets(StyleResolver& styleResolver)
     m_authorStyle->disableAutoShrinkToFit();
 }
 
-DocumentRuleSets::~DocumentRuleSets()
+DocumentRuleSets::~DocumentRuleSets() = default;
+
+RuleSet* DocumentRuleSets::userAgentMediaQueryStyle() const
 {
+    // FIXME: We should have a separate types for document rule sets and shadow tree rule sets.
+    if (m_isForShadowScope)
+        return m_styleResolver.document().styleScope().resolver().ruleSets().userAgentMediaQueryStyle();
+
+    updateUserAgentMediaQueryStyleIfNeeded();
+    return m_userAgentMediaQueryStyle.get();
+}
+
+void DocumentRuleSets::updateUserAgentMediaQueryStyleIfNeeded() const
+{
+    if (!CSSDefaultStyleSheets::mediaQueryStyleSheet)
+        return;
+
+    auto ruleCount = CSSDefaultStyleSheets::mediaQueryStyleSheet->ruleCount();
+    if (m_userAgentMediaQueryStyle && ruleCount == m_userAgentMediaQueryRuleCountOnUpdate)
+        return;
+    m_userAgentMediaQueryRuleCountOnUpdate = ruleCount;
+
+#if !ASSERT_DISABLED
+    bool hadViewportDependentMediaQueries = m_styleResolver.hasViewportDependentMediaQueries();
+#endif
+
+    // Media queries on user agent sheet need to evaluated in document context. They behave like author sheets in this respect.
+    auto& mediaQueryEvaluator = m_styleResolver.mediaQueryEvaluator();
+    m_userAgentMediaQueryStyle = std::make_unique<RuleSet>();
+    m_userAgentMediaQueryStyle->addRulesFromSheet(*CSSDefaultStyleSheets::mediaQueryStyleSheet, mediaQueryEvaluator, &m_styleResolver);
+
+    // Viewport dependent queries are currently too inefficient to allow on UA sheet.
+    ASSERT(!m_styleResolver.hasViewportDependentMediaQueries() || hadViewportDependentMediaQueries);
 }
 
 RuleSet* DocumentRuleSets::userStyle() const
@@ -83,7 +114,7 @@ static std::unique_ptr<RuleSet> makeRuleSet(const Vector<RuleFeature>& rules)
         return nullptr;
     auto ruleSet = std::make_unique<RuleSet>();
     for (size_t i = 0; i < size; ++i)
-        ruleSet->addRule(rules[i].rule, rules[i].selectorIndex, rules[i].hasDocumentSecurityOrigin ? RuleHasDocumentSecurityOrigin : RuleHasNoSpecialState);
+        ruleSet->addRule(rules[i].rule, rules[i].selectorIndex);
     ruleSet->shrinkToFit();
     return ruleSet;
 }
@@ -93,6 +124,11 @@ void DocumentRuleSets::resetAuthorStyle()
     m_isAuthorStyleDefined = true;
     m_authorStyle = std::make_unique<RuleSet>();
     m_authorStyle->disableAutoShrinkToFit();
+}
+
+void DocumentRuleSets::resetUserAgentMediaQueryStyle()
+{
+    m_userAgentMediaQueryStyle = nullptr;
 }
 
 void DocumentRuleSets::appendAuthorStyleSheets(const Vector<RefPtr<CSSStyleSheet>>& styleSheets, MediaQueryEvaluator* medium, InspectorCSSOMWrappers& inspectorCSSOMWrappers, StyleResolver* resolver)
@@ -120,6 +156,9 @@ void DocumentRuleSets::collectFeatures() const
         m_features.add(CSSDefaultStyleSheets::defaultStyle->features());
     m_defaultStyleVersionOnFeatureCollection = CSSDefaultStyleSheets::defaultStyleVersion;
 
+    if (auto* userAgentMediaQueryStyle = this->userAgentMediaQueryStyle())
+        m_features.add(userAgentMediaQueryStyle->features());
+
     if (m_authorStyle)
         m_features.add(m_authorStyle->features());
     if (auto* userStyle = this->userStyle())
@@ -128,20 +167,32 @@ void DocumentRuleSets::collectFeatures() const
     m_siblingRuleSet = makeRuleSet(m_features.siblingRules);
     m_uncommonAttributeRuleSet = makeRuleSet(m_features.uncommonAttributeRules);
 
-    m_ancestorClassRuleSets.clear();
+    m_classInvalidationRuleSets.clear();
     m_ancestorAttributeRuleSetsForHTML.clear();
 
     m_features.shrinkToFit();
 }
 
-RuleSet* DocumentRuleSets::ancestorClassRules(const AtomicString& className) const
+const Vector<InvalidationRuleSet>* DocumentRuleSets::classInvalidationRuleSets(const AtomicString& className) const
 {
-    auto addResult = m_ancestorClassRuleSets.add(className, nullptr);
-    if (addResult.isNewEntry) {
-        if (auto* rules = m_features.ancestorClassRules.get(className))
-            addResult.iterator->value = makeRuleSet(*rules);
-    }
-    return addResult.iterator->value.get();
+    return m_classInvalidationRuleSets.ensure(className, [&] () -> std::unique_ptr<Vector<InvalidationRuleSet>> {
+        auto* features = m_features.classRules.get(className);
+        if (!features)
+            return nullptr;
+        std::array<std::unique_ptr<RuleSet>, matchElementCount> matchElementArray;
+        for (auto& feature : *features) {
+            auto& ruleSet = matchElementArray[static_cast<unsigned>(*feature.matchElement)];
+            if (!ruleSet)
+                ruleSet = std::make_unique<RuleSet>();
+            ruleSet->addRule(feature.rule, feature.selectorIndex);
+        }
+        auto invalidationRuleSets = std::make_unique<Vector<InvalidationRuleSet>>();
+        for (unsigned i = 0; i < matchElementArray.size(); ++i) {
+            if (matchElementArray[i])
+                invalidationRuleSets->append({ static_cast<MatchElement>(i), WTFMove(matchElementArray[i]) });
+        }
+        return invalidationRuleSets;
+    }).iterator->value.get();
 }
 
 const DocumentRuleSets::AttributeRules* DocumentRuleSets::ancestorAttributeRulesForHTML(const AtomicString& attributeName) const

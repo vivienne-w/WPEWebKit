@@ -6,77 +6,102 @@
         const userShouldBeConsulted = hashArguments[1] === "userShouldBeConsulted";
         const policyShouldGrantAccess = hashArguments[2] === "policyShouldGrantAccess";
         const isSameOriginIframe = hashArguments[3] === "isSameOriginIframe";
+        const originIsNull = hashArguments[4] === "originIsNull";
 
         if (internals && userShouldGrantAccess)
                 internals.setUserGrantsStorageAccess(true);
 
-        function storageAccessShouldBeFalse() {
-            if (document.hasStorageAccess)
-                console.log("FAIL document.hasStorageAccess was true when it was not supposed to.");
-            if (requestStorageAccessReturnValue)
-                console.log("FAIL requestStorageAccessReturnValue was true when it was not supposed to.");
+        var requestStorageAccessResolved;
+
+        function messageToTop(messagePrefix, fetchData) {
+            if (originIsNull) {
+                top.postMessage(messagePrefix, "http://127.0.0.1:8000");
+            } else {
+                top.postMessage(messagePrefix + " document.cookie == " + document.cookie +
+                    (fetchData ? ", cookies seen server-side == " + JSON.stringify(fetchData) : ""), "http://127.0.0.1:8000");
+            }
         }
 
-        function storageAccessShouldBeTrue() {
-            if (!document.hasStorageAccess)
-                console.log("FAIL document.hasStorageAccess was false when it was not supposed to.");
-            if (!requestStorageAccessReturnValue)
-                console.log("FAIL requestStorageAccessReturnValue was false when it was not supposed to.");
-        }
+        window.addEventListener("message", receiveMessage, false);
 
-        var requestStorageAccessReturnValue;
-
-        function makeRequestWithoutUserGesture() {
-            storageAccessShouldBeFalse();
-
-            var promise = document.requestStorageAccess();
-            promise.then(function (hasAccess) {
-                requestStorageAccessReturnValue = hasAccess;
-                continueAfterRequestWithoutUserGesture();
-            });
-        }
-
-        function continueAfterRequestWithoutUserGesture() {
-            if (isSameOriginIframe && policyShouldGrantAccess)
-                storageAccessShouldBeTrue();
-            else
-                storageAccessShouldBeFalse();
+        function receiveMessage(event) {
+            if (event.origin === "http://127.0.0.1:8000") {
+                if (event.data.indexOf("reportBackCookies") !== -1) {
+                    fetch("echo-incoming-cookies-as-json.php", { credentials: "same-origin" }).then(function(response) {
+                        return response.json();
+                    }).then(function(data) {
+                        messageToTop("PASS.", data);
+                    }).catch(function(error) {
+                        console.log(error.message);
+                    });
+                } else {
+                    messageToTop("FAIL Unknown request.");
+                }
+            } else {
+                messageToTop("Fail Received a message from an unexpected origin: " + event.origin);
+            }
         }
 
         function makeRequestWithUserGesture() {
-            if (isSameOriginIframe && policyShouldGrantAccess)
-                storageAccessShouldBeTrue();
-            else
-                storageAccessShouldBeFalse();
-
             var promise = document.requestStorageAccess();
-            promise.then(function (hasAccess) {
-                requestStorageAccessReturnValue = hasAccess;
-                continueAfterRequestWithUserGesture();
-            });
+            promise.then(
+                function () {
+                    requestStorageAccessResolved = true;
+                    continueAfterRequestWithUserGesture();
+                },
+                function () {
+                    requestStorageAccessResolved = false;
+                    continueAfterRequestWithUserGesture();
+                }
+            );
         }
 
         function continueAfterRequestWithUserGesture() {
-            if (requestStorageAccessReturnValue
-                && document.hasStorageAccess
-                && (userShouldGrantAccess || !userShouldBeConsulted)
-                && policyShouldGrantAccess)
-                console.log("PASS document.hasStorageAccess was granted.");
-            else if (!document.hasStorageAccess
-                    && !requestStorageAccessReturnValue
-                    && ((!userShouldGrantAccess && userShouldBeConsulted) || !policyShouldGrantAccess))
-                console.log("PASS document.hasStorageAccess was denied.");
-            else
-                console.log("FAIL document.hasStorageAccess was " +
-                    (document.hasStorageAccess ? "" : "not ") +
-                    "granted and requestStorageAccessReturnValue was " +
-                    (requestStorageAccessReturnValue ? "" : "not ") +
-                    "granted but should " +
-                    (userShouldGrantAccess && policyShouldGrantAccess ? "" : "not ") +
-                    "have been granted.");
+            var promise = document.hasStorageAccess();
+            promise.then(
+                function (hasAccess) {
+                    if (requestStorageAccessResolved
+                        && hasAccess
+                        && (userShouldGrantAccess || !userShouldBeConsulted)
+                        && policyShouldGrantAccess) {
+                        fetch("echo-incoming-cookies-as-json.php", { credentials: "same-origin" }).then(function(response) {
+                            return response.json();
+                        }).then(function(data) {
+                            messageToTop("PASS Storage access was granted.", data);
+                        }).catch(function(error) {
+                            console.log(error.message);
+                        });
+
+                    } else if (!hasAccess
+                        && !requestStorageAccessResolved
+                        && ((!userShouldGrantAccess && userShouldBeConsulted) || !policyShouldGrantAccess)) {
+                        if (originIsNull) {
+                            messageToTop("PASS Storage access was denied for origin null.");
+                        } else {
+                            fetch("echo-incoming-cookies-as-json.php", { credentials: "same-origin" }).then(function(response) {
+                                return response.json();
+                            }).then(function(data) {
+                                messageToTop("PASS Storage access was denied.", data);
+                            }).catch(function(error) {
+                                console.log(error.message);
+                            });
+                        }
+                    } else
+                        messageToTop("FAIL Storage access was " +
+                            (hasAccess ? "" : "not ") +
+                            "granted and requestStorageAccessResolved was " +
+                            (requestStorageAccessResolved ? "" : "not ") +
+                            "granted but should " +
+                            (userShouldGrantAccess && policyShouldGrantAccess ? "" : "not ") +
+                            "have been granted.");
+                },
+                function (reason) {
+                    messageToTop("FAIL document.hasStorageAccess() was rejected. Reason: " + reason);
+                }
+            );
         }
     </script>
 </head>
-<body onload="makeRequestWithoutUserGesture()" onclick="makeRequestWithUserGesture()">
+<body onclick="makeRequestWithUserGesture()">
 </body>
 </html>

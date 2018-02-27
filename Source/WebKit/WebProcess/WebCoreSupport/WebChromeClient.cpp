@@ -128,6 +128,26 @@ WebChromeClient::WebChromeClient(WebPage& page)
 {
 }
 
+void WebChromeClient::didInsertMenuElement(HTMLMenuElement& element)
+{
+    m_page.didInsertMenuElement(element);
+}
+
+void WebChromeClient::didRemoveMenuElement(HTMLMenuElement& element)
+{
+    m_page.didRemoveMenuElement(element);
+}
+
+void WebChromeClient::didInsertMenuItemElement(HTMLMenuItemElement& element)
+{
+    m_page.didInsertMenuItemElement(element);
+}
+
+void WebChromeClient::didRemoveMenuItemElement(HTMLMenuItemElement& element)
+{
+    m_page.didRemoveMenuItemElement(element);
+}
+
 inline WebChromeClient::~WebChromeClient()
 {
 }
@@ -609,7 +629,9 @@ PlatformPageClient WebChromeClient::platformPageClient() const
 
 void WebChromeClient::contentsSizeChanged(Frame& frame, const IntSize& size) const
 {
-    if (m_page.corePage()->settings().frameFlattening() == FrameFlatteningDisabled) {
+    FrameView* frameView = frame.view();
+
+    if (frameView && frameView->effectiveFrameFlattening() == FrameFlattening::Disabled) {
         WebFrame* largestFrame = findLargestFrameInFrameSet(m_page);
         if (largestFrame != m_cachedFrameSetLargestFrame.get()) {
             m_cachedFrameSetLargestFrame = largestFrame;
@@ -624,7 +646,6 @@ void WebChromeClient::contentsSizeChanged(Frame& frame, const IntSize& size) con
 
     m_page.drawingArea()->mainFrameContentSizeChanged(size);
 
-    FrameView* frameView = frame.view();
     if (frameView && !frameView->delegatesScrolling())  {
         bool hasHorizontalScrollbar = frameView->horizontalScrollbar();
         bool hasVerticalScrollbar = frameView->verticalScrollbar();
@@ -732,6 +753,13 @@ void WebChromeClient::print(Frame& frame)
 #endif
 
     m_page.sendSync(Messages::WebPageProxy::PrintFrame(webFrame->frameID()), Messages::WebPageProxy::PrintFrame::Reply(), Seconds::infinity(), IPC::SendSyncOption::InformPlatformProcessWillSuspend);
+}
+
+void WebChromeClient::testIncomingSyncIPCMessageWhileWaitingForSyncReply()
+{
+    bool wasHandled = false;
+    WebProcess::singleton().parentProcessConnection()->sendSync(Messages::WebProcessProxy::TestIncomingSyncIPCMessageWhileWaitingForSyncReply(), Messages::WebProcessProxy::TestIncomingSyncIPCMessageWhileWaitingForSyncReply::Reply(wasHandled), 0, Seconds::infinity(), IPC::SendSyncOption::DoNotProcessIncomingMessagesWhenWaitingForSyncReply);
+    RELEASE_ASSERT(wasHandled);
 }
 
 void WebChromeClient::exceededDatabaseQuota(Frame& frame, const String& databaseName, DatabaseDetails details)
@@ -917,6 +945,20 @@ void WebChromeClient::scheduleCompositingLayerFlush()
         m_page.drawingArea()->scheduleCompositingLayerFlush();
 }
 
+void WebChromeClient::contentRuleListNotification(const URL& url, const HashSet<std::pair<String, String>>& notificationPairs)
+{
+    Vector<String> identifiers;
+    Vector<String> notifications;
+    identifiers.reserveInitialCapacity(notificationPairs.size());
+    notifications.reserveInitialCapacity(notificationPairs.size());
+    for (auto& notification : notificationPairs) {
+        identifiers.uncheckedAppend(notification.first);
+        notifications.uncheckedAppend(notification.second);
+    }
+
+    m_page.send(Messages::WebPageProxy::ContentRuleListNotification(url, identifiers, notifications));
+}
+
 bool WebChromeClient::adjustLayerFlushThrottling(LayerFlushThrottleState::Flags flags)
 {
     return m_page.drawingArea() && m_page.drawingArea()->adjustLayerFlushThrottling(flags);
@@ -949,6 +991,11 @@ bool WebChromeClient::supportsVideoFullscreen(HTMLMediaElementEnums::VideoFullsc
     return m_page.videoFullscreenManager().supportsVideoFullscreen(mode);
 }
 
+bool WebChromeClient::supportsVideoFullscreenStandby()
+{
+    return m_page.videoFullscreenManager().supportsVideoFullscreenStandby();
+}
+
 void WebChromeClient::setUpPlaybackControlsManager(HTMLMediaElement& mediaElement)
 {
     m_page.playbackSessionManager().setUpPlaybackControlsManager(mediaElement);
@@ -959,10 +1006,14 @@ void WebChromeClient::clearPlaybackControlsManager()
     m_page.playbackSessionManager().clearPlaybackControlsManager();
 }
 
-void WebChromeClient::enterVideoFullscreenForVideoElement(HTMLVideoElement& videoElement, HTMLMediaElementEnums::VideoFullscreenMode mode)
+void WebChromeClient::enterVideoFullscreenForVideoElement(HTMLVideoElement& videoElement, HTMLMediaElementEnums::VideoFullscreenMode mode, bool standby)
 {
+#if ENABLE(FULLSCREEN_API) && PLATFORM(IOS)
+    ASSERT(standby || mode != HTMLMediaElementEnums::VideoFullscreenModeNone);
+#else
     ASSERT(mode != HTMLMediaElementEnums::VideoFullscreenModeNone);
-    m_page.videoFullscreenManager().enterVideoFullscreenForVideoElement(videoElement, mode);
+#endif
+    m_page.videoFullscreenManager().enterVideoFullscreenForVideoElement(videoElement, mode, standby);
 }
 
 void WebChromeClient::exitVideoFullscreenForVideoElement(HTMLVideoElement& videoElement)
@@ -1251,6 +1302,18 @@ void WebChromeClient::didInvalidateDocumentMarkerRects()
 {
     m_page.findController().didInvalidateDocumentMarkerRects();
 }
+
+#if HAVE(CFNETWORK_STORAGE_PARTITIONING)
+void WebChromeClient::hasStorageAccess(String&& subFrameHost, String&& topFrameHost, uint64_t frameID, uint64_t pageID, WTF::CompletionHandler<void (bool)>&& callback)
+{
+    m_page.hasStorageAccess(WTFMove(subFrameHost), WTFMove(topFrameHost), frameID, pageID, WTFMove(callback));
+}
+
+void WebChromeClient::requestStorageAccess(String&& subFrameHost, String&& topFrameHost, uint64_t frameID, uint64_t pageID, WTF::CompletionHandler<void (bool)>&& callback)
+{
+    m_page.requestStorageAccess(WTFMove(subFrameHost), WTFMove(topFrameHost), frameID, pageID, WTFMove(callback));
+}
+#endif
 
 uint64_t WebChromeClient::nativeWindowID() const
 {

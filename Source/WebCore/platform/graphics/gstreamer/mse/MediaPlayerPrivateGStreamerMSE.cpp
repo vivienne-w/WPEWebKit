@@ -207,7 +207,7 @@ void MediaPlayerPrivateGStreamerMSE::seek(const MediaTime& time)
     }
 
     m_isEndReached = false;
-    GST_DEBUG("m_seeking=%s, m_seekTime=%f", boolForPrinting(m_seeking), m_seekTime);
+    GST_DEBUG("m_seeking=%s, m_seekTime=%s", boolForPrinting(m_seeking), toString(m_seekTime).utf8().data());
 }
 
 void MediaPlayerPrivateGStreamerMSE::configurePlaySink()
@@ -809,17 +809,14 @@ const static HashSet<AtomicString>& codecSet()
             Vector<AtomicString> webkitCodecs;
         };
 
-        std::array<GstCapsWebKitMapping, 8> mapping = { {
-            { VideoDecoder, "video/x-h264,  profile=(string){ constrained-baseline, baseline }", { "x-h264" } },
-            { VideoDecoder, "video/x-h264, stream-format=avc", { "avc*"} },
-            // An autoplugged h264parse in decodebin can convert from byte-stream to avc.
-            { VideoDecoder, "video/x-h264, stream-format=byte-stream", { "avc*"} },
+        GstCapsWebKitMapping mapping[] = {
+            { VideoDecoder, "video/x-h264,  profile=(string){ constrained-baseline, baseline }", { "x-h264", "avc*" } },
             { VideoDecoder, "video/mpeg, mpegversion=(int){1,2}, systemstream=(boolean)false", { "mpeg" } },
             { VideoDecoder, "video/x-vp8", { "vp8", "x-vp8" } },
             { VideoDecoder, "video/x-vp9", { "vp9", "x-vp9" } },
             { AudioDecoder, "audio/x-vorbis", { "vorbis", "x-vorbis" } },
             { AudioDecoder, "audio/x-opus", { "opus", "x-opus" } }
-        } };
+        };
 
         for (auto& current : mapping) {
             GList* factories = nullptr;
@@ -987,8 +984,7 @@ MediaTime MediaPlayerPrivateGStreamerMSE::currentMediaTime() const
 
         m_eosPending = false;
         m_isEndReached = true;
-        position = m_mediaTimeDuration;
-        m_cachedPosition = position;
+        m_cachedPosition = m_mediaTimeDuration;
         m_durationAtEOS = m_mediaTimeDuration;
         m_player->timeChanged();
     }
@@ -1013,7 +1009,7 @@ MediaTime MediaPlayerPrivateGStreamerMSE::maxMediaTimeSeekable() const
 }
 
 #if ENABLE(ENCRYPTED_MEDIA)
-void MediaPlayerPrivateGStreamerMSE::attemptToDecryptWithInstance(const CDMInstance& instance)
+void MediaPlayerPrivateGStreamerMSE::attemptToDecryptWithInstance(CDMInstance& instance)
 {
     if (is<CDMInstanceClearKey>(instance)) {
         GST_TRACE("instance is clear key, continuing");

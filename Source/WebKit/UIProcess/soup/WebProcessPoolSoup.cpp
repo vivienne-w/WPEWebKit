@@ -42,12 +42,11 @@ void WebProcessPool::platformInitializeNetworkProcess(NetworkProcessCreationPara
     parameters.cookieAcceptPolicy = m_initialHTTPCookieAcceptPolicy;
     parameters.ignoreTLSErrors = m_ignoreTLSErrors;
     parameters.languages = userPreferredLanguages();
+    parameters.shouldEnableNetworkCacheEfficacyLogging = false;
+    parameters.proxySettings = m_networkProxySettings;
+
     for (const auto& scheme : m_urlSchemesRegisteredForCustomProtocols)
         parameters.urlSchemesRegisteredForCustomProtocols.append(scheme);
-#if ENABLE(NETWORK_CACHE)
-    parameters.shouldEnableNetworkCacheEfficacyLogging = false;
-#endif
-    parameters.proxySettings = m_networkProxySettings;
 }
 
 void WebProcessPool::setIgnoreTLSErrors(bool ignoreTLSErrors)

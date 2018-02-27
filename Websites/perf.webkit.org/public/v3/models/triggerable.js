@@ -23,7 +23,7 @@ class Triggerable extends LabeledObject {
     isDisabled() { return this._isDisabled; }
     repositoryGroups() { return this._repositoryGroups; }
 
-    acceptsTest(test) { return this._acceptedTests.has(test); }
+    acceptedTests() { return this._acceptedTests; }
 
     static findByTestConfiguration(test, platform)
     {
@@ -65,8 +65,7 @@ class TriggerableRepositoryGroup extends LabeledObject {
 
     accepts(commitSet)
     {
-        // FIXME: Add a check for patch.
-        const commitSetRepositories = Repository.sortByNamePreferringOnesWithURL(commitSet.repositories());
+        const commitSetRepositories = commitSet.topLevelRepositories();
         if (this._repositories.length != commitSetRepositories.length)
             return false;
         for (let i = 0; i < this._repositories.length; i++) {

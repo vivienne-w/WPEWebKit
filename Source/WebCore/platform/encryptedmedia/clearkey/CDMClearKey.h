@@ -48,6 +48,7 @@ public:
     bool supportsKeySystem(const String&) override;
 
 private:
+    friend class NeverDestroyed<CDMFactoryClearKey>;
     CDMFactoryClearKey();
 };
 
@@ -84,6 +85,7 @@ public:
     SuccessValue setDistinctiveIdentifiersAllowed(bool) override;
     SuccessValue setPersistentStateAllowed(bool) override;
     SuccessValue setServerCertificate(Ref<SharedBuffer>&&) override;
+    SuccessValue setStorageDirectory(const String&) override;
 
     void requestLicense(LicenseType, const AtomicString& initDataType, Ref<SharedBuffer>&& initData, LicenseCallback) override;
     void updateLicense(const String&, LicenseType, const SharedBuffer&, LicenseUpdateCallback) override;
@@ -100,11 +102,10 @@ public:
         RefPtr<SharedBuffer> keyValueData;
     };
 
-    const Vector<Key>& keys() const { return m_keys; }
+    const Vector<Key> keys() const;
 
 private:
     WeakPtrFactory<CDMInstanceClearKey> m_weakPtrFactory;
-    Vector<Key> m_keys;
 };
 
 } // namespace WebCore

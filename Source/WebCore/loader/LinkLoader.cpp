@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2011 Google Inc. All rights reserved.
- * Copyright (C) 2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2016-2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -47,8 +47,11 @@
 #include "LinkHeader.h"
 #include "LinkPreloadResourceClients.h"
 #include "LinkRelAttribute.h"
+#include "LoaderStrategy.h"
 #include "MIMETypeRegistry.h"
 #include "MediaQueryEvaluator.h"
+#include "PlatformStrategies.h"
+#include "ResourceError.h"
 #include "RuntimeEnabledFeatures.h"
 #include "Settings.h"
 #include "StyleResolver.h"
@@ -102,7 +105,7 @@ void LinkLoader::loadLinksFromHeader(const String& headerValue, const URL& baseU
                 continue;
         }
 
-        LinkRelAttribute relAttribute(header.rel());
+        LinkRelAttribute relAttribute(document, header.rel());
         URL url(baseURL, header.url());
         // Sanity check to avoid re-entrancy here.
         if (equalIgnoringFragmentIdentifier(url, baseURL))
@@ -166,6 +169,9 @@ static std::unique_ptr<LinkPreloadResourceClient> createLinkPreloadResourceClien
     case CachedResource::LinkSubresource:
     case CachedResource::LinkPrefetch:
 #endif
+#if ENABLE(APPLICATION_MANIFEST)
+    case CachedResource::ApplicationManifest:
+#endif
         // None of these values is currently supported as an `as` value.
         ASSERT_NOT_REACHED();
     }
@@ -178,7 +184,7 @@ bool LinkLoader::isSupportedType(CachedResource::Type resourceType, const String
         return true;
     switch (resourceType) {
     case CachedResource::ImageResource:
-        return MIMETypeRegistry::isSupportedImageOrSVGMIMEType(mimeType);
+        return MIMETypeRegistry::isSupportedImageVideoOrSVGMIMEType(mimeType);
     case CachedResource::Script:
         return MIMETypeRegistry::isSupportedJavaScriptMIMEType(mimeType);
     case CachedResource::CSSStyleSheet:
@@ -195,6 +201,9 @@ bool LinkLoader::isSupportedType(CachedResource::Type resourceType, const String
         return MIMETypeRegistry::isSupportedTextTrackMIMEType(mimeType);
 #endif
     case CachedResource::RawResource:
+#if ENABLE(APPLICATION_MANIFEST)
+    case CachedResource::ApplicationManifest:
+#endif
         return true;
     default:
         ASSERT_NOT_REACHED();
@@ -228,7 +237,7 @@ std::unique_ptr<LinkPreloadResourceClient> LinkLoader::preloadIfNeeded(const Lin
     linkRequest.setIsLinkPreload();
 
     linkRequest.setAsPotentiallyCrossOrigin(crossOriginMode, document);
-    auto cachedLinkResource = document.cachedResourceLoader().preload(type.value(), WTFMove(linkRequest)).valueOr(nullptr);
+    auto cachedLinkResource = document.cachedResourceLoader().preload(type.value(), WTFMove(linkRequest)).value_or(nullptr);
 
     if (cachedLinkResource && loader)
         return createLinkPreloadResourceClient(*cachedLinkResource, *loader, type.value());
@@ -248,6 +257,23 @@ bool LinkLoader::loadLink(const LinkRelAttribute& relAttribute, const URL& href,
         // to complete that as URL <https://bugs.webkit.org/show_bug.cgi?id=48857>.
         if (document.settings().dnsPrefetchingEnabled() && href.isValid() && !href.isEmpty() && document.frame())
             document.frame()->loader().client().prefetchDNS(href.host());
+    }
+
+    if (relAttribute.isLinkPreconnect && href.isValid() && href.protocolIsInHTTPFamily() && document.frame()) {
+        ASSERT(document.settings().linkPreconnectEnabled());
+        StoredCredentialsPolicy storageCredentialsPolicy = StoredCredentialsPolicy::Use;
+        if (equalIgnoringASCIICase(crossOrigin, "anonymous") && document.securityOrigin().canAccess(SecurityOrigin::create(href)))
+            storageCredentialsPolicy = StoredCredentialsPolicy::DoNotUse;
+        ASSERT(document.frame()->loader().networkingContext());
+        platformStrategies()->loaderStrategy()->preconnectTo(*document.frame()->loader().networkingContext(), href, storageCredentialsPolicy, [weakDocument = document.createWeakPtr(), href](ResourceError error) {
+            if (!weakDocument)
+                return;
+
+            if (!error.isNull())
+                weakDocument->addConsoleMessage(MessageSource::Network, MessageLevel::Error, makeString(ASCIILiteral("Failed to preconnect to "), href.string(), ASCIILiteral(". Error: "), error.localizedDescription()));
+            else
+                weakDocument->addConsoleMessage(MessageSource::Network, MessageLevel::Info, makeString(ASCIILiteral("Successfuly preconnected to "), href.string()));
+        });
     }
 
     if (m_client.shouldLoadLink()) {
@@ -278,7 +304,7 @@ bool LinkLoader::loadLink(const LinkRelAttribute& relAttribute, const URL& href,
         }
         ResourceLoaderOptions options = CachedResourceLoader::defaultCachedResourceOptions();
         options.contentSecurityPolicyImposition = ContentSecurityPolicyImposition::SkipPolicyCheck;
-        m_cachedLinkResource = document.cachedResourceLoader().requestLinkResource(type, CachedResourceRequest(ResourceRequest(document.completeURL(href)), options, priority)).valueOr(nullptr);
+        m_cachedLinkResource = document.cachedResourceLoader().requestLinkResource(type, CachedResourceRequest(ResourceRequest(document.completeURL(href)), options, priority)).value_or(nullptr);
         if (m_cachedLinkResource)
             m_cachedLinkResource->addClient(*this);
     }

@@ -2,10 +2,10 @@
 // This code is governed by the BSD license found in the LICENSE file.
 /*---
 esid: sec-integer-indexed-exotic-objects-defineownproperty-p-desc
-description: |
+description: >
   Throws a TypeError if object has valid numeric index and a detached buffer
   (honoring the Realm of the current execution context)
-info: >
+info: |
   9.4.5.3 [[DefineOwnProperty]] ( P, Desc)
   ...
   3. If Type(P) is String, then
@@ -24,7 +24,7 @@ info: >
   5. If IsDetachedBuffer(buffer) is true, throw a TypeError exception.
   ...
 includes: [testTypedArray.js, detachArrayBuffer.js]
-features: [Reflect, TypedArray]
+features: [cross-realm, Reflect, TypedArray]
 ---*/
 
 var other = $262.createRealm().global;

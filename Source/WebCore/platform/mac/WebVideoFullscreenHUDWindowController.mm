@@ -29,7 +29,6 @@
 
 #import "FloatConversion.h"
 #import <WebCore/HTMLVideoElement.h>
-#import <WebCoreSystemInterface.h>
 #import <pal/spi/cg/CoreGraphicsSPI.h>
 #import <pal/spi/mac/QTKitSPI.h>
 #import <wtf/SoftLinking.h>
@@ -46,7 +45,6 @@ SOFT_LINK_CLASS(QTKit, QTHUDTimeline)
 #define QTHUDSlider getQTHUDSliderClass()
 #define QTHUDTimeline getQTHUDTimelineClass()
 
-using namespace WebCore;
 
 namespace WebCore {
 
@@ -63,6 +61,9 @@ enum class MediaUIControl {
 
 }
 
+using WebCore::MediaUIControl;
+using WebCore::HTMLVideoElement;
+using WebCore::narrowPrecisionToFloat;
 @interface WebVideoFullscreenHUDWindowController (Private) <NSWindowDelegate>
 
 - (void)updateTime;

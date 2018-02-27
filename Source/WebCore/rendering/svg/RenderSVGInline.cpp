@@ -27,8 +27,11 @@
 #include "RenderSVGText.h"
 #include "SVGInlineFlowBox.h"
 #include "SVGResourcesCache.h"
+#include <wtf/IsoMallocInlines.h>
 
 namespace WebCore {
+
+WTF_MAKE_ISO_ALLOCATED_IMPL(RenderSVGInline);
     
 RenderSVGInline::RenderSVGInline(SVGGraphicsElement& element, RenderStyle&& style)
     : RenderInline(element, WTFMove(style))
@@ -120,29 +123,24 @@ void RenderSVGInline::updateFromStyle()
     setInline(true);
 }
 
-void RenderSVGInline::addChild(RenderObject* child, RenderObject* beforeChild)
+void RenderSVGInline::addChild(RenderTreeBuilder& builder, RenderPtr<RenderObject> newChild, RenderObject* beforeChild)
 {
-    RenderInline::addChild(child, beforeChild);
-    SVGResourcesCache::clientWasAddedToTree(*child);
-
-    if (auto* textAncestor = RenderSVGText::locateRenderSVGTextAncestor(*this))
-        textAncestor->subtreeChildWasAdded(child);
+    builder.insertChildToSVGInline(*this, WTFMove(newChild), beforeChild);
 }
 
-void RenderSVGInline::removeChild(RenderObject& child)
+RenderPtr<RenderObject> RenderSVGInline::takeChild(RenderTreeBuilder& builder, RenderObject& child)
 {
     SVGResourcesCache::clientWillBeRemovedFromTree(child);
 
     auto* textAncestor = RenderSVGText::locateRenderSVGTextAncestor(*this);
-    if (!textAncestor) {
-        RenderInline::removeChild(child);
-        return;
-    }
+    if (!textAncestor)
+        return RenderInline::takeChild(builder, child);
 
     Vector<SVGTextLayoutAttributes*, 2> affectedAttributes;
     textAncestor->subtreeChildWillBeRemoved(&child, affectedAttributes);
-    RenderInline::removeChild(child);
+    auto takenChild = RenderInline::takeChild(builder, child);
     textAncestor->subtreeChildWasRemoved(affectedAttributes);
+    return takenChild;
 }
 
 }

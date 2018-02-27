@@ -35,24 +35,102 @@
 
 namespace WebCore {
 
-void RuleFeatureSet::recursivelyCollectFeaturesFromSelector(SelectorFeatures& selectorFeatures, const CSSSelector& firstSelector, bool matchesAncestor)
+static bool isSiblingOrSubject(MatchElement matchElement)
+{
+    switch (matchElement) {
+    case MatchElement::Subject:
+    case MatchElement::IndirectSibling:
+    case MatchElement::DirectSibling:
+    case MatchElement::AnySibling:
+        return true;
+    case MatchElement::Parent:
+    case MatchElement::Ancestor:
+    case MatchElement::ParentSibling:
+    case MatchElement::AncestorSibling:
+    case MatchElement::Host:
+        return false;
+    }
+    ASSERT_NOT_REACHED();
+    return false;
+}
+
+MatchElement RuleFeatureSet::computeNextMatchElement(MatchElement matchElement, CSSSelector::RelationType relation)
+{
+    if (isSiblingOrSubject(matchElement)) {
+        switch (relation) {
+        case CSSSelector::Subselector:
+            return matchElement;
+        case CSSSelector::DescendantSpace:
+            return MatchElement::Ancestor;
+        case CSSSelector::Child:
+            return MatchElement::Parent;
+        case CSSSelector::IndirectAdjacent:
+            if (matchElement == MatchElement::AnySibling)
+                return MatchElement::AnySibling;
+            return MatchElement::IndirectSibling;
+        case CSSSelector::DirectAdjacent:
+            if (matchElement == MatchElement::AnySibling)
+                return MatchElement::AnySibling;
+            return matchElement == MatchElement::Subject ? MatchElement::DirectSibling : MatchElement::IndirectSibling;
+        case CSSSelector::ShadowDescendant:
+            return MatchElement::Host;
+        };
+    }
+    switch (relation) {
+    case CSSSelector::Subselector:
+        return matchElement;
+    case CSSSelector::DescendantSpace:
+    case CSSSelector::Child:
+        return MatchElement::Ancestor;
+    case CSSSelector::IndirectAdjacent:
+    case CSSSelector::DirectAdjacent:
+        return matchElement == MatchElement::Parent ? MatchElement::ParentSibling : MatchElement::AncestorSibling;
+    case CSSSelector::ShadowDescendant:
+        return MatchElement::Host;
+    };
+    ASSERT_NOT_REACHED();
+    return matchElement;
+};
+
+MatchElement RuleFeatureSet::computeSubSelectorMatchElement(MatchElement matchElement, const CSSSelector& selector)
+{
+    ASSERT(selector.selectorList());
+
+    if (selector.match() == CSSSelector::PseudoClass) {
+        auto type = selector.pseudoClassType();
+        // For :nth-child(n of .some-subselector) where an element change may affect other elements similar to sibling combinators.
+        if (type == CSSSelector::PseudoClassNthChild || type == CSSSelector::PseudoClassNthLastChild)
+            return MatchElement::AnySibling;
+
+        // Similarly for :host().
+        if (type == CSSSelector::PseudoClassHost)
+            return MatchElement::Host;
+    }
+    if (selector.match() == CSSSelector::PseudoElement) {
+        // Similarly for ::slotted().
+        if (selector.pseudoElementType() == CSSSelector::PseudoElementSlotted)
+            return MatchElement::Host;
+    }
+
+    return matchElement;
+};
+
+void RuleFeatureSet::recursivelyCollectFeaturesFromSelector(SelectorFeatures& selectorFeatures, const CSSSelector& firstSelector, MatchElement matchElement)
 {
     const CSSSelector* selector = &firstSelector;
     do {
         if (selector->match() == CSSSelector::Id) {
             idsInRules.add(selector->value());
-            if (matchesAncestor)
+            if (matchElement == MatchElement::Parent || matchElement == MatchElement::Ancestor)
                 idsMatchingAncestorsInRules.add(selector->value());
-        } else if (selector->match() == CSSSelector::Class) {
-            classesInRules.add(selector->value());
-            if (matchesAncestor)
-                selectorFeatures.classesMatchingAncestors.append(selector->value());
-        } else if (selector->isAttributeSelector()) {
+        } else if (selector->match() == CSSSelector::Class)
+            selectorFeatures.classes.append(std::make_pair(selector->value(), matchElement));
+        else if (selector->isAttributeSelector()) {
             auto& canonicalLocalName = selector->attributeCanonicalLocalName();
             auto& localName = selector->attribute().localName();
             attributeCanonicalLocalNamesInRules.add(canonicalLocalName);
             attributeLocalNamesInRules.add(localName);
-            if (matchesAncestor)
+            if (matchElement == MatchElement::Parent || matchElement == MatchElement::Ancestor)
                 selectorFeatures.attributeSelectorsMatchingAncestors.append(selector);
         } else if (selector->match() == CSSSelector::PseudoElement) {
             switch (selector->pseudoElementType()) {
@@ -71,14 +149,16 @@ void RuleFeatureSet::recursivelyCollectFeaturesFromSelector(SelectorFeatures& se
             selectorFeatures.hasSiblingSelector = true;
 
         if (const CSSSelectorList* selectorList = selector->selectorList()) {
+            auto subSelectorMatchElement = computeSubSelectorMatchElement(matchElement, *selector);
+
             for (const CSSSelector* subSelector = selectorList->first(); subSelector; subSelector = CSSSelectorList::next(subSelector)) {
                 if (!selectorFeatures.hasSiblingSelector && selector->isSiblingSelector())
                     selectorFeatures.hasSiblingSelector = true;
-                recursivelyCollectFeaturesFromSelector(selectorFeatures, *subSelector, matchesAncestor);
+                recursivelyCollectFeaturesFromSelector(selectorFeatures, *subSelector, subSelectorMatchElement);
             }
         }
-        if (selector->hasDescendantOrChildRelation())
-            matchesAncestor = true;
+
+        matchElement = computeNextMatchElement(matchElement, selector->relation());
 
         selector = selector->tagHistory();
     } while (selector);
@@ -96,14 +176,15 @@ void RuleFeatureSet::collectFeatures(const RuleData& ruleData)
     SelectorFeatures selectorFeatures;
     recursivelyCollectFeaturesFromSelector(selectorFeatures, *ruleData.selector());
     if (selectorFeatures.hasSiblingSelector)
-        siblingRules.append(RuleFeature(ruleData.rule(), ruleData.selectorIndex(), ruleData.hasDocumentSecurityOrigin()));
+        siblingRules.append(RuleFeature(ruleData.rule(), ruleData.selectorIndex()));
     if (ruleData.containsUncommonAttributeSelector())
-        uncommonAttributeRules.append(RuleFeature(ruleData.rule(), ruleData.selectorIndex(), ruleData.hasDocumentSecurityOrigin()));
-    for (auto& className : selectorFeatures.classesMatchingAncestors) {
-        auto addResult = ancestorClassRules.ensure(className, [] {
+        uncommonAttributeRules.append(RuleFeature(ruleData.rule(), ruleData.selectorIndex()));
+    for (auto& nameAndMatch : selectorFeatures.classes) {
+        classRules.ensure(nameAndMatch.first, [] {
             return std::make_unique<Vector<RuleFeature>>();
-        });
-        addResult.iterator->value->append(RuleFeature(ruleData.rule(), ruleData.selectorIndex(), ruleData.hasDocumentSecurityOrigin()));
+        }).iterator->value->append(RuleFeature(ruleData.rule(), ruleData.selectorIndex(), nameAndMatch.second));
+        if (nameAndMatch.second == MatchElement::Host)
+            classesAffectingHost.add(nameAndMatch.first);
     }
     for (auto* selector : selectorFeatures.attributeSelectorsMatchingAncestors) {
         // Hashing by attributeCanonicalLocalName makes this HTML specific.
@@ -111,7 +192,7 @@ void RuleFeatureSet::collectFeatures(const RuleData& ruleData)
             return std::make_unique<AttributeRules>();
         });
         auto& rules = *addResult.iterator->value;
-        rules.features.append(RuleFeature(ruleData.rule(), ruleData.selectorIndex(), ruleData.hasDocumentSecurityOrigin()));
+        rules.features.append(RuleFeature(ruleData.rule(), ruleData.selectorIndex()));
         // Deduplicate selectors.
         rules.selectors.add(makeAttributeSelectorKey(*selector), selector);
     }
@@ -121,17 +202,17 @@ void RuleFeatureSet::add(const RuleFeatureSet& other)
 {
     idsInRules.add(other.idsInRules.begin(), other.idsInRules.end());
     idsMatchingAncestorsInRules.add(other.idsMatchingAncestorsInRules.begin(), other.idsMatchingAncestorsInRules.end());
-    classesInRules.add(other.classesInRules.begin(), other.classesInRules.end());
     attributeCanonicalLocalNamesInRules.add(other.attributeCanonicalLocalNamesInRules.begin(), other.attributeCanonicalLocalNamesInRules.end());
     attributeLocalNamesInRules.add(other.attributeLocalNamesInRules.begin(), other.attributeLocalNamesInRules.end());
     siblingRules.appendVector(other.siblingRules);
     uncommonAttributeRules.appendVector(other.uncommonAttributeRules);
-    for (auto& keyValuePair : other.ancestorClassRules) {
-        auto addResult = ancestorClassRules.ensure(keyValuePair.key, [] {
+    for (auto& keyValuePair : other.classRules) {
+        classRules.ensure(keyValuePair.key, [] {
             return std::make_unique<Vector<RuleFeature>>();
-        });
-        addResult.iterator->value->appendVector(*keyValuePair.value);
+        }).iterator->value->appendVector(*keyValuePair.value);
     }
+    classesAffectingHost.add(other.classesAffectingHost.begin(), other.classesAffectingHost.end());
+
     for (auto& keyValuePair : other.ancestorAttributeRulesForHTML) {
         auto addResult = ancestorAttributeRulesForHTML.ensure(keyValuePair.key, [] {
             return std::make_unique<AttributeRules>();
@@ -149,12 +230,12 @@ void RuleFeatureSet::clear()
 {
     idsInRules.clear();
     idsMatchingAncestorsInRules.clear();
-    classesInRules.clear();
     attributeCanonicalLocalNamesInRules.clear();
     attributeLocalNamesInRules.clear();
     siblingRules.clear();
     uncommonAttributeRules.clear();
-    ancestorClassRules.clear();
+    classRules.clear();
+    classesAffectingHost.clear();
     ancestorAttributeRulesForHTML.clear();
     usesFirstLineRules = false;
     usesFirstLetterRules = false;
@@ -164,7 +245,7 @@ void RuleFeatureSet::shrinkToFit()
 {
     siblingRules.shrinkToFit();
     uncommonAttributeRules.shrinkToFit();
-    for (auto& rules : ancestorClassRules.values())
+    for (auto& rules : classRules.values())
         rules->shrinkToFit();
     for (auto& rules : ancestorAttributeRulesForHTML.values())
         rules->features.shrinkToFit();

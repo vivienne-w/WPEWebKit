@@ -144,13 +144,13 @@ public:
 #endif
 
 #if ENABLE(ENCRYPTED_MEDIA)
-    void cdmInstanceAttached(const CDMInstance&) override;
-    void cdmInstanceDetached(const CDMInstance&) override;
+    void cdmInstanceAttached(CDMInstance&) override;
+    void cdmInstanceDetached(CDMInstance&) override;
     void dispatchDecryptionKey(GstBuffer*);
     void dispatchDecryptionSession(const String&);
     void handleProtectionEvent(GstEvent*);
     void attemptToDecryptWithLocalInstance();
-    void attemptToDecryptWithInstance(const CDMInstance&) override;
+    void attemptToDecryptWithInstance(CDMInstance&) override;
 #endif
 
     static bool supportsKeySystem(const String& keySystem, const String& mimeType);
@@ -250,10 +250,10 @@ protected:
 
     Condition m_drawCondition;
     Lock m_drawMutex;
+    bool m_drawCancelled { false };
     RunLoop::Timer<MediaPlayerPrivateGStreamerBase> m_drawTimer;
 
 #if USE(TEXTURE_MAPPER_GL)
-    RefPtr<GraphicsContext3D> m_context3D;
     RefPtr<TextureMapperPlatformLayerProxy> m_platformLayerProxy;
 #endif
 

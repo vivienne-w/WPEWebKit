@@ -34,8 +34,8 @@
 #endif
 
 #include "PlatformExportMacros.h"
+#include <JavaScriptCore/JSExportMacros.h>
 #include <pal/ExportMacros.h>
-#include <runtime/JSExportMacros.h>
 
 #ifdef __APPLE__
 #define HAVE_FUNC_USLEEP 1
@@ -70,12 +70,6 @@
 #endif
 
 #include <wtf/DisallowCType.h>
-
-#if COMPILER(MSVC)
-#define SKIP_STATIC_CONSTRUCTORS_ON_MSVC 1
-#else
-#define SKIP_STATIC_CONSTRUCTORS_ON_GCC 1
-#endif
 
 #if PLATFORM(WIN)
 #if PLATFORM(WIN_CAIRO)

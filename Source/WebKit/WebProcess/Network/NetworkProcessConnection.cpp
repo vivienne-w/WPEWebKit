@@ -59,6 +59,7 @@ NetworkProcessConnection::NetworkProcessConnection(IPC::Connection::Identifier c
 
 NetworkProcessConnection::~NetworkProcessConnection()
 {
+    m_connection->invalidate();
 }
 
 void NetworkProcessConnection::didReceiveMessage(IPC::Connection& connection, IPC::Decoder& decoder)
@@ -125,7 +126,7 @@ void NetworkProcessConnection::writeBlobsToTemporaryFiles(const Vector<String>& 
 
     m_writeBlobToFileCompletionHandlers.set(requestIdentifier, WTFMove(completionHandler));
 
-    WebProcess::singleton().networkConnection().connection().send(Messages::NetworkConnectionToWebProcess::WriteBlobsToTemporaryFiles(blobURLs, requestIdentifier), 0);
+    WebProcess::singleton().ensureNetworkProcessConnection().connection().send(Messages::NetworkConnectionToWebProcess::WriteBlobsToTemporaryFiles(blobURLs, requestIdentifier), 0);
 }
 
 void NetworkProcessConnection::didWriteBlobsToTemporaryFiles(uint64_t requestIdentifier, const Vector<String>& filenames)
@@ -135,9 +136,14 @@ void NetworkProcessConnection::didWriteBlobsToTemporaryFiles(uint64_t requestIde
         handler(filenames);
 }
 
-void NetworkProcessConnection::didFinishPingLoad(uint64_t pingLoadIdentifier, ResourceError&& error)
+void NetworkProcessConnection::didFinishPingLoad(uint64_t pingLoadIdentifier, ResourceError&& error, ResourceResponse&& response)
 {
-    WebProcess::singleton().webLoaderStrategy().didFinishPingLoad(pingLoadIdentifier, WTFMove(error));
+    WebProcess::singleton().webLoaderStrategy().didFinishPingLoad(pingLoadIdentifier, WTFMove(error), WTFMove(response));
+}
+
+void NetworkProcessConnection::didFinishPreconnection(uint64_t preconnectionIdentifier, ResourceError&& error)
+{
+    WebProcess::singleton().webLoaderStrategy().didFinishPreconnection(preconnectionIdentifier, WTFMove(error));
 }
 
 #if ENABLE(SHAREABLE_RESOURCE)

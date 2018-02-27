@@ -41,7 +41,6 @@ outputFlnm = ARGV.shift
 
 validBackends = ARGV.shift
 if validBackends
-    $stderr.puts "Only dealing with backends: #{validBackends}"
     includeOnlyBackends(validBackends.split(","))
 end
 

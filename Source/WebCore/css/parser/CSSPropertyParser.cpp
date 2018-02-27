@@ -82,9 +82,9 @@
 #include <memory>
 #include <wtf/text/StringBuilder.h>
 
-using namespace WTF;
 
 namespace WebCore {
+using namespace WTF;
 
     
 bool isCustomPropertyName(const String& propertyName)
@@ -1111,12 +1111,9 @@ static RefPtr<CSSValue> consumeWordSpacing(CSSParserTokenRange& range, CSSParser
     return consumeLengthOrPercent(range, cssParserMode, ValueRangeAll, UnitlessQuirk::Allow);
 }
     
-static RefPtr<CSSValue> consumeTabSize(CSSParserTokenRange& range, CSSParserMode cssParserMode)
+static RefPtr<CSSValue> consumeTabSize(CSSParserTokenRange& range, CSSParserMode)
 {
-    RefPtr<CSSPrimitiveValue> parsedValue = consumeInteger(range, 0);
-    if (parsedValue)
-        return parsedValue;
-    return consumeLength(range, cssParserMode, ValueRangeNonNegative);
+    return consumeInteger(range, 0);
 }
 
 #if ENABLE(TEXT_AUTOSIZING)
@@ -1153,6 +1150,7 @@ static Ref<CSSPrimitiveValue> createPrimitiveValuePair(Args&&... args)
 {
     return CSSValuePool::singleton().createValue(Pair::create(std::forward<Args>(args)...));
 }
+
 
 static RefPtr<CSSValue> consumeCounter(CSSParserTokenRange& range, int defaultValue)
 {
@@ -1342,6 +1340,25 @@ static RefPtr<CSSPrimitiveValue> consumeLineClamp(CSSParserTokenRange& range)
     return consumePositiveInteger(range);
 }
 
+static RefPtr<CSSValue> consumeLinesClamp(CSSParserTokenRange& range)
+{
+    if (range.peek().id() == CSSValueNone)
+        return consumeIdent(range);
+    
+    RefPtr<CSSValueList> list = CSSValueList::createSpaceSeparated();
+    RefPtr<CSSPrimitiveValue> startClampValue = consumeLineClamp(range);
+    RefPtr<CSSPrimitiveValue> endClampValue = consumeLineClamp(range);
+    RefPtr<CSSPrimitiveValue> centerClampValue = consumeCustomIdent(range);
+    if (!startClampValue)
+        return nullptr;
+    list->append(startClampValue.releaseNonNull());
+    if (endClampValue)
+        list->append(endClampValue.releaseNonNull());
+    if (centerClampValue)
+        list->append(centerClampValue.releaseNonNull());
+    return list;
+}
+
 static RefPtr<CSSValue> consumeAutoOrString(CSSParserTokenRange& range)
 {
     if (range.peek().id() == CSSValueAuto)
@@ -1375,11 +1392,11 @@ static RefPtr<CSSValue> consumeColumnCount(CSSParserTokenRange& range)
     return consumePositiveInteger(range);
 }
 
-static RefPtr<CSSValue> consumeColumnGap(CSSParserTokenRange& range, CSSParserMode cssParserMode)
+static RefPtr<CSSValue> consumeGapLength(CSSParserTokenRange& range, CSSParserMode cssParserMode)
 {
     if (range.peek().id() == CSSValueNormal)
         return consumeIdent(range);
-    return consumeLength(range, cssParserMode, ValueRangeNonNegative);
+    return consumeLengthOrPercent(range, cssParserMode, ValueRangeNonNegative);
 }
 
 static RefPtr<CSSValue> consumeColumnSpan(CSSParserTokenRange& range)
@@ -1448,7 +1465,8 @@ static RefPtr<CSSValue> consumeTransitionProperty(CSSParserTokenRange& range)
 }
 
     
-static RefPtr<CSSValue> consumeSteps(CSSParserTokenRange& range) {
+static RefPtr<CSSValue> consumeSteps(CSSParserTokenRange& range)
+{
     ASSERT(range.peek().functionId() == CSSValueSteps);
     CSSParserTokenRange rangeCopy = range;
     CSSParserTokenRange args = consumeFunction(rangeCopy);
@@ -1477,6 +1495,27 @@ static RefPtr<CSSValue> consumeSteps(CSSParserTokenRange& range) {
     
     range = rangeCopy;
     return CSSStepsTimingFunctionValue::create(steps->intValue(), stepAtStart);
+}
+
+static RefPtr<CSSValue> consumeFrames(CSSParserTokenRange& range)
+{
+    ASSERT(range.peek().functionId() == CSSValueFrames);
+    CSSParserTokenRange rangeCopy = range;
+    CSSParserTokenRange args = consumeFunction(rangeCopy);
+    
+    RefPtr<CSSPrimitiveValue> frames = consumePositiveInteger(args);
+    if (!frames)
+        return nullptr;
+
+    auto numberOfFrames = frames->intValue();
+    if (numberOfFrames < 2)
+        return nullptr;
+    
+    if (!args.atEnd())
+        return nullptr;
+    
+    range = rangeCopy;
+    return CSSFramesTimingFunctionValue::create(numberOfFrames);
 }
 
 static RefPtr<CSSValue> consumeCubicBezier(CSSParserTokenRange& range)
@@ -1549,6 +1588,8 @@ static RefPtr<CSSValue> consumeAnimationTimingFunction(CSSParserTokenRange& rang
         return consumeCubicBezier(range);
     if (function == CSSValueSteps)
         return consumeSteps(range);
+    if (function == CSSValueFrames)
+        return consumeFrames(range);
     if (context.springTimingFunctionEnabled && function == CSSValueSpring)
         return consumeSpringFunction(range);
     return nullptr;
@@ -2625,6 +2666,11 @@ static bool isAutoOrNormalOrStretch(CSSValueID id)
     return identMatches<CSSValueAuto, CSSValueNormal, CSSValueStretch>(id);
 }
 
+static bool isLeftOrRightKeyword(CSSValueID id)
+{
+    return identMatches<CSSValueLeft, CSSValueRight>(id);
+}
+
 static bool isContentDistributionKeyword(CSSValueID id)
 {
     return identMatches<CSSValueSpaceBetween, CSSValueSpaceAround, CSSValueSpaceEvenly, CSSValueStretch>(id);
@@ -2632,7 +2678,12 @@ static bool isContentDistributionKeyword(CSSValueID id)
 
 static bool isContentPositionKeyword(CSSValueID id)
 {
-    return identMatches<CSSValueStart, CSSValueEnd, CSSValueCenter, CSSValueFlexStart, CSSValueFlexEnd, CSSValueLeft, CSSValueRight>(id);
+    return identMatches<CSSValueStart, CSSValueEnd, CSSValueCenter, CSSValueFlexStart, CSSValueFlexEnd>(id);
+}
+
+static bool isContentPositionOrLeftOrRightKeyword(CSSValueID id)
+{
+    return isContentPositionKeyword(id) || isLeftOrRightKeyword(id);
 }
 
 static bool isOverflowKeyword(CSSValueID id)
@@ -2645,14 +2696,18 @@ static bool isBaselineKeyword(CSSValueID id)
     return identMatches<CSSValueFirst, CSSValueLast, CSSValueBaseline>(id);
 }
 
+static RefPtr<CSSPrimitiveValue> consumeOverflowPositionKeyword(CSSParserTokenRange& range)
+{
+    return isOverflowKeyword(range.peek().id()) ? consumeIdent(range) : nullptr;
+}
+
 static CSSValueID getBaselineKeyword(RefPtr<CSSValue> value)
 {
     auto& primitiveValue = downcast<CSSPrimitiveValue>(*value);
-    if (auto* pairValue = primitiveValue.pairValue()) {
-        ASSERT(pairValue->second()->valueID() == CSSValueBaseline);
-        if (pairValue->first()->valueID() == CSSValueLast)
-            return CSSValueLastBaseline;
-        return CSSValueFirstBaseline;
+    if (primitiveValue.pairValue()) {
+        ASSERT(primitiveValue.pairValue()->first()->valueID() == CSSValueLast);
+        ASSERT(primitiveValue.pairValue()->second()->valueID() == CSSValueBaseline);
+        return CSSValueLastBaseline;
     }
     ASSERT(primitiveValue.valueID() == CSSValueBaseline);
     return CSSValueBaseline;
@@ -2660,20 +2715,20 @@ static CSSValueID getBaselineKeyword(RefPtr<CSSValue> value)
 
 static RefPtr<CSSValue> consumeBaselineKeyword(CSSParserTokenRange& range)
 {
-    CSSValueID id = range.peek().id();
-    if (identMatches<CSSValueBaseline>(id))
-        return consumeIdent(range);
-
-    if (RefPtr<CSSPrimitiveValue> preference = consumeIdent<CSSValueFirst, CSSValueLast>(range)) {
-        if (range.peek().id() == CSSValueBaseline)
-            return createPrimitiveValuePair(preference.releaseNonNull(), consumeIdent(range), Pair::IdenticalValueEncoding::Coalesce);
-    }
-    return nullptr;
+    RefPtr<CSSPrimitiveValue> preference = consumeIdent<CSSValueFirst, CSSValueLast>(range);
+    RefPtr<CSSPrimitiveValue> baseline = consumeIdent<CSSValueBaseline>(range);
+    if (!baseline)
+        return nullptr;
+    if (preference && preference->valueID() == CSSValueLast)
+        return createPrimitiveValuePair(preference.releaseNonNull(), baseline.releaseNonNull(), Pair::IdenticalValueEncoding::Coalesce);
+    return baseline;
 }
 
+using IsPositionKeyword = bool (*)(CSSValueID);
 
-static RefPtr<CSSValue> consumeContentDistributionOverflowPosition(CSSParserTokenRange& range)
+static RefPtr<CSSValue> consumeContentDistributionOverflowPosition(CSSParserTokenRange& range, IsPositionKeyword isPositionKeyword)
 {
+    ASSERT(isPositionKeyword);
     CSSValueID id = range.peek().id();
     if (identMatches<CSSValueNormal>(id))
         return CSSContentDistributionValue::create(CSSValueInvalid, range.consumeIncludingWhitespace().id(), CSSValueInvalid);
@@ -2685,38 +2740,14 @@ static RefPtr<CSSValue> consumeContentDistributionOverflowPosition(CSSParserToke
         return CSSContentDistributionValue::create(CSSValueInvalid, getBaselineKeyword(baseline), CSSValueInvalid);
     }
 
-    CSSValueID distribution = CSSValueInvalid;
-    CSSValueID position = CSSValueInvalid;
-    CSSValueID overflow = CSSValueInvalid;
-    do {
-        CSSValueID id = range.peek().id();
-        if (isContentDistributionKeyword(id)) {
-            if (distribution != CSSValueInvalid)
-                return nullptr;
-            distribution = id;
-        } else if (isContentPositionKeyword(id)) {
-            if (position != CSSValueInvalid)
-                return nullptr;
-            position = id;
-        } else if (isOverflowKeyword(id)) {
-            if (overflow != CSSValueInvalid)
-                return nullptr;
-            overflow = id;
-        } else {
-            return nullptr;
-        }
-        range.consumeIncludingWhitespace();
-    } while (!range.atEnd());
+    if (isContentDistributionKeyword(id))
+        return CSSContentDistributionValue::create(range.consumeIncludingWhitespace().id(), CSSValueInvalid, CSSValueInvalid);
 
-    // The grammar states that we should have at least <content-distribution> or <content-position>.
-    if (position == CSSValueInvalid && distribution == CSSValueInvalid)
-        return nullptr;
+    CSSValueID overflow = isOverflowKeyword(id) ? range.consumeIncludingWhitespace().id() : CSSValueInvalid;
+    if (isPositionKeyword(range.peek().id()))
+        return CSSContentDistributionValue::create(CSSValueInvalid, range.consumeIncludingWhitespace().id(), overflow);
 
-    // The grammar states that <overflow-position> must be associated to <content-position>.
-    if (overflow != CSSValueInvalid && position == CSSValueInvalid)
-        return nullptr;
-
-    return CSSContentDistributionValue::create(distribution, position, overflow);
+    return nullptr;
 }
 
 static RefPtr<CSSPrimitiveValue> consumeBorderImageRepeatKeyword(CSSParserTokenRange& range)
@@ -3068,18 +3099,19 @@ static RefPtr<CSSValue> consumeCommaSeparatedBackgroundComponent(CSSPropertyID p
     return result;
 }
 
-static RefPtr<CSSPrimitiveValue> consumeSelfPositionKeyword(CSSParserTokenRange& range)
+static bool isSelfPositionKeyword(CSSValueID id)
 {
-    CSSValueID id = range.peek().id();
-    if (id == CSSValueStart || id == CSSValueEnd || id == CSSValueCenter
-        || id == CSSValueSelfStart || id == CSSValueSelfEnd || id == CSSValueFlexStart
-        || id == CSSValueFlexEnd || id == CSSValueLeft || id == CSSValueRight)
-        return consumeIdent(range);
-    return nullptr;
+    return identMatches<CSSValueStart, CSSValueEnd, CSSValueCenter, CSSValueSelfStart, CSSValueSelfEnd, CSSValueFlexStart, CSSValueFlexEnd>(id);
 }
 
-static RefPtr<CSSValue> consumeSelfPositionOverflowPosition(CSSParserTokenRange& range)
+static bool isSelfPositionOrLeftOrRightKeyword(CSSValueID id)
 {
+    return isSelfPositionKeyword(id) || isLeftOrRightKeyword(id);
+}
+
+static RefPtr<CSSValue> consumeSelfPositionOverflowPosition(CSSParserTokenRange& range, IsPositionKeyword isPositionKeyword)
+{
+    ASSERT(isPositionKeyword);
     CSSValueID id = range.peek().id();
     if (isAutoOrNormalOrStretch(id))
         return consumeIdent(range);
@@ -3087,14 +3119,12 @@ static RefPtr<CSSValue> consumeSelfPositionOverflowPosition(CSSParserTokenRange&
     if (isBaselineKeyword(id))
         return consumeBaselineKeyword(range);
 
-    RefPtr<CSSPrimitiveValue> overflowPosition = consumeIdent<CSSValueUnsafe, CSSValueSafe>(range);
-    RefPtr<CSSPrimitiveValue> selfPosition = consumeSelfPositionKeyword(range);
-    if (!selfPosition)
+    RefPtr<CSSPrimitiveValue> overflowPosition = consumeOverflowPositionKeyword(range);
+    if (!isPositionKeyword(range.peek().id()))
         return nullptr;
-    if (!overflowPosition)
-        overflowPosition = consumeIdent<CSSValueUnsafe, CSSValueSafe>(range);
+    RefPtr<CSSPrimitiveValue> selfPosition = consumeIdent(range);
     if (overflowPosition)
-        return createPrimitiveValuePair(selfPosition.releaseNonNull(), overflowPosition.releaseNonNull(), Pair::IdenticalValueEncoding::Coalesce);
+        return createPrimitiveValuePair(overflowPosition.releaseNonNull(), selfPosition.releaseNonNull(), Pair::IdenticalValueEncoding::Coalesce);
     return selfPosition;
 }
 
@@ -3103,7 +3133,7 @@ static RefPtr<CSSValue> consumeAlignItems(CSSParserTokenRange& range)
     // align-items property does not allow the 'auto' value.
     if (identMatches<CSSValueAuto>(range.peek().id()))
         return nullptr;
-    return consumeSelfPositionOverflowPosition(range);
+    return consumeSelfPositionOverflowPosition(range, isSelfPositionKeyword);
 }
 
 static RefPtr<CSSValue> consumeJustifyItems(CSSParserTokenRange& range)
@@ -3117,7 +3147,7 @@ static RefPtr<CSSValue> consumeJustifyItems(CSSParserTokenRange& range)
         range = rangeCopy;
         return createPrimitiveValuePair(legacy.releaseNonNull(), positionKeyword.releaseNonNull(), Pair::IdenticalValueEncoding::Coalesce);
     }
-    return consumeSelfPositionOverflowPosition(range);
+    return consumeSelfPositionOverflowPosition(range, isSelfPositionOrLeftOrRightKeyword);
 }
 
 static RefPtr<CSSValue> consumeFitContent(CSSParserTokenRange& range, CSSParserMode cssParserMode)
@@ -3256,7 +3286,7 @@ static Vector<String> parseGridTemplateAreasColumnNames(const String& gridRowNam
 
 static bool parseGridTemplateAreasRow(const String& gridRowNames, NamedGridAreaMap& gridAreaMap, const size_t rowCount, size_t& columnCount)
 {
-    if (gridRowNames.isEmpty() || gridRowNames.containsOnlyWhitespace())
+    if (gridRowNames.isAllSpecialCharacters<isCSSSpace>())
         return false;
 
     Vector<String> columnNames = parseGridTemplateAreasColumnNames(gridRowNames);
@@ -3569,6 +3599,52 @@ static RefPtr<CSSValue> consumeInitialLetter(CSSParserTokenRange& range)
     return createPrimitiveValuePair(position.releaseNonNull(), WTFMove(height));
 }
 
+static RefPtr<CSSValue> consumeSpeakAs(CSSParserTokenRange& range)
+{
+    if (range.peek().id() == CSSValueNone)
+        return consumeIdent(range);
+    
+    RefPtr<CSSValueList> list = CSSValueList::createSpaceSeparated();
+    std::bitset<numCSSValueKeywords> seenValues;
+    
+    bool seenNormal = false;
+    bool seenSpellOut = false;
+    bool seenLiteralPunctuation = false;
+    bool seenNoPunctuation = false;
+
+    // normal | spell-out || digits || [ literal-punctuation | no-punctuation ]
+    while (!range.atEnd()) {
+        CSSValueID valueID = range.peek().id();
+        if ((valueID == CSSValueNormal && seenSpellOut)
+            || (valueID == CSSValueSpellOut && seenNormal)
+            || (valueID == CSSValueLiteralPunctuation && seenNoPunctuation)
+            || (valueID == CSSValueNoPunctuation && seenLiteralPunctuation))
+            return nullptr;
+        RefPtr<CSSValue> ident = consumeIdent<CSSValueNormal, CSSValueSpellOut, CSSValueDigits, CSSValueLiteralPunctuation, CSSValueNoPunctuation>(range);
+        if (!ident)
+            return nullptr;
+        switch (valueID) {
+        case CSSValueNormal:
+            seenNormal = true;
+            break;
+        case CSSValueSpellOut:
+            seenSpellOut = true;
+            break;
+        case CSSValueLiteralPunctuation:
+            seenLiteralPunctuation = true;
+            break;
+        case CSSValueNoPunctuation:
+            seenNoPunctuation = true;
+            break;
+        default:
+            break;
+        }
+        list->append(ident.releaseNonNull());
+    }
+    
+    return list->length() ? list : nullptr;
+}
+    
 static RefPtr<CSSValue> consumeHangingPunctuation(CSSParserTokenRange& range)
 {
     if (range.peek().id() == CSSValueNone)
@@ -3941,6 +4017,8 @@ RefPtr<CSSValue> CSSPropertyParser::parseSingleValue(CSSPropertyID property, CSS
         return consumePosition(m_range, m_context.mode, UnitlessQuirk::Forbid);
     case CSSPropertyWebkitLineClamp:
         return consumeLineClamp(m_range);
+    case CSSPropertyWebkitLinesClamp:
+        return m_context.allowNewLinesClamp ? consumeLinesClamp(m_range) : nullptr;
     case CSSPropertyWebkitFontSizeDelta:
         return consumeLength(m_range, m_context.mode, ValueRangeAll, UnitlessQuirk::Allow);
     case CSSPropertyWebkitHyphenateCharacter:
@@ -3956,7 +4034,7 @@ RefPtr<CSSValue> CSSPropertyParser::parseSingleValue(CSSPropertyID property, CSS
     case CSSPropertyColumnCount:
         return consumeColumnCount(m_range);
     case CSSPropertyColumnGap:
-        return consumeColumnGap(m_range, m_context.mode);
+        return consumeGapLength(m_range, m_context.mode);
     case CSSPropertyColumnSpan:
         return consumeColumnSpan(m_range);
     case CSSPropertyZoom:
@@ -4149,8 +4227,12 @@ RefPtr<CSSValue> CSSPropertyParser::parseSingleValue(CSSPropertyID property, CSS
     case CSSPropertyWebkitClipPath:
         return consumeWebkitClipPath(m_range, m_context);
     case CSSPropertyJustifyContent:
+        // justify-content property does not allow the <baseline-position> values.
+        if (isBaselineKeyword(m_range.peek().id()))
+            return nullptr;
+        return consumeContentDistributionOverflowPosition(m_range, isContentPositionOrLeftOrRightKeyword);
     case CSSPropertyAlignContent:
-        return consumeContentDistributionOverflowPosition(m_range);
+        return consumeContentDistributionOverflowPosition(m_range, isContentPositionKeyword);
     case CSSPropertyBorderImageRepeat:
     case CSSPropertyWebkitMaskBoxImageRepeat:
         return consumeBorderImageRepeat(m_range);
@@ -4203,10 +4285,11 @@ RefPtr<CSSValue> CSSPropertyParser::parseSingleValue(CSSPropertyID property, CSS
             return nullptr;
         return consumeAlignItems(m_range);
     case CSSPropertyJustifySelf:
+        return consumeSelfPositionOverflowPosition(m_range, isSelfPositionOrLeftOrRightKeyword);
     case CSSPropertyAlignSelf:
         if (!m_context.cssGridLayoutEnabled)
             return nullptr;
-        return consumeSelfPositionOverflowPosition(m_range);
+        return consumeSelfPositionOverflowPosition(m_range, isSelfPositionKeyword);
     case CSSPropertyJustifyItems:
         if (!m_context.cssGridLayoutEnabled)
             return nullptr;
@@ -4240,6 +4323,8 @@ RefPtr<CSSValue> CSSPropertyParser::parseSingleValue(CSSPropertyID property, CSS
         return consumeLineGrid(m_range);
     case CSSPropertyWebkitInitialLetter:
         return consumeInitialLetter(m_range);
+    case CSSPropertySpeakAs:
+        return consumeSpeakAs(m_range);
     case CSSPropertyHangingPunctuation:
         return consumeHangingPunctuation(m_range);
     case CSSPropertyWebkitMarqueeIncrement:
@@ -5438,10 +5523,11 @@ bool CSSPropertyParser::consumeGridShorthand(bool important)
     return true;
 }
 
-static RefPtr<CSSValue> consumeSimplifiedContentPosition(CSSParserTokenRange& range)
+static RefPtr<CSSValue> consumeSimplifiedContentPosition(CSSParserTokenRange& range, IsPositionKeyword isPositionKeyword)
 {
+    ASSERT(isPositionKeyword);
     CSSValueID id = range.peek().id();
-    if (identMatches<CSSValueNormal>(id) || isContentPositionKeyword(id))
+    if (identMatches<CSSValueNormal>(id) || isPositionKeyword(id))
         return CSSContentDistributionValue::create(CSSValueInvalid, range.consumeIncludingWhitespace().id(), CSSValueInvalid);
     if (isBaselineKeyword(id)) {
         RefPtr<CSSValue> baseline = consumeBaselineKeyword(range);
@@ -5461,10 +5547,18 @@ bool CSSPropertyParser::consumePlaceContentShorthand(bool important)
     if (m_range.atEnd())
         return false;
 
-    RefPtr<CSSValue> alignContentValue = consumeSimplifiedContentPosition(m_range);
+    bool isBaseline = isBaselineKeyword(m_range.peek().id());
+    RefPtr<CSSValue> alignContentValue = consumeSimplifiedContentPosition(m_range, isContentPositionKeyword);
     if (!alignContentValue)
         return false;
-    RefPtr<CSSValue> justifyContentValue = m_range.atEnd() ? alignContentValue : consumeSimplifiedContentPosition(m_range);
+
+    // justify-content property does not allow the <baseline-position> values.
+    if (m_range.atEnd() && isBaseline)
+        return false;
+    if (isBaselineKeyword(m_range.peek().id()))
+        return false;
+
+    RefPtr<CSSValue> justifyContentValue = m_range.atEnd() ? alignContentValue : consumeSimplifiedContentPosition(m_range, isContentPositionOrLeftOrRightKeyword);
     if (!justifyContentValue)
         return false;
     if (!m_range.atEnd())
@@ -5475,16 +5569,17 @@ bool CSSPropertyParser::consumePlaceContentShorthand(bool important)
     return true;
 }
 
-static RefPtr<CSSValue> consumeSimplifiedItemPosition(CSSParserTokenRange& range)
+static RefPtr<CSSValue> consumeSimplifiedItemPosition(CSSParserTokenRange& range, IsPositionKeyword isPositionKeyword)
 {
+    ASSERT(isPositionKeyword);
     CSSValueID id = range.peek().id();
-    if (isAutoOrNormalOrStretch(id))
+    if (isAutoOrNormalOrStretch(id) || isPositionKeyword(id))
         return consumeIdent(range);
 
     if (isBaselineKeyword(id))
         return consumeBaselineKeyword(range);
 
-    return consumeSelfPositionKeyword(range);
+    return nullptr;
 }
 
 bool CSSPropertyParser::consumePlaceItemsShorthand(bool important)
@@ -5495,10 +5590,10 @@ bool CSSPropertyParser::consumePlaceItemsShorthand(bool important)
     if (identMatches<CSSValueAuto>(m_range.peek().id()))
         return false;
 
-    RefPtr<CSSValue> alignItemsValue = consumeSimplifiedItemPosition(m_range);
+    RefPtr<CSSValue> alignItemsValue = consumeSimplifiedItemPosition(m_range, isSelfPositionKeyword);
     if (!alignItemsValue)
         return false;
-    RefPtr<CSSValue> justifyItemsValue = m_range.atEnd() ? alignItemsValue : consumeSimplifiedItemPosition(m_range);
+    RefPtr<CSSValue> justifyItemsValue = m_range.atEnd() ? alignItemsValue : consumeSimplifiedItemPosition(m_range, isSelfPositionOrLeftOrRightKeyword);
     if (!justifyItemsValue)
         return false;
 
@@ -5514,10 +5609,10 @@ bool CSSPropertyParser::consumePlaceSelfShorthand(bool important)
 {
     ASSERT(shorthandForProperty(CSSPropertyPlaceSelf).length() == 2);
 
-    RefPtr<CSSValue> alignSelfValue = consumeSimplifiedItemPosition(m_range);
+    RefPtr<CSSValue> alignSelfValue = consumeSimplifiedItemPosition(m_range, isSelfPositionKeyword);
     if (!alignSelfValue)
         return false;
-    RefPtr<CSSValue> justifySelfValue = m_range.atEnd() ? alignSelfValue : consumeSimplifiedItemPosition(m_range);
+    RefPtr<CSSValue> justifySelfValue = m_range.atEnd() ? alignSelfValue : consumeSimplifiedItemPosition(m_range, isSelfPositionOrLeftOrRightKeyword);
     if (!justifySelfValue)
         return false;
 

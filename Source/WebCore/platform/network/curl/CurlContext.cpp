@@ -31,6 +31,7 @@
 #include "HTTPHeaderMap.h"
 #include <NetworkLoadMetrics.h>
 #include <wtf/MainThread.h>
+#include <wtf/NeverDestroyed.h>
 #include <wtf/text/CString.h>
 
 #if OS(WINDOWS)
@@ -39,49 +40,19 @@
 #include <shlwapi.h>
 #endif
 
-using namespace WebCore;
-
 namespace WebCore {
-
-static CString cookieJarPath()
-{
-    char* cookieJarPath = getenv("CURL_COOKIE_JAR_PATH");
-    if (cookieJarPath)
-        return cookieJarPath;
-
-#if OS(WINDOWS)
-    char executablePath[MAX_PATH];
-    char appDataDirectory[MAX_PATH];
-    char cookieJarFullPath[MAX_PATH];
-    char cookieJarDirectory[MAX_PATH];
-
-    if (FAILED(::SHGetFolderPathA(0, CSIDL_LOCAL_APPDATA | CSIDL_FLAG_CREATE, 0, 0, appDataDirectory))
-        || FAILED(::GetModuleFileNameA(0, executablePath, MAX_PATH)))
-        return "cookies.dat";
-
-    ::PathRemoveExtensionA(executablePath);
-    LPSTR executableName = ::PathFindFileNameA(executablePath);
-    sprintf_s(cookieJarDirectory, MAX_PATH, "%s/%s", appDataDirectory, executableName);
-    sprintf_s(cookieJarFullPath, MAX_PATH, "%s/cookies.dat", cookieJarDirectory);
-
-    if (::SHCreateDirectoryExA(0, cookieJarDirectory, 0) != ERROR_SUCCESS
-        && ::GetLastError() != ERROR_FILE_EXISTS
-        && ::GetLastError() != ERROR_ALREADY_EXISTS)
-        return "cookies.dat";
-
-    return cookieJarFullPath;
-#else
-    return "cookies.dat";
-#endif
-}
 
 // CurlContext -------------------------------------------------------------------
 
-CurlContext::CurlContext()
-: m_cookieJarFileName { cookieJarPath() }
-, m_cookieJar { std::make_unique<CookieJarCurlFileSystem>() }
+CurlContext& CurlContext::singleton()
 {
-    initCookieSession();
+    static NeverDestroyed<CurlContext> sharedInstance;
+    return sharedInstance;
+}
+
+CurlContext::CurlContext()
+{
+    initShareHandle();
 
 #ifndef NDEBUG
     m_verbose = getenv("DEBUG_CURL");
@@ -100,26 +71,14 @@ CurlContext::~CurlContext()
 #endif
 }
 
-// Cookie =======================
-
-void CurlContext::initCookieSession()
+void CurlContext::initShareHandle()
 {
-    // Curl saves both persistent cookies, and session cookies to the cookie file.
-    // The session cookies should be deleted before starting a new session.
-
     CURL* curl = curl_easy_init();
 
     if (!curl)
         return;
 
     curl_easy_setopt(curl, CURLOPT_SHARE, m_shareHandle.handle());
-
-    if (!m_cookieJarFileName.isNull()) {
-        curl_easy_setopt(curl, CURLOPT_COOKIEFILE, m_cookieJarFileName.data());
-        curl_easy_setopt(curl, CURLOPT_COOKIEJAR, m_cookieJarFileName.data());
-    }
-
-    curl_easy_setopt(curl, CURLOPT_COOKIESESSION, 1);
 
     curl_easy_cleanup(curl);
 }
@@ -152,7 +111,11 @@ void CurlContext::setProxyInfo(const String& host,
     setProxyInfo(info);
 }
 
-
+bool CurlContext::isHttp2Enabled() const
+{
+    curl_version_info_data* data = curl_version_info(CURLVERSION_NOW);
+    return data->features & CURL_VERSION_HTTP2;
+}
 
 // CurlShareHandle --------------------------------------------
 
@@ -173,29 +136,29 @@ CurlShareHandle::~CurlShareHandle()
 
 void CurlShareHandle::lockCallback(CURL*, curl_lock_data data, curl_lock_access, void*)
 {
-    if (Lock* mutex = mutexFor(data))
+    if (auto* mutex = mutexFor(data))
         mutex->lock();
 }
 
 void CurlShareHandle::unlockCallback(CURL*, curl_lock_data data, void*)
 {
-    if (Lock* mutex = mutexFor(data))
+    if (auto* mutex = mutexFor(data))
         mutex->unlock();
 }
 
-Lock* CurlShareHandle::mutexFor(curl_lock_data data)
+StaticLock* CurlShareHandle::mutexFor(curl_lock_data data)
 {
-    static NeverDestroyed<Lock> cookieMutex;
-    static NeverDestroyed<Lock> dnsMutex;
-    static NeverDestroyed<Lock> shareMutex;
+    static StaticLock cookieMutex;
+    static StaticLock dnsMutex;
+    static StaticLock shareMutex;
 
     switch (data) {
     case CURL_LOCK_DATA_COOKIE:
-        return &cookieMutex.get();
+        return &cookieMutex;
     case CURL_LOCK_DATA_DNS:
-        return &dnsMutex.get();
+        return &dnsMutex;
     case CURL_LOCK_DATA_SHARE:
-        return &shareMutex.get();
+        return &shareMutex;
     default:
         ASSERT_NOT_REACHED();
         return nullptr;
@@ -270,14 +233,12 @@ void CurlHandle::initialize()
 
 CURLcode CurlHandle::perform()
 {
-    m_errorCode = curl_easy_perform(m_handle);
-    return m_errorCode;
+    return curl_easy_perform(m_handle);
 }
 
 CURLcode CurlHandle::pause(int bitmask)
 {
-    m_errorCode = curl_easy_pause(m_handle, bitmask);
-    return m_errorCode;
+    return curl_easy_pause(m_handle, bitmask);
 }
 
 void CurlHandle::enableShareHandle()
@@ -356,18 +317,32 @@ void CurlHandle::enableRequestHeaders()
     curl_easy_setopt(m_handle, CURLOPT_HTTPHEADER, headers);
 }
 
+void CurlHandle::enableHttp()
+{
+    if (CurlContext::singleton().isHttp2Enabled()) {
+        curl_easy_setopt(m_handle, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2TLS);
+        curl_easy_setopt(m_handle, CURLOPT_PIPEWAIT, 1L);
+        curl_easy_setopt(m_handle, CURLOPT_SSL_ENABLE_ALPN, 1L);
+        curl_easy_setopt(m_handle, CURLOPT_SSL_ENABLE_NPN, 0L);
+    } else
+        curl_easy_setopt(m_handle, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
+}
+
 void CurlHandle::enableHttpGetRequest()
 {
+    enableHttp();
     curl_easy_setopt(m_handle, CURLOPT_HTTPGET, 1L);
 }
 
 void CurlHandle::enableHttpHeadRequest()
 {
+    enableHttp();
     curl_easy_setopt(m_handle, CURLOPT_NOBODY, 1L);
 }
 
 void CurlHandle::enableHttpPostRequest()
 {
+    enableHttp();
     curl_easy_setopt(m_handle, CURLOPT_POST, 1L);
     curl_easy_setopt(m_handle, CURLOPT_POSTFIELDSIZE, 0L);
 }
@@ -388,6 +363,7 @@ void CurlHandle::setPostFieldLarge(curl_off_t size)
 
 void CurlHandle::enableHttpPutRequest()
 {
+    enableHttp();
     curl_easy_setopt(m_handle, CURLOPT_UPLOAD, 1L);
     curl_easy_setopt(m_handle, CURLOPT_INFILESIZE, 0L);
 }
@@ -402,6 +378,7 @@ void CurlHandle::setInFileSizeLarge(curl_off_t size)
 
 void CurlHandle::setHttpCustomRequest(const String& method)
 {
+    enableHttp();
     curl_easy_setopt(m_handle, CURLOPT_CUSTOMREQUEST, method.ascii().data());
 }
 
@@ -416,20 +393,6 @@ void CurlHandle::enableAllowedProtocols()
     static const long allowedProtocols = CURLPROTO_FILE | CURLPROTO_FTP | CURLPROTO_FTPS | CURLPROTO_HTTP | CURLPROTO_HTTPS;
 
     curl_easy_setopt(m_handle, CURLOPT_PROTOCOLS, allowedProtocols);
-    curl_easy_setopt(m_handle, CURLOPT_REDIR_PROTOCOLS, allowedProtocols);
-}
-
-void CurlHandle::enableFollowLocation()
-{
-    static const long maxNumberOfRedirectCount = 10;
-
-    curl_easy_setopt(m_handle, CURLOPT_FOLLOWLOCATION, 1L);
-    curl_easy_setopt(m_handle, CURLOPT_MAXREDIRS, maxNumberOfRedirectCount);
-}
-
-void CurlHandle::enableAutoReferer()
-{
-    curl_easy_setopt(m_handle, CURLOPT_AUTOREFERER, 1L);
 }
 
 void CurlHandle::enableHttpAuthentication(long option)
@@ -439,12 +402,8 @@ void CurlHandle::enableHttpAuthentication(long option)
 
 void CurlHandle::setHttpAuthUserPass(const String& user, const String& password)
 {
-    String userpass = emptyString();
-
-    if (!user.isEmpty() || !password.isEmpty())
-        userpass = user + ":" + password;
-
-    curl_easy_setopt(m_handle, CURLOPT_USERPWD, userpass.utf8().data());
+    curl_easy_setopt(m_handle, CURLOPT_USERNAME, user.utf8().data());
+    curl_easy_setopt(m_handle, CURLOPT_PASSWORD, password.utf8().data());
 }
 
 void CurlHandle::setCACertPath(const char* path)
@@ -478,26 +437,6 @@ void CurlHandle::setSslKeyPassword(const char* password)
     curl_easy_setopt(m_handle, CURLOPT_KEYPASSWD, password);
 }
 
-void CurlHandle::enableCookieJarIfExists()
-{
-    const char* cookieJar = CurlContext::singleton().getCookieJarFileName();
-    if (cookieJar)
-        curl_easy_setopt(m_handle, CURLOPT_COOKIEJAR, cookieJar);
-}
-
-void CurlHandle::setCookieList(const char* cookieList)
-{
-    if (!cookieList)
-        return;
-
-    curl_easy_setopt(m_handle, CURLOPT_COOKIELIST, cookieList);
-}
-
-void CurlHandle::fetchCookieList(CurlSList &cookies) const
-{
-    curl_easy_getinfo(m_handle, CURLINFO_COOKIELIST, static_cast<struct curl_slist**>(cookies));
-}
-
 void CurlHandle::enableProxyIfExists()
 {
     auto& proxy = CurlContext::singleton().proxyInfo();
@@ -513,6 +452,11 @@ void CurlHandle::enableTimeout()
     static const long dnsCacheTimeout = 5 * 60; // [sec.]
 
     curl_easy_setopt(m_handle, CURLOPT_DNS_CACHE_TIMEOUT, dnsCacheTimeout);
+}
+
+void CurlHandle::setTimeout(long timeoutMilliseconds)
+{
+    curl_easy_setopt(m_handle, CURLOPT_TIMEOUT_MS, timeoutMilliseconds);
 }
 
 void CurlHandle::setHeaderCallbackFunction(curl_write_callback callbackFunc, void* userData)
@@ -539,31 +483,14 @@ void CurlHandle::setSslCtxCallbackFunction(curl_ssl_ctx_callback callbackFunc, v
     curl_easy_setopt(m_handle, CURLOPT_SSL_CTX_FUNCTION, callbackFunc);
 }
 
-URL CurlHandle::getEffectiveURL()
-{
-    if (!m_handle) {
-        m_errorCode = CURLE_FAILED_INIT;
-        return URL();
-    }
-
-    char* url;
-    m_errorCode = curl_easy_getinfo(m_handle, CURLINFO_EFFECTIVE_URL, &url);
-    if (m_errorCode != CURLE_OK)
-        return URL();
-
-    return URL(URL(), url);
-}
-
 std::optional<uint16_t> CurlHandle::getPrimaryPort()
 {
-    if (!m_handle) {
-        m_errorCode = CURLE_FAILED_INIT;
+    if (!m_handle)
         return std::nullopt;
-    }
 
     long port;
-    m_errorCode = curl_easy_getinfo(m_handle, CURLINFO_PRIMARY_PORT, &port);
-    if (m_errorCode != CURLE_OK)
+    CURLcode errorCode = curl_easy_getinfo(m_handle, CURLINFO_PRIMARY_PORT, &port);
+    if (errorCode != CURLE_OK)
         return std::nullopt;
 
     /*
@@ -575,30 +502,39 @@ std::optional<uint16_t> CurlHandle::getPrimaryPort()
 
 std::optional<long> CurlHandle::getResponseCode()
 {
-    if (!m_handle) {
-        m_errorCode = CURLE_FAILED_INIT;
+    if (!m_handle)
         return std::nullopt;
-    }
 
     long responseCode;
-    m_errorCode = curl_easy_getinfo(m_handle, CURLINFO_RESPONSE_CODE, &responseCode);
-    if (m_errorCode != CURLE_OK)
+    CURLcode errorCode = curl_easy_getinfo(m_handle, CURLINFO_RESPONSE_CODE, &responseCode);
+    if (errorCode != CURLE_OK)
         return std::nullopt;
 
     return responseCode;
 }
 
+std::optional<long> CurlHandle::getHttpConnectCode()
+{
+    if (!m_handle)
+        return std::nullopt;
+
+    long httpConnectCode;
+    CURLcode errorCode = curl_easy_getinfo(m_handle, CURLINFO_HTTP_CONNECTCODE, &httpConnectCode);
+    if (errorCode != CURLE_OK)
+        return std::nullopt;
+
+    return httpConnectCode;
+}
+
 std::optional<long long> CurlHandle::getContentLength()
 {
-    if (!m_handle) {
-        m_errorCode = CURLE_FAILED_INIT;
+    if (!m_handle)
         return std::nullopt;
-    }
 
     double contentLength;
 
-    m_errorCode = curl_easy_getinfo(m_handle, CURLINFO_CONTENT_LENGTH_DOWNLOAD, &contentLength);
-    if (m_errorCode != CURLE_OK)
+    CURLcode errorCode = curl_easy_getinfo(m_handle, CURLINFO_CONTENT_LENGTH_DOWNLOAD, &contentLength);
+    if (errorCode != CURLE_OK)
         return std::nullopt;
 
     return static_cast<long long>(contentLength);
@@ -606,17 +542,28 @@ std::optional<long long> CurlHandle::getContentLength()
 
 std::optional<long> CurlHandle::getHttpAuthAvail()
 {
-    if (!m_handle) {
-        m_errorCode = CURLE_FAILED_INIT;
+    if (!m_handle)
         return std::nullopt;
-    }
 
     long httpAuthAvailable;
-    m_errorCode = curl_easy_getinfo(m_handle, CURLINFO_HTTPAUTH_AVAIL, &httpAuthAvailable);
-    if (m_errorCode != CURLE_OK)
+    CURLcode errorCode = curl_easy_getinfo(m_handle, CURLINFO_HTTPAUTH_AVAIL, &httpAuthAvailable);
+    if (errorCode != CURLE_OK)
         return std::nullopt;
 
     return httpAuthAvailable;
+}
+
+std::optional<long> CurlHandle::getHttpVersion()
+{
+    if (!m_handle)
+        return std::nullopt;
+
+    long version;
+    CURLcode errorCode = curl_easy_getinfo(m_handle, CURLINFO_HTTP_VERSION, &version);
+    if (errorCode != CURLE_OK)
+        return std::nullopt;
+
+    return version;
 }
 
 std::optional<NetworkLoadMetrics> CurlHandle::getNetworkLoadMetrics()
@@ -626,25 +573,23 @@ std::optional<NetworkLoadMetrics> CurlHandle::getNetworkLoadMetrics()
     double appConnect = 0.0;
     double startTransfer = 0.0;
 
-    if (!m_handle) {
-        m_errorCode = CURLE_FAILED_INIT;
-        return std::nullopt;
-    }
-
-    m_errorCode = curl_easy_getinfo(m_handle, CURLINFO_NAMELOOKUP_TIME, &nameLookup);
-    if (m_errorCode != CURLE_OK)
+    if (!m_handle)
         return std::nullopt;
 
-    m_errorCode = curl_easy_getinfo(m_handle, CURLINFO_CONNECT_TIME, &connect);
-    if (m_errorCode != CURLE_OK)
+    CURLcode errorCode = curl_easy_getinfo(m_handle, CURLINFO_NAMELOOKUP_TIME, &nameLookup);
+    if (errorCode != CURLE_OK)
         return std::nullopt;
 
-    m_errorCode = curl_easy_getinfo(m_handle, CURLINFO_APPCONNECT_TIME, &appConnect);
-    if (m_errorCode != CURLE_OK)
+    errorCode = curl_easy_getinfo(m_handle, CURLINFO_CONNECT_TIME, &connect);
+    if (errorCode != CURLE_OK)
         return std::nullopt;
 
-    m_errorCode = curl_easy_getinfo(m_handle, CURLINFO_STARTTRANSFER_TIME, &startTransfer);
-    if (m_errorCode != CURLE_OK)
+    errorCode = curl_easy_getinfo(m_handle, CURLINFO_APPCONNECT_TIME, &appConnect);
+    if (errorCode != CURLE_OK)
+        return std::nullopt;
+
+    errorCode = curl_easy_getinfo(m_handle, CURLINFO_STARTTRANSFER_TIME, &startTransfer);
+    if (errorCode != CURLE_OK)
         return std::nullopt;
 
     NetworkLoadMetrics networkLoadMetrics;

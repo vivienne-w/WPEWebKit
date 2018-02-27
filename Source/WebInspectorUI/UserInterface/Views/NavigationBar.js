@@ -42,6 +42,9 @@ WI.NavigationBar = class NavigationBar extends WI.View
         this.element.addEventListener("keydown", this._keyDown.bind(this), false);
         this.element.addEventListener("mousedown", this._mouseDown.bind(this), false);
 
+        this._mouseMovedEventListener = this._mouseMoved.bind(this);
+        this._mouseUpEventListener = this._mouseUp.bind(this);
+
         this._forceLayout = false;
         this._minimumWidth = NaN;
         this._navigationItems = [];
@@ -301,9 +304,6 @@ WI.NavigationBar = class NavigationBar extends WI.View
 
         this._mouseIsDown = true;
 
-        this._mouseMovedEventListener = this._mouseMoved.bind(this);
-        this._mouseUpEventListener = this._mouseUp.bind(this);
-
         if (typeof this.selectedNavigationItem.dontPreventDefaultOnNavigationBarMouseDown === "function"
             && this.selectedNavigationItem.dontPreventDefaultOnNavigationBarMouseDown()
             && this._previousSelectedNavigationItem === this.selectedNavigationItem)
@@ -363,9 +363,6 @@ WI.NavigationBar = class NavigationBar extends WI.View
         document.removeEventListener("mousemove", this._mouseMovedEventListener, false);
         document.removeEventListener("mouseup", this._mouseUpEventListener, false);
 
-        delete this._mouseMovedEventListener;
-        delete this._mouseUpEventListener;
-
         // Restore the tabIndex so the navigation bar can be in the keyboard tab loop.
         this.element.tabIndex = 0;
 
@@ -424,13 +421,17 @@ WI.NavigationBar = class NavigationBar extends WI.View
 
     _calculateMinimumWidth()
     {
+        let visibleNavigationItems = this._visibleNavigationItems;
+        if (!visibleNavigationItems.length)
+            return 0;
+
         const wasCollapsed = this.element.classList.contains(WI.NavigationBar.CollapsedStyleClassName);
 
         // Add the collapsed style class to calculate the width of the items when they are collapsed.
         if (!wasCollapsed)
             this.element.classList.add(WI.NavigationBar.CollapsedStyleClassName);
 
-        let totalItemWidth = this._visibleNavigationItems.reduce((total, item) => item.minimumWidth, 0);
+        let totalItemWidth = visibleNavigationItems.reduce((total, item) => total + item.minimumWidth, 0);
 
         // Remove the collapsed style class if we were not collapsed before.
         if (!wasCollapsed)
@@ -451,7 +452,6 @@ WI.NavigationBar = class NavigationBar extends WI.View
     }
 };
 
-WI.NavigationBar.CachedWidthSymbol = Symbol("cached-width");
 WI.NavigationBar.ForceHiddenSymbol = Symbol("force-hidden");
 
 WI.NavigationBar.CollapsedStyleClassName = "collapsed";

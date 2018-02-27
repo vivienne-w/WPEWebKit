@@ -23,8 +23,7 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef WKBundlePageUIClient_h
-#define WKBundlePageUIClient_h
+#pragma once
 
 #include <WebKit/WKBase.h>
 #include <WebKit/WKEvent.h>
@@ -196,7 +195,6 @@ typedef struct WKBundlePageUIClientV3 {
     WKBundlePageDidClickAutoFillButtonCallback                          didClickAutoFillButton;
 } WKBundlePageUIClientV3;
 
-
 typedef struct WKBundlePageUIClientV4 {
     WKBundlePageUIClientBase                                            base;
 
@@ -237,5 +235,3 @@ typedef struct WKBundlePageUIClientV4 {
     WKBundlePageWillAddDetailedMessageToConsoleCallback                 willAddDetailedMessageToConsole;
 } WKBundlePageUIClientV4;
 
-
-#endif // WKBundlePageUIClient_h

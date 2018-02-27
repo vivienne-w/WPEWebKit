@@ -27,20 +27,32 @@
 
 #if ENABLE(SERVICE_WORKER)
 
+#include "FetchOptions.h"
+#include "ServiceWorkerTypes.h"
+
 namespace WebCore {
 
+class ContentSecurityPolicyResponseHeaders;
 class Exception;
+class ResourceError;
 class ServiceWorkerJob;
+class SharedBuffer;
 struct ServiceWorkerRegistrationData;
 
 class ServiceWorkerJobClient {
 public:
-    virtual ~ServiceWorkerJobClient() { };
+    virtual ~ServiceWorkerJobClient() = default;
+
+    virtual DocumentOrWorkerIdentifier contextIdentifier() = 0;
 
     virtual void jobFailedWithException(ServiceWorkerJob&, const Exception&) = 0;
-    virtual void jobResolvedWithRegistration(ServiceWorkerJob&, const ServiceWorkerRegistrationData&) = 0;
+    virtual void jobResolvedWithRegistration(ServiceWorkerJob&, ServiceWorkerRegistrationData&&, ShouldNotifyWhenResolved) = 0;
+    virtual void jobResolvedWithUnregistrationResult(ServiceWorkerJob&, bool unregistrationResult) = 0;
+    virtual void startScriptFetchForJob(ServiceWorkerJob&, FetchOptions::Cache) = 0;
+    virtual void jobFinishedLoadingScript(ServiceWorkerJob&, const String& script, const ContentSecurityPolicyResponseHeaders&) = 0;
+    virtual void jobFailedLoadingScript(ServiceWorkerJob&, const ResourceError&, std::optional<Exception>&&) = 0;
 
-    virtual uint64_t connectionIdentifier() = 0;
+    virtual SWServerConnectionIdentifier connectionIdentifier() = 0;
 
     virtual void ref() = 0;
     virtual void deref() = 0;

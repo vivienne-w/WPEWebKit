@@ -51,16 +51,6 @@ void WebPage::platformEditorState(Frame&, EditorState&, IncludePostLayoutDataHin
     notImplemented();
 }
 
-void WebPage::platformPreferencesDidChange(const WebPreferencesStore& store)
-{
-    m_page->settings().setAllowRunningOfInsecureContent(store.getBoolValueForKey(WebPreferencesKey::allowRunningOfInsecureContentKey()));
-    m_page->settings().setAllowDisplayOfInsecureContent(store.getBoolValueForKey(WebPreferencesKey::allowDisplayOfInsecureContentKey()));
-    m_page->settings().setScrollToFocusedElementEnabled(store.getBoolValueForKey(WebPreferencesKey::scrollToFocusedElementEnabledKey()));
-#if ENABLE(INDEXED_DATABASE)
-    RuntimeEnabledFeatures::sharedFeatures().setIndexedDBEnabled(store.getBoolValueForKey(WebPreferencesKey::databasesEnabledKey()));
-#endif
-}
-
 bool WebPage::performDefaultBehaviorForKeyEvent(const WebKeyboardEvent& keyboardEvent)
 {
     if (keyboardEvent.type() != WebEvent::KeyDown && keyboardEvent.type() != WebEvent::RawKeyDown)

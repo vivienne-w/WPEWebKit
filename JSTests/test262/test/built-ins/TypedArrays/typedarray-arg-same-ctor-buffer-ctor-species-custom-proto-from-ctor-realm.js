@@ -4,7 +4,7 @@
 esid: sec-typedarray-typedarray
 description: >
   Derive the ArrayBuffer prototype from the realm of the species constructor
-info: >
+info: |
   22.2.4.3 TypedArray ( typedArray )
 
   This description applies only if the TypedArray function is called with at
@@ -46,7 +46,7 @@ info: >
      b. Let proto be realm's intrinsic object named intrinsicDefaultProto.
   ...
 includes: [testTypedArray.js]
-features: [Symbol.species, TypedArray]
+features: [cross-realm, Symbol.species, TypedArray]
 ---*/
 
 var other = $262.createRealm().global;

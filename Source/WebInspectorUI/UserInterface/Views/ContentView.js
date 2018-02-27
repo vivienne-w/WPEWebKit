@@ -60,6 +60,9 @@ WI.ContentView = class ContentView extends WI.View
         if (representedObject instanceof WI.Canvas)
             return new WI.CanvasContentView(representedObject, extraArguments);
 
+        if (representedObject instanceof WI.CanvasCollection)
+            return new WI.CanvasOverviewContentView(representedObject, extraArguments);
+
         if (representedObject instanceof WI.ShaderProgram)
             return new WI.ShaderProgramContentView(representedObject, extraArguments);
 
@@ -161,6 +164,9 @@ WI.ContentView = class ContentView extends WI.View
         if (representedObject instanceof WI.Recording)
             return new WI.RecordingContentView(representedObject, extraArguments);
 
+        if (representedObject instanceof WI.ResourceCollection)
+            return new WI.ResourceCollectionContentView(representedObject, extraArguments);
+
         if (representedObject instanceof WI.Collection)
             return new WI.CollectionContentView(representedObject, extraArguments);
 
@@ -196,14 +202,16 @@ WI.ContentView = class ContentView extends WI.View
             return null;
 
         console.assert(newContentView.representedObject === resolvedRepresentedObject, "createFromRepresentedObject and resolvedRepresentedObjectForRepresentedObject are out of sync for type", representedObject.constructor.name);
-        newContentView.representedObject[WI.ContentView.ContentViewForRepresentedObjectSymbol] = newContentView;
+        if (typeof resolvedRepresentedObject === "object")
+            newContentView.representedObject[WI.ContentView.ContentViewForRepresentedObjectSymbol] = newContentView;
         return newContentView;
     }
 
     static closedContentViewForRepresentedObject(representedObject)
     {
         let resolvedRepresentedObject = WI.ContentView.resolvedRepresentedObjectForRepresentedObject(representedObject);
-        resolvedRepresentedObject[WI.ContentView.ContentViewForRepresentedObjectSymbol] = null;
+        if (typeof resolvedRepresentedObject === "object")
+            resolvedRepresentedObject[WI.ContentView.ContentViewForRepresentedObjectSymbol] = null;
     }
 
     static resolvedRepresentedObjectForRepresentedObject(representedObject)
@@ -433,6 +441,11 @@ WI.ContentView = class ContentView extends WI.View
     }
 
     performSearch(query)
+    {
+        // Implemented by subclasses.
+    }
+
+    searchHidden()
     {
         // Implemented by subclasses.
     }

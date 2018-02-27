@@ -141,7 +141,7 @@ void WebCookieManagerProxy::deleteCookie(PAL::SessionID sessionID, const Cookie&
     processPool()->sendToNetworkingProcessRelaunchingIfNecessary(Messages::WebCookieManager::DeleteCookie(sessionID, cookie, callbackID));
 }
 
-void WebCookieManagerProxy::deleteAllCookiesModifiedSince(PAL::SessionID sessionID, std::chrono::system_clock::time_point time, Function<void (CallbackBase::Error)>&& callbackFunction)
+void WebCookieManagerProxy::deleteAllCookiesModifiedSince(PAL::SessionID sessionID, WallTime time, Function<void (CallbackBase::Error)>&& callbackFunction)
 {
     auto callbackID = m_callbacks.put(WTFMove(callbackFunction));
     processPool()->sendToNetworkingProcessRelaunchingIfNecessary(Messages::WebCookieManager::DeleteAllCookiesModifiedSince(sessionID, time, callbackID));
@@ -287,6 +287,7 @@ void WebCookieManagerProxy::setCookieStoragePartitioningEnabled(bool enabled)
 #endif
 }
 
+<<<<<<< HEAD
 void WebCookieManagerProxy::setCookies2(PAL::SessionID sessionID, const Vector<WebCore::Cookie>& cookies)
 {
     processPool()->sendToNetworkingProcessRelaunchingIfNecessary(Messages::WebCookieManager::SetCookies2(sessionID, cookies));
@@ -296,6 +297,15 @@ void WebCookieManagerProxy::getCookies2(PAL::SessionID sessionID, Function<void 
 {
     auto callbackID = m_callbacks.put(WTFMove(callbackFunction));
     processPool()->sendToNetworkingProcessRelaunchingIfNecessary(Messages::WebCookieManager::GetCookies2(sessionID, callbackID));
+}
+
+void WebCookieManagerProxy::setStorageAccessAPIEnabled(bool enabled)
+{
+#if PLATFORM(COCOA)
+    processPool()->sendToNetworkingProcess(Messages::NetworkProcess::SetStorageAccessAPIEnabled(enabled));
+#else
+    UNUSED_PARAM(enabled);
+#endif
 }
 
 void WebCookieManagerProxy::didGetCookies2(Vector<WebCore::Cookie> cookies, uint64_t callbackID)

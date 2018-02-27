@@ -25,8 +25,6 @@
 
 #pragma once
 
-#if USE(NETWORK_SESSION)
-
 #include "DownloadID.h"
 #include "SandboxExtension.h"
 #include <WebCore/Credential.h>
@@ -54,7 +52,7 @@ class NetworkSession;
 class PendingDownload;
 enum class AuthenticationChallengeDisposition;
 
-using RedirectCompletionHandler = CompletionHandler<void(const WebCore::ResourceRequest&)>;
+using RedirectCompletionHandler = CompletionHandler<void(WebCore::ResourceRequest&&)>;
 using ChallengeCompletionHandler = CompletionHandler<void(AuthenticationChallengeDisposition, const WebCore::Credential&)>;
 using ResponseCompletionHandler = CompletionHandler<void(WebCore::PolicyAction)>;
 
@@ -119,14 +117,13 @@ public:
         m_pendingDownload = &pendingDownload;
     }
 
-    virtual void setPendingDownloadLocation(const String& filename, const SandboxExtension::Handle&, bool /*allowOverwrite*/) { m_pendingDownloadLocation = filename; }
+    virtual void setPendingDownloadLocation(const String& filename, SandboxExtension::Handle&&, bool /*allowOverwrite*/) { m_pendingDownloadLocation = filename; }
     const String& pendingDownloadLocation() const { return m_pendingDownloadLocation; }
     bool isDownload() const { return !!m_pendingDownloadID.downloadID(); }
 
     const WebCore::ResourceRequest& firstRequest() const { return m_firstRequest; }
     virtual String suggestedFilename() const { return String(); }
     void setSuggestedFilename(const String& suggestedName) { m_suggestedFilename = suggestedName; }
-    virtual bool allowsSpecificHTTPSCertificateForHost(const WebCore::AuthenticationChallenge&) { return false; }
     const String& partition() { return m_partition; }
 
 protected:
@@ -161,5 +158,3 @@ protected:
 };
 
 } // namespace WebKit
-
-#endif // USE(NETWORK_SESSION)

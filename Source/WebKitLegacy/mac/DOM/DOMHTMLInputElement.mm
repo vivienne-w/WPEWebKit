@@ -34,20 +34,23 @@
 #import "DOMPrivate.h"
 #import "ExceptionHandlers.h"
 
-// FIXME <radar:34583628>: Simplyfy this once the UIKit work is available in the build.
-#if USE(APPLE_INTERNAL_SDK) && TARGET_OS_IPHONE
-#if __has_include(<UIKit/UIKeyboardLoginCredentialsSuggestion.h>)
-#import <UIKit/UIKeyboardLoginCredentialsSuggestion.h>
-#else
-#import <UIKit/UITextInput_Private.h>
-@interface UIKeyboardLoginCredentialsSuggestion : UITextSuggestion
+#if TARGET_OS_IPHONE
+#if __has_include(<UIKit/UITextAutofillSuggestion.h>)
 
+#import <UIKit/UITextAutofillSuggestion.h>
+
+#else
+
+@interface UITextSuggestion : NSObject
+@end
+
+@interface UITextAutofillSuggestion : UITextSuggestion
 @property (nonatomic, assign) NSString *username;
 @property (nonatomic, assign) NSString *password;
-
 @end
-#endif // __has_include(<UIKit/UIKeyboardLoginCredentialsSuggestion.h>)
-#endif // USE(APPLE_INTERNAL_SDK) && TARGET_OS_IPHONE
+
+#endif // __has_include(<UIKit/UITextAutofillSuggestion.h>)
+#endif // TARGET_OS_IPHONE
 
 #import <WebCore/AutofillElements.h>
 #import <WebCore/FileList.h>
@@ -683,28 +686,29 @@
     IMPL->setValueForUser(inValue);
 }
 
-- (BOOL)acceptsAutofilledLoginCredentials
+- (NSDictionary *)_autofillContext
 {
     WebCore::JSMainThreadNullState state;
-    return !!WebCore::AutofillElements::computeAutofillElements(*IMPL);
+    if (!WebCore::AutofillElements::computeAutofillElements(*IMPL))
+        return nil;
+
+    NSURL *documentURL = [NSURL URLWithString:self.ownerDocument.URL];
+    if (!documentURL)
+        return nil;
+
+    return @{ @"_WebViewURL" : documentURL };
 }
 
-- (NSURL *)representingPageURL
-{
-    WebCore::JSMainThreadNullState state;
-    return [NSURL URLWithString:self.ownerDocument.URL];
-}
-
-#if USE(APPLE_INTERNAL_SDK) && TARGET_OS_IPHONE
-- (void)insertTextSuggestion:(UIKeyboardLoginCredentialsSuggestion *)credentialsSuggestion
+#if TARGET_OS_IPHONE
+- (void)insertTextSuggestion:(UITextAutofillSuggestion *)credentialSuggestion
 {
     WebCore::JSMainThreadNullState state;
     if (is<WebCore::HTMLInputElement>(IMPL)) {
         if (auto autofillElements = WebCore::AutofillElements::computeAutofillElements(*IMPL))
-            autofillElements->autofill(credentialsSuggestion.username, credentialsSuggestion.password);
+            autofillElements->autofill(credentialSuggestion.username, credentialSuggestion.password);
     }
 }
-#endif // USE(APPLE_INTERNAL_SDK) && TARGET_OS_IPHONE
+#endif // TARGET_OS_IPHONE
 
 @end
 

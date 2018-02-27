@@ -3085,19 +3085,14 @@
                 "obsolete-url": "https://www.w3.org/TR/SVG11/painting.html#StrokeWidthProperty"
             }
         },
-        "speak": {
+        "speak-as": {
             "inherited": true,
-            "values": [
-                "none",
-                "normal",
-                "spell-out",
-                "digits",
-                "literal-punctuation",
-                "no-punctuation"
-            ],
+            "codegen-properties": {
+                "converter": "SpeakAs"
+            },
             "specification": {
                 "category": "css-speech",
-                "url": "https://www.w3.org/TR/css3-speech/#speak"
+                "url": "https://www.w3.org/TR/css3-speech/#speak-as"
             }
         },
         "table-layout": {
@@ -4311,11 +4306,11 @@
                 "aliases": [
                     "-webkit-column-gap"
                 ],
-                "custom": "All"
+                "converter": "GapLength"
             },
             "specification":  {
                 "category": "css-multicol",
-                "url": ""
+                "url": "https://drafts.csswg.org/css-multicol/#column-gap"
             }
         },
         "-webkit-column-progression": {
@@ -5087,6 +5082,12 @@
         },
         "-webkit-line-clamp": {
             "status": "non-standard"
+        },
+        "-webkit-lines-clamp": {
+            "status": "non-standard",
+            "codegen-properties": {
+                "custom": "Value"
+            }
         },
         "-webkit-line-grid": {
             "inherited": true,

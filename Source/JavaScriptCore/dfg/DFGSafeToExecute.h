@@ -73,6 +73,7 @@ public:
         case StringObjectUse:
         case StringOrStringObjectUse:
         case NotStringVarUse:
+        case NotSymbolUse:
         case NotCellUse:
         case OtherUse:
         case MiscUse:
@@ -171,6 +172,7 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     case CreateThis:
     case GetCallee:
     case GetArgumentCountIncludingThis:
+    case SetArgumentCountIncludingThis:
     case GetRestLength:
     case GetLocal:
     case SetLocal:
@@ -185,7 +187,6 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     case Phi:
     case Flush:
     case PhantomLocal:
-    case GetLocalUnlinked:
     case SetArgument:
     case BitAnd:
     case BitOr:
@@ -240,7 +241,6 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     case CheckStructureOrEmpty:
     case GetExecutable:
     case GetButterfly:
-    case GetButterflyWithoutCaging:
     case CallDOMGetter:
     case CallDOM:
     case CheckSubClass:
@@ -259,13 +259,18 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     case CheckCell:
     case CheckBadCell:
     case CheckNotEmpty:
+    case AssertNotEmpty:
     case CheckStringIdent:
     case RegExpExec:
+    case RegExpExecNonGlobalOrSticky:
     case RegExpTest:
+    case RegExpMatchFast:
     case CompareLess:
     case CompareLessEq:
     case CompareGreater:
     case CompareGreaterEq:
+    case CompareBelow:
+    case CompareBelowEq:
     case CompareEq:
     case CompareStrictEq:
     case CompareEqPtr:
@@ -312,6 +317,7 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     case ToPrimitive:
     case ToString:
     case ToNumber:
+    case ToObject:
     case NumberToStringWithRadix:
     case NumberToStringWithValidRadixConstant:
     case SetFunctionName:
@@ -345,7 +351,10 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     case Throw:
     case ThrowStaticError:
     case CountExecution:
+    case SuperSamplerBegin:
+    case SuperSamplerEnd:
     case ForceOSRExit:
+    case CPUIntrinsic:
     case CheckTraps:
     case LogShadowChickenPrologue:
     case LogShadowChickenTail:
@@ -386,6 +395,7 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     case PhantomNewAsyncGeneratorFunction:
     case PhantomNewAsyncFunction:
     case PhantomCreateActivation:
+    case PhantomNewRegexp:
     case PutHint:
     case CheckStructureImmediate:
     case MaterializeNewObject:
@@ -394,11 +404,13 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     case PhantomCreateRest:
     case PhantomSpread:
     case PhantomNewArrayWithSpread:
+    case PhantomNewArrayBuffer:
     case PhantomClonedArguments:
     case GetMyArgumentByVal:
     case GetMyArgumentByValOutOfBounds:
     case ForwardVarargs:
     case CreateRest:
+    case GetPrototypeOf:
     case StringReplace:
     case StringReplaceRegExp:
     case GetRegExpObjectLastIndex:
@@ -409,13 +421,18 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     case ResolveScopeForHoistingFuncDeclInEval:
     case ResolveScope:
     case MapHash:
+    case NormalizeMapKey:
+    case StringSlice:
     case ToLowerCase:
     case GetMapBucket:
     case GetMapBucketHead:
     case GetMapBucketNext:
     case LoadKeyFromMapBucket:
     case LoadValueFromMapBucket:
+    case ExtractValueFromWeakMapGet:
     case WeakMapGet:
+    case WeakSetAdd:
+    case WeakMapSet:
     case AtomicsAdd:
     case AtomicsAnd:
     case AtomicsCompareExchange:
@@ -456,12 +473,14 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     case GetIndexedPropertyStorage:
     case GetArrayLength:
     case GetVectorLength:
-    case ArrayPush:
     case ArrayPop:
     case StringCharAt:
     case StringCharCodeAt:
         return node->arrayMode().alreadyChecked(graph, node, state.forNode(node->child1()));
-        
+
+    case ArrayPush:
+        return node->arrayMode().alreadyChecked(graph, node, state.forNode(graph.varArgChild(node, 1)));
+
     case GetTypedArrayByteOffset:
         return !(state.forNode(node->child1()).m_type & ~(SpecTypedArrayView));
             
@@ -525,6 +544,10 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
         }
         return true;
     }
+
+    case SetAdd:
+    case MapSet:
+        return false;
 
     case LastNodeType:
         RELEASE_ASSERT_NOT_REACHED();

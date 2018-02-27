@@ -73,7 +73,6 @@
 #import "WebUIDelegatePrivate.h"
 #import "WebViewInternal.h"
 #import <JavaScriptCore/JSContextInternal.h>
-#import <WebCore/AuthenticationCF.h>
 #import <WebCore/AuthenticationMac.h>
 #import <WebCore/BackForwardController.h>
 #import <WebCore/BitmapImage.h>
@@ -122,7 +121,6 @@
 #import <WebCore/Widget.h>
 #import <WebKitLegacy/DOMElement.h>
 #import <WebKitLegacy/DOMHTMLFormElement.h>
-#import <WebKitSystemInterface.h>
 #import <pal/spi/cocoa/NSURLDownloadSPI.h>
 #import <pal/spi/cocoa/NSURLFileTypeMappingsSPI.h>
 #import <runtime/InitializeThreading.h>
@@ -201,6 +199,22 @@ static inline WebDataSource *dataSource(DocumentLoader* loader)
 WebFrameLoaderClient::WebFrameLoaderClient(WebFrame *webFrame)
     : m_webFrame(webFrame)
 {
+}
+
+std::optional<uint64_t> WebFrameLoaderClient::pageID() const
+{
+    return std::nullopt;
+}
+
+std::optional<uint64_t> WebFrameLoaderClient::frameID() const
+{
+    return std::nullopt;
+}
+
+PAL::SessionID WebFrameLoaderClient::sessionID() const
+{
+    RELEASE_ASSERT_NOT_REACHED();
+    return PAL::SessionID::defaultSessionID();
 }
 
 void WebFrameLoaderClient::frameLoaderDestroyed()
@@ -303,13 +317,7 @@ void WebFrameLoaderClient::convertMainResourceLoadToDownload(DocumentLoader* doc
 
     ResourceHandle* handle = mainResourceLoader->handle();
 
-#if USE(CFURLCONNECTION)
-    ASSERT([WebDownload respondsToSelector:@selector(_downloadWithLoadingCFURLConnection:request:response:delegate:proxy:)]);
-    auto connection = handle->releaseConnectionForDownload();
-    [WebDownload _downloadWithLoadingCFURLConnection:connection.get() request:request.cfURLRequest(UpdateHTTPBody) response:response.cfURLResponse() delegate:[webView downloadDelegate] proxy:nil];
-#else
     [WebDownload _downloadWithLoadingConnection:handle->connection() request:request.nsURLRequest(UpdateHTTPBody) response:response.nsURLResponse() delegate:[webView downloadDelegate] proxy:nil];
-#endif
 }
 
 bool WebFrameLoaderClient::dispatchDidLoadResourceFromMemoryCache(DocumentLoader* loader, const ResourceRequest& request, const ResourceResponse& response, int length)

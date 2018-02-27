@@ -48,17 +48,19 @@ void ReadableStreamToSharedBufferSink::pipeFrom(ReadableStream& stream)
 
 void ReadableStreamToSharedBufferSink::enqueue(const BufferSource& buffer)
 {
-    if (!m_data) {
-        m_data = SharedBuffer::create(buffer.data(), buffer.length());
+    if (!buffer.length())
         return;
+
+    if (m_callback) {
+        ReadableStreamChunk chunk { buffer.data(), buffer.length() };
+        m_callback(&chunk);
     }
-    m_data->append(reinterpret_cast<const char*>(buffer.data()), buffer.length());
 }
 
 void ReadableStreamToSharedBufferSink::close()
 {
-    if (auto callback = WTFMove(m_callback))
-        callback(WTFMove(m_data));
+    if (m_callback)
+        m_callback(nullptr);
 }
 
 void ReadableStreamToSharedBufferSink::error(String&& message)

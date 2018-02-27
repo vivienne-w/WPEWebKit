@@ -45,6 +45,7 @@
 #include "WebPage.h"
 #include "WebPageProxyMessages.h"
 #include "WebProcess.h"
+#include "WebsitePoliciesData.h"
 #include <JavaScriptCore/APICast.h>
 #include <JavaScriptCore/JSContextRef.h>
 #include <JavaScriptCore/JSLock.h>
@@ -171,14 +172,14 @@ WebFrame::~WebFrame()
 }
 
 WebPage* WebFrame::page() const
-{ 
+{
     if (!m_coreFrame)
-        return 0;
+        return nullptr;
     
     if (Page* page = m_coreFrame->page())
         return WebPage::fromCorePage(page);
 
-    return 0;
+    return nullptr;
 }
 
 WebFrame* WebFrame::fromCoreFrame(Frame& frame)
@@ -209,7 +210,7 @@ void WebFrame::invalidate()
     m_coreFrame = 0;
 }
 
-uint64_t WebFrame::setUpPolicyListener(WebCore::FramePolicyFunction&& policyFunction)
+uint64_t WebFrame::setUpPolicyListener(WebCore::FramePolicyFunction&& policyFunction, ForNavigationAction forNavigationAction)
 {
     // FIXME: <rdar://5634381> We need to support multiple active policy listeners.
 
@@ -217,12 +218,14 @@ uint64_t WebFrame::setUpPolicyListener(WebCore::FramePolicyFunction&& policyFunc
 
     m_policyListenerID = generateListenerID();
     m_policyFunction = WTFMove(policyFunction);
+    m_policyFunctionForNavigationAction = forNavigationAction;
     return m_policyListenerID;
 }
 
 uint64_t WebFrame::setUpWillSubmitFormListener(WTF::Function<void(void)>&& completionHandler)
 {
     uint64_t identifier = generateListenerID();
+    invalidatePolicyListener();
     m_willSubmitFormCompletionHandlers.set(identifier, WTFMove(completionHandler));
     return identifier;
 }
@@ -231,6 +234,7 @@ void WebFrame::continueWillSubmitForm(uint64_t listenerID)
 {
     if (auto completionHandler = m_willSubmitFormCompletionHandlers.take(listenerID))
         completionHandler();
+    invalidatePolicyListener();
 }
 
 void WebFrame::invalidatePolicyListener()
@@ -242,9 +246,13 @@ void WebFrame::invalidatePolicyListener()
     m_policyListenerID = 0;
     if (auto function = std::exchange(m_policyFunction, nullptr))
         function(PolicyAction::Ignore);
+    m_policyFunctionForNavigationAction = ForNavigationAction::No;
+    for (auto& function : m_willSubmitFormCompletionHandlers.values())
+        function();
+    m_willSubmitFormCompletionHandlers.clear();
 }
 
-void WebFrame::didReceivePolicyDecision(uint64_t listenerID, PolicyAction action, uint64_t navigationID, DownloadID downloadID)
+void WebFrame::didReceivePolicyDecision(uint64_t listenerID, PolicyAction action, uint64_t navigationID, DownloadID downloadID, std::optional<WebsitePoliciesData>&& websitePolicies)
 {
     if (!m_coreFrame)
         return;
@@ -259,8 +267,12 @@ void WebFrame::didReceivePolicyDecision(uint64_t listenerID, PolicyAction action
         return;
 
     FramePolicyFunction function = WTFMove(m_policyFunction);
+    bool forNavigationAction = m_policyFunctionForNavigationAction == ForNavigationAction::Yes;
 
     invalidatePolicyListener();
+
+    if (forNavigationAction && m_frameLoaderClient && websitePolicies)
+        m_frameLoaderClient->applyToDocumentLoader(WTFMove(*websitePolicies));
 
     m_policyDownloadID = downloadID;
     if (navigationID) {
@@ -280,7 +292,7 @@ void WebFrame::startDownload(const WebCore::ResourceRequest& request, const Stri
 
     auto& webProcess = WebProcess::singleton();
     PAL::SessionID sessionID = page() ? page()->sessionID() : PAL::SessionID::defaultSessionID();
-    webProcess.networkConnection().connection().send(Messages::NetworkConnectionToWebProcess::StartDownload(sessionID, policyDownloadID, request, suggestedName), 0);
+    webProcess.ensureNetworkProcessConnection().connection().send(Messages::NetworkConnectionToWebProcess::StartDownload(sessionID, policyDownloadID, request, suggestedName), 0);
 }
 
 void WebFrame::convertMainResourceLoadToDownload(DocumentLoader* documentLoader, PAL::SessionID sessionID, const ResourceRequest& request, const ResourceResponse& response)
@@ -302,7 +314,7 @@ void WebFrame::convertMainResourceLoadToDownload(DocumentLoader* documentLoader,
     else
         mainResourceLoadIdentifier = 0;
 
-    webProcess.networkConnection().connection().send(Messages::NetworkConnectionToWebProcess::ConvertMainResourceLoadToDownload(sessionID, mainResourceLoadIdentifier, policyDownloadID, request, response), 0);
+    webProcess.ensureNetworkProcessConnection().connection().send(Messages::NetworkConnectionToWebProcess::ConvertMainResourceLoadToDownload(sessionID, mainResourceLoadIdentifier, policyDownloadID, request, response), 0);
 }
 
 String WebFrame::source() const
@@ -507,21 +519,13 @@ JSGlobalContextRef WebFrame::jsContextForWorld(InjectedBundleScriptWorld* world)
 
 bool WebFrame::handlesPageScaleGesture() const
 {
-    if (!m_coreFrame->document()->isPluginDocument())
-        return 0;
-
-    PluginDocument* pluginDocument = static_cast<PluginDocument*>(m_coreFrame->document());
-    PluginView* pluginView = static_cast<PluginView*>(pluginDocument->pluginWidget());
+    auto* pluginView = WebPage::pluginViewForFrame(m_coreFrame);
     return pluginView && pluginView->handlesPageScaleFactor();
 }
 
 bool WebFrame::requiresUnifiedScaleFactor() const
 {
-    if (!m_coreFrame->document()->isPluginDocument())
-        return 0;
-
-    PluginDocument* pluginDocument = static_cast<PluginDocument*>(m_coreFrame->document());
-    PluginView* pluginView = static_cast<PluginView*>(pluginDocument->pluginWidget());
+    auto* pluginView = WebPage::pluginViewForFrame(m_coreFrame);
     return pluginView && pluginView->requiresUnifiedScaleFactor();
 }
 

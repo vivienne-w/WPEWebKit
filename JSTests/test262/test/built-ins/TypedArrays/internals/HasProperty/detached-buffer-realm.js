@@ -5,7 +5,7 @@ esid: sec-integer-indexed-exotic-objects-hasproperty-p
 description: >
   Throws a TypeError if this has a detached buffer (honoring the Realm of the
   current execution context)
-info: >
+info: |
   9.4.5.2 [[HasProperty]](P)
 
   ...
@@ -16,7 +16,7 @@ info: >
       ii. If IsDetachedBuffer(buffer) is true, throw a TypeError exception.
   ...
 includes: [testTypedArray.js, detachArrayBuffer.js]
-features: [Reflect, TypedArray]
+features: [cross-realm, Reflect, TypedArray]
 ---*/
 
 var other = $262.createRealm().global;

@@ -31,6 +31,7 @@
 #import "APIPageConfiguration.h"
 #import "AccessibilityIOS.h"
 #import "ApplicationStateTracker.h"
+#import "FullscreenClient.h"
 #import "InputViewUpdateDeferrer.h"
 #import "Logging.h"
 #import "PageClientImplIOS.h"
@@ -50,7 +51,6 @@
 #import "WebKit2Initialize.h"
 #import "WebPageGroup.h"
 #import "WebProcessPool.h"
-#import "WebSystemInterface.h"
 #import "_WKFrameHandleInternal.h"
 #import "_WKWebViewPrintFormatterInternal.h"
 #import <CoreGraphics/CoreGraphics.h>
@@ -201,6 +201,10 @@ private:
     _page->setUseFixedLayout(true);
     _page->setDelegatesScrolling(true);
 
+#if ENABLE(FULLSCREEN_API) && WK_API_ENABLED
+    _page->setFullscreenClient(std::make_unique<WebKit::FullscreenClient>(_webView));
+#endif
+
     WebProcessPool::statistics().wkViewCount++;
 
     _rootContentView = adoptNS([[UIView alloc] init]);
@@ -256,16 +260,6 @@ private:
 - (WebPageProxy*)page
 {
     return _page.get();
-}
-
-- (BOOL)acceptsAutofilledLoginCredentials
-{
-    return _page->acceptsAutofilledLoginCredentials();
-}
-
-- (NSURL *)representingPageURL
-{
-    return _page->representingPageURL();
 }
 
 - (void)willMoveToWindow:(UIWindow *)newWindow

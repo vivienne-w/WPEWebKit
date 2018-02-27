@@ -29,6 +29,7 @@
 #include "ExceptionHelpers.h"
 #include "Identifier.h"
 #include "InternalFunction.h"
+#include "JSBigInt.h"
 #include "JSCJSValue.h"
 #include "JSCellInlines.h"
 #include "JSFunction.h"
@@ -341,7 +342,7 @@ inline JSValue::JSValue(int i)
     u.asBits.payload = i;
 }
 
-#if !ENABLE(JIT)
+#if USE(JSVALUE32_64)
 inline JSValue::JSValue(int32_t tag, int32_t payload)
 {
     u.asBits.tag = tag;
@@ -576,6 +577,11 @@ inline int64_t JSValue::asAnyInt() const
 inline bool JSValue::isString() const
 {
     return isCell() && asCell()->isString();
+}
+
+inline bool JSValue::isBigInt() const
+{
+    return isCell() && asCell()->isBigInt();
 }
 
 inline bool JSValue::isSymbol() const
@@ -1020,6 +1026,8 @@ ALWAYS_INLINE bool JSValue::strictEqualSlowCaseInline(ExecState* exec, JSValue v
 
     if (v1.asCell()->isString() && v2.asCell()->isString())
         return asString(v1)->equal(exec, asString(v2));
+    if (v1.isBigInt() && v2.isBigInt())
+        return JSBigInt::equals(asBigInt(v1.asCell()), asBigInt(v2.asCell()));
     return v1 == v2;
 }
 

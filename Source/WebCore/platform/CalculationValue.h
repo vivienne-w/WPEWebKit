@@ -64,7 +64,7 @@ class CalcExpressionNode {
     WTF_MAKE_FAST_ALLOCATED;
 public:
     explicit CalcExpressionNode(CalcExpressionNodeType = CalcExpressionNodeUndefined);
-    virtual ~CalcExpressionNode() { }
+    virtual ~CalcExpressionNode() = default;
 
     CalcExpressionNodeType type() const { return m_type; }
 
@@ -211,23 +211,12 @@ inline CalcExpressionOperation::CalcExpressionOperation(Vector<std::unique_ptr<C
 {
 }
 
-inline bool operator==(const CalcExpressionOperation& a, const CalcExpressionOperation& b)
-{
-    return a.getOperator() == b.getOperator() && a.children() == b.children();
-}
+bool operator==(const CalcExpressionOperation&, const CalcExpressionOperation&);
 
 inline const CalcExpressionOperation& toCalcExpressionOperation(const CalcExpressionNode& value)
 {
     ASSERT_WITH_SECURITY_IMPLICATION(value.type() == CalcExpressionNodeOperation);
     return static_cast<const CalcExpressionOperation&>(value);
-}
-
-inline CalcExpressionBlendLength::CalcExpressionBlendLength(Length from, Length to, float progress)
-    : CalcExpressionNode(CalcExpressionNodeBlendLength)
-    , m_from(from)
-    , m_to(to)
-    , m_progress(progress)
-{
 }
 
 inline bool operator==(const CalcExpressionBlendLength& a, const CalcExpressionBlendLength& b)

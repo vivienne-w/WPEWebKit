@@ -849,7 +849,6 @@ var
 //
 // Environment Variables
 //
-constant
 env
 
 //
@@ -857,7 +856,6 @@ env
 //
 avoid-column
 avoid-page
-avoid-region
 page
 recto
 region
@@ -1098,8 +1096,6 @@ x
 y
 #endif
 
-// -webkit-region-fragment
-// auto
 break
 
 wrap
@@ -1159,8 +1155,10 @@ cross-fade
 image-set
 linear-gradient
 radial-gradient
+conic-gradient
 repeating-linear-gradient
 repeating-radial-gradient
+repeating-conic-gradient
 -webkit-canvas
 -webkit-cross-fade
 -webkit-gradient
@@ -1209,6 +1207,7 @@ url
 cubic-bezier
 spring
 steps
+frames
 
 // colors
 rgb
@@ -1348,3 +1347,10 @@ auto-fit
 swap
 fallback
 optional
+
+#if defined(ENABLE_APPLICATION_MANIFEST) && ENABLE_APPLICATION_MANIFEST
+fullscreen
+standalone
+minimal-ui
+browser
+#endif

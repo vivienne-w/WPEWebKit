@@ -39,13 +39,9 @@ static std::optional<Exception> setMethod(ResourceRequest& request, const String
 {
     if (!isValidHTTPToken(initMethod))
         return Exception { TypeError, ASCIILiteral("Method is not a valid HTTP token.") };
-
-    String method = initMethod.convertToASCIIUppercase();
-    if (method == "CONNECT" || method == "TRACE" || method == "TRACK")
+    if (isForbiddenMethod(initMethod))
         return Exception { TypeError, ASCIILiteral("Method is forbidden.") };
-
-    request.setHTTPMethod((method == "DELETE" || method == "GET" || method == "HEAD" || method == "OPTIONS" || method == "POST" || method == "PUT") ? method : initMethod);
-
+    request.setHTTPMethod(normalizeHTTPMethod(initMethod));
     return std::nullopt;
 }
 
@@ -73,6 +69,13 @@ static std::optional<Exception> buildOptions(FetchOptions& options, ResourceRequ
     if (!init.window.isUndefinedOrNull() && !init.window.isEmpty())
         return Exception { TypeError, ASCIILiteral("Window can only be null.") };
 
+    if (init.hasMembers()) {
+        if (options.mode == FetchOptions::Mode::Navigate)
+            options.mode = FetchOptions::Mode::SameOrigin;
+        referrer = ASCIILiteral("client");
+        options.referrerPolicy = { };
+    }
+
     if (!init.referrer.isNull()) {
         auto result = computeReferrer(context, init.referrer);
         if (result.hasException())
@@ -83,10 +86,11 @@ static std::optional<Exception> buildOptions(FetchOptions& options, ResourceRequ
     if (init.referrerPolicy)
         options.referrerPolicy = init.referrerPolicy.value();
 
-    if (init.mode)
+    if (init.mode) {
         options.mode = init.mode.value();
-    if (options.mode == FetchOptions::Mode::Navigate)
-        return Exception { TypeError, ASCIILiteral("Request constructor does not accept navigate fetch mode.") };
+        if (options.mode == FetchOptions::Mode::Navigate)
+            return Exception { TypeError, ASCIILiteral("Request constructor does not accept navigate fetch mode.") };
+    }
 
     if (init.credentials)
         options.credentials = init.credentials.value();
@@ -267,7 +271,7 @@ String FetchRequest::referrer() const
 const String& FetchRequest::urlString() const
 {
     if (m_requestURL.isNull())
-        m_requestURL = m_request.url().serialize();
+        m_requestURL = m_request.url();
     return m_requestURL;
 }
 

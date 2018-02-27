@@ -36,15 +36,19 @@ class StaticPasteboard final : public Pasteboard {
 public:
     StaticPasteboard();
 
-    void commitToPasteboard(Pasteboard&);
+    PasteboardCustomData takeCustomData();
 
     bool isStatic() const final { return true; }
 
     bool hasData() final;
-    Vector<String> types() final { return m_types; }
+    Vector<String> typesSafeForBindings(const String&) final { return m_types; }
+    Vector<String> typesForLegacyUnsafeBindings() final { return m_types; }
+    String readOrigin() final { return { }; }
     String readString(const String& type) final;
+    String readStringInCustomData(const String& type) final;
 
     void writeString(const String& type, const String& data) final;
+    void writeStringInCustomData(const String& type, const String& data);
     void clear() final;
     void clear(const String& type) final;
 
@@ -55,7 +59,9 @@ public:
     void write(const PasteboardImage&) final { }
     void write(const PasteboardWebContent&) final { }
 
-    Vector<String> readFilenames() final { return { }; }
+    void writeCustomData(const PasteboardCustomData&) final { }
+
+    bool containsFiles() final { return false; }
     bool canSmartReplace() final { return false; }
 
     void writeMarkup(const String&) final { }
@@ -67,7 +73,8 @@ public:
 
 private:
     Vector<String> m_types;
-    HashMap<String, String> m_stringContents;
+    HashMap<String, String> m_platformData;
+    HashMap<String, String> m_customData;
 };
 
 }

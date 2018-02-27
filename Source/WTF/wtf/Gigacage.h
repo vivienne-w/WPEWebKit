@@ -31,12 +31,19 @@
 #define GIGACAGE_ENABLED 0
 #define PRIMITIVE_GIGACAGE_MASK 0
 #define JSVALUE_GIGACAGE_MASK 0
+#define GIGACAGE_BASE_PTRS_SIZE 8192
 
 extern "C" {
-extern WTF_EXPORTDATA void* g_gigacageBasePtr;
+extern WTF_EXPORTDATA char g_gigacageBasePtrs[GIGACAGE_BASE_PTRS_SIZE];
 }
 
 namespace Gigacage {
+
+struct BasePtrs {
+    void* primitive;
+    void* jsValue;
+    void* string;
+};
 
 enum Kind {
     Primitive,
@@ -71,9 +78,33 @@ ALWAYS_INLINE const char* name(Kind kind)
     return nullptr;
 }
 
-ALWAYS_INLINE void*& basePtr(Kind)
+ALWAYS_INLINE void*& basePtr(BasePtrs& basePtrs, Kind kind)
 {
-    return g_gigacageBasePtr;
+    switch (kind) {
+    case Primitive:
+        return basePtrs.primitive;
+    case JSValue:
+        return basePtrs.jsValue;
+    case String:
+        return basePtrs.string;
+    }
+    RELEASE_ASSERT_NOT_REACHED();
+    return basePtrs.primitive;
+}
+
+ALWAYS_INLINE BasePtrs& basePtrs()
+{
+    return *reinterpret_cast<BasePtrs*>(g_gigacageBasePtrs);
+}
+
+ALWAYS_INLINE void*& basePtr(Kind kind)
+{
+    return basePtr(basePtrs(), kind);
+}
+
+ALWAYS_INLINE bool isEnabled(Kind kind)
+{
+    return !!basePtr(kind);
 }
 
 ALWAYS_INLINE size_t mask(Kind) { return 0; }
@@ -88,7 +119,7 @@ inline void alignedFree(Kind, void* p) { fastAlignedFree(p); }
 WTF_EXPORT_PRIVATE void* tryMalloc(Kind, size_t size);
 inline void free(Kind, void* p) { fastFree(p); }
 
-WTF_EXPORT_PRIVATE void* tryAllocateVirtualPages(Kind, size_t size);
+WTF_EXPORT_PRIVATE void* tryAllocateZeroedVirtualPages(Kind, size_t size);
 WTF_EXPORT_PRIVATE void freeVirtualPages(Kind, void* basePtr, size_t size);
 
 } // namespace Gigacage
@@ -102,7 +133,7 @@ WTF_EXPORT_PRIVATE void alignedFree(Kind, void*);
 WTF_EXPORT_PRIVATE void* tryMalloc(Kind, size_t);
 WTF_EXPORT_PRIVATE void free(Kind, void*);
 
-WTF_EXPORT_PRIVATE void* tryAllocateVirtualPages(Kind, size_t size);
+WTF_EXPORT_PRIVATE void* tryAllocateZeroedVirtualPages(Kind, size_t size);
 WTF_EXPORT_PRIVATE void freeVirtualPages(Kind, void* basePtr, size_t size);
 
 } // namespace Gigacage

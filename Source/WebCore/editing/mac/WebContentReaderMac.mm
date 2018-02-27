@@ -38,70 +38,14 @@
 #import "FrameLoader.h"
 #import "FrameLoaderClient.h"
 #import "HTMLAnchorElement.h"
-#import "HTMLAttachmentElement.h"
 #import "HTMLNames.h"
 #import "LegacyWebArchive.h"
-#import "MIMETypeRegistry.h"
-#import "RuntimeEnabledFeatures.h"
 #import "Settings.h"
 #import "Text.h"
 #import "WebCoreNSURLExtras.h"
 #import "markup.h"
 
 namespace WebCore {
-
-bool WebContentReader::readFilenames(const Vector<String>& paths)
-{
-    if (paths.isEmpty())
-        return false;
-
-    if (!frame.document())
-        return false;
-    Document& document = *frame.document();
-
-    fragment = document.createDocumentFragment();
-
-    for (auto& text : paths) {
-#if ENABLE(ATTACHMENT_ELEMENT)
-        if (RuntimeEnabledFeatures::sharedFeatures().attachmentElementEnabled()) {
-            auto attachment = HTMLAttachmentElement::create(HTMLNames::attachmentTag, document);
-            attachment->setFile(File::create([[NSURL fileURLWithPath:text] path]).ptr());
-            fragment->appendChild(attachment);
-            continue;
-        }
-#else
-        auto paragraph = createDefaultParagraphElement(document);
-        paragraph->appendChild(document.createTextNode(userVisibleString([NSURL fileURLWithPath:text])));
-        fragment->appendChild(paragraph);
-#endif
-    }
-
-    return true;
-}
-
-bool WebContentReader::readHTML(const String& string)
-{
-    String stringOmittingMicrosoftPrefix = string;
-
-    // This code was added to make HTML paste from Microsoft Word on Mac work, back in 2004.
-    // It's a simple-minded way to ignore the CF_HTML clipboard format, just skipping over the
-    // description part and parsing the entire context plus fragment.
-    if (string.startsWith("Version:")) {
-        size_t location = string.findIgnoringCase("<html");
-        if (location != notFound)
-            stringOmittingMicrosoftPrefix = string.substring(location);
-    }
-
-    if (stringOmittingMicrosoftPrefix.isEmpty())
-        return false;
-
-    if (!frame.document())
-        return false;
-    Document& document = *frame.document();
-
-    fragment = createFragmentFromMarkup(document, stringOmittingMicrosoftPrefix, emptyString(), DisallowScriptingAndPluginContent);
-    return fragment;
-}
 
 bool WebContentReader::readURL(const URL& url, const String& title)
 {

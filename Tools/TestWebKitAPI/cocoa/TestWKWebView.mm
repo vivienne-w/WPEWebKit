@@ -45,6 +45,7 @@
 #endif
 
 #if PLATFORM(IOS)
+#import <UIKit/UIKit.h>
 #import <wtf/SoftLinking.h>
 SOFT_LINK_FRAMEWORK(UIKit)
 SOFT_LINK_CLASS(UIKit, UIWindow)
@@ -237,21 +238,24 @@ NSEventMask __simulated_forceClickAssociatedEventsMask(id self, SEL _cmd)
     [self _test_waitForDidFinishNavigation];
 }
 
-- (NSString *)stringByEvaluatingJavaScript:(NSString *)script
+- (id)objectByEvaluatingJavaScript:(NSString *)script
 {
-    __block bool isWaitingForJavaScript = false;
-    __block NSString *evalResult = nil;
-    [self _evaluateJavaScriptWithoutUserGesture:script completionHandler:^(id result, NSError *error)
-    {
-        evalResult = [[NSString alloc] initWithFormat:@"%@", result];
+    bool isWaitingForJavaScript = false;
+    RetainPtr<id> evalResult;
+    [self _evaluateJavaScriptWithoutUserGesture:script completionHandler:[&] (id result, NSError *error) {
+        evalResult = result;
         isWaitingForJavaScript = true;
         EXPECT_TRUE(!error);
         if (error)
             NSLog(@"Encountered error: %@ while evaluating script: %@", error, script);
     }];
-
     TestWebKitAPI::Util::run(&isWaitingForJavaScript);
-    return [evalResult autorelease];
+    return evalResult.autorelease();
+}
+
+- (NSString *)stringByEvaluatingJavaScript:(NSString *)script
+{
+    return [NSString stringWithFormat:@"%@", [self objectByEvaluatingJavaScript:script]];
 }
 
 - (void)waitForMessage:(NSString *)message
@@ -291,6 +295,11 @@ NSEventMask __simulated_forceClickAssociatedEventsMask(id self, SEL _cmd)
 #if PLATFORM(IOS)
 
 @implementation TestWKWebView (IOSOnly)
+
+- (UIView <UITextInput> *)textInputContentView
+{
+    return (UIView <UITextInput> *)[self valueForKey:@"_currentContentView"];
+}
 
 - (RetainPtr<NSArray>)selectionRectsAfterPresentationUpdate
 {

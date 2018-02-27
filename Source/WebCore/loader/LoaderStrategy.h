@@ -28,6 +28,7 @@
 #include "ResourceLoadPriority.h"
 #include "ResourceLoaderOptions.h"
 #include "StoredCredentialsPolicy.h"
+#include <pal/SessionID.h>
 #include <wtf/Forward.h>
 #include <wtf/SHA1.h>
 
@@ -53,7 +54,7 @@ struct FetchOptions;
 
 class WEBCORE_EXPORT LoaderStrategy {
 public:
-    virtual RefPtr<SubresourceLoader> loadResource(Frame&, CachedResource&, const ResourceRequest&, const ResourceLoaderOptions&) = 0;
+    virtual void loadResource(Frame&, CachedResource&, ResourceRequest&&, const ResourceLoaderOptions&, CompletionHandler<void(RefPtr<SubresourceLoader>&&)>&&) = 0;
     virtual void loadResourceSynchronously(NetworkingContext*, unsigned long identifier, const ResourceRequest&, StoredCredentialsPolicy, ClientCredentialPolicy, ResourceError&, ResourceResponse&, Vector<char>& data) = 0;
 
     virtual void remove(ResourceLoader*) = 0;
@@ -64,8 +65,11 @@ public:
     virtual void suspendPendingRequests() = 0;
     virtual void resumePendingRequests() = 0;
 
-    using PingLoadCompletionHandler = WTF::Function<void(const ResourceError&)>;
+    using PingLoadCompletionHandler = WTF::Function<void(const ResourceError&, const ResourceResponse&)>;
     virtual void startPingLoad(Frame&, ResourceRequest&, const HTTPHeaderMap& originalRequestHeaders, const FetchOptions&, PingLoadCompletionHandler&& = { }) = 0;
+
+    using PreconnectCompletionHandler = WTF::Function<void(const ResourceError&)>;
+    virtual void preconnectTo(NetworkingContext&, const URL&, StoredCredentialsPolicy, PreconnectCompletionHandler&&) = 0;
 
     virtual void storeDerivedDataToCache(const SHA1::Digest& bodyKey, const String& type, const String& partition, WebCore::SharedBuffer&) = 0;
 

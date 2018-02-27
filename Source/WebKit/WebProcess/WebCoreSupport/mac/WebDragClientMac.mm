@@ -48,10 +48,8 @@
 #import <WebCore/Page.h>
 #import <WebCore/Pasteboard.h>
 #import <WebCore/RenderImage.h>
-#import <WebCore/ResourceHandle.h>
 #import <WebCore/StringTruncator.h>
 #import <WebCore/WebCoreNSURLExtras.h>
-#import <WebKitSystemInterface.h>
 #import <wtf/StdLibExtras.h>
 
 #if PLATFORM(IOS)
@@ -77,7 +75,10 @@ static RefPtr<ShareableBitmap> convertImageToBitmap(NSImage *image, const IntSiz
 
     RetainPtr<NSGraphicsContext> savedContext = [NSGraphicsContext currentContext];
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
     [NSGraphicsContext setCurrentContext:[NSGraphicsContext graphicsContextWithGraphicsPort:graphicsContext->platformContext() flipped:YES]];
+#pragma clang diagnostic pop
     [image drawInRect:NSMakeRect(0, 0, bitmap->size().width(), bitmap->size().height()) fromRect:NSZeroRect operation:NSCompositingOperationSourceOver fraction:1 respectFlipped:YES hints:nil];
 
     [NSGraphicsContext setCurrentContext:savedContext.get()];
@@ -112,19 +113,6 @@ static WebCore::CachedImage* cachedImage(Element& element)
         return nullptr;
     return image;
 }
-
-#if ENABLE(ATTACHMENT_ELEMENT)
-void WebDragClient::declareAndWriteAttachment(const String& pasteboardName, Element& element, const URL& url, const String& path, WebCore::Frame* frame)
-{
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-    ASSERT(pasteboardName == String(NSDragPboard));
-#pragma clang diagnostic pop
-    
-    NSURL* nsURL = (NSURL *)url;
-    m_page->send(Messages::WebPageProxy::SetPromisedDataForAttachment(pasteboardName, String(nsURL.lastPathComponent), String(nsURL.pathExtension), path, String(nsURL.absoluteString), userVisibleString(nsURL)));
-}
-#endif
 
 void WebDragClient::declareAndWriteDragImage(const String& pasteboardName, Element& element, const URL& url, const String& label, Frame*)
 {
@@ -229,15 +217,6 @@ void WebDragClient::didConcludeEditDrag()
 {
     m_page->didConcludeEditDataInteraction();
 }
-
-#if ENABLE(ATTACHMENT_ELEMENT)
-
-void WebDragClient::declareAndWriteAttachment(const String&, Element&, const URL&, const String&, Frame*)
-{
-    notImplemented();
-}
-
-#endif
 
 #endif // PLATFORM(IOS)
 

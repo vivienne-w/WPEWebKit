@@ -47,6 +47,7 @@
 #include <WebCore/EventNames.h>
 #include <WebCore/GtkUtilities.h>
 #include <WebCore/RefPtrCairo.h>
+#include <wtf/Compiler.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/WTFString.h>
 
@@ -211,9 +212,9 @@ RefPtr<WebPopupMenuProxy> PageClientImpl::createPopupMenuProxy(WebPageProxy& pag
     return WebPopupMenuProxyGtk::create(m_viewWidget, page);
 }
 
-RefPtr<WebContextMenuProxy> PageClientImpl::createContextMenuProxy(WebPageProxy& page, const ContextMenuContextData& context, const UserData& userData)
+Ref<WebContextMenuProxy> PageClientImpl::createContextMenuProxy(WebPageProxy& page, ContextMenuContextData&& context, const UserData& userData)
 {
-    return WebContextMenuProxyGtk::create(m_viewWidget, page, context, userData);
+    return WebContextMenuProxyGtk::create(m_viewWidget, page, WTFMove(context), userData);
 }
 
 RefPtr<WebColorPicker> PageClientImpl::createColorPicker(WebPageProxy* page, const WebCore::Color& color, const WebCore::IntRect& rect)
@@ -342,18 +343,21 @@ void PageClientImpl::beganExitFullScreen(const IntRect& /* initialFrame */, cons
 #if ENABLE(TOUCH_EVENTS)
 void PageClientImpl::doneWithTouchEvent(const NativeWebTouchEvent& event, bool wasEventHandled)
 {
-    if (wasEventHandled)
-        return;
+    const GdkEvent* touchEvent = event.nativeEvent();
 
 #if HAVE(GTK_GESTURES)
     GestureController& gestureController = webkitWebViewBaseGestureController(WEBKIT_WEB_VIEW_BASE(m_viewWidget));
-    if (gestureController.handleEvent(event.nativeEvent()))
+    if (wasEventHandled) {
+        gestureController.reset();
         return;
+    }
+    wasEventHandled = gestureController.handleEvent(const_cast<GdkEvent*>(event.nativeEvent()));
 #endif
 
-    // Emulate pointer events if unhandled.
-    const GdkEvent* touchEvent = event.nativeEvent();
+    if (wasEventHandled)
+        return;
 
+    // Emulate pointer events if unhandled.
     if (!touchEvent->touch.emulating_pointer)
         return;
 
@@ -369,6 +373,8 @@ void PageClientImpl::doneWithTouchEvent(const NativeWebTouchEvent& event, bool w
         pointerEvent->motion.state = touchEvent->touch.state | GDK_BUTTON1_MASK;
     } else {
         switch (touchEvent->type) {
+        case GDK_TOUCH_CANCEL:
+            FALLTHROUGH;
         case GDK_TOUCH_END:
             pointerEvent.reset(gdk_event_new(GDK_BUTTON_RELEASE));
             pointerEvent->button.state = touchEvent->touch.state | GDK_BUTTON1_MASK;
@@ -474,6 +480,16 @@ JSGlobalContextRef PageClientImpl::javascriptGlobalContext()
         return nullptr;
 
     return webkit_web_view_get_javascript_global_context(WEBKIT_WEB_VIEW(m_viewWidget));
+}
+
+void PageClientImpl::zoom(double zoomLevel)
+{
+    if (WEBKIT_IS_WEB_VIEW(m_viewWidget)) {
+        webkit_web_view_set_zoom_level(WEBKIT_WEB_VIEW(m_viewWidget), zoomLevel);
+        return;
+    }
+
+    webkitWebViewBaseGetPage(WEBKIT_WEB_VIEW_BASE(m_viewWidget))->setPageZoomFactor(zoomLevel);
 }
 
 } // namespace WebKit

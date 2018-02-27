@@ -1,4 +1,4 @@
-# Copyright (C) 2011-2017 Apple Inc. All rights reserved.
+# Copyright (C) 2011-2018 Apple Inc. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -125,8 +125,8 @@ macro doVMEntry(makeCall)
     storep vm, VMEntryRecord::m_vm[sp]
     loadp VM::topCallFrame[vm], t4
     storep t4, VMEntryRecord::m_prevTopCallFrame[sp]
-    loadp VM::topVMEntryFrame[vm], t4
-    storep t4, VMEntryRecord::m_prevTopVMEntryFrame[sp]
+    loadp VM::topEntryFrame[vm], t4
+    storep t4, VMEntryRecord::m_prevTopEntryFrame[sp]
 
     # Align stack pointer
     if X86_WIN or MIPS
@@ -189,8 +189,8 @@ macro doVMEntry(makeCall)
     loadp VMEntryRecord::m_vm[sp], t5
     loadp VMEntryRecord::m_prevTopCallFrame[sp], t4
     storep t4, VM::topCallFrame[t5]
-    loadp VMEntryRecord::m_prevTopVMEntryFrame[sp], t4
-    storep t4, VM::topVMEntryFrame[t5]
+    loadp VMEntryRecord::m_prevTopEntryFrame[sp], t4
+    storep t4, VM::topEntryFrame[t5]
 
     if ARMv7
         subp cfr, CalleeRegisterSaveSize, t5
@@ -241,7 +241,7 @@ macro doVMEntry(makeCall)
 
 .copyArgsDone:
     storep sp, VM::topCallFrame[vm]
-    storep cfr, VM::topVMEntryFrame[vm]
+    storep cfr, VM::topEntryFrame[vm]
 
     makeCall(entry, t3, t4)
 
@@ -255,8 +255,8 @@ macro doVMEntry(makeCall)
     loadp VMEntryRecord::m_vm[sp], t5
     loadp VMEntryRecord::m_prevTopCallFrame[sp], t4
     storep t4, VM::topCallFrame[t5]
-    loadp VMEntryRecord::m_prevTopVMEntryFrame[sp], t4
-    storep t4, VM::topVMEntryFrame[t5]
+    loadp VMEntryRecord::m_prevTopEntryFrame[sp], t4
+    storep t4, VM::topEntryFrame[t5]
 
     if ARMv7
         subp cfr, CalleeRegisterSaveSize, t5
@@ -307,7 +307,7 @@ end
 _handleUncaughtException:
     loadp Callee + PayloadOffset[cfr], t3
     andp MarkedBlockMask, t3
-    loadp MarkedBlock::m_vm[t3], t3
+    loadp MarkedBlockFooterOffset + MarkedBlock::Footer::m_vm[t3], t3
     restoreCalleeSavesFromVMEntryFrameCalleeSavesBuffer(t3, t0)
     loadp VM::callFrameForCatch[t3], cfr
     storep 0, VM::callFrameForCatch[t3]
@@ -324,8 +324,8 @@ _handleUncaughtException:
     loadp VMEntryRecord::m_vm[sp], t3
     loadp VMEntryRecord::m_prevTopCallFrame[sp], t5
     storep t5, VM::topCallFrame[t3]
-    loadp VMEntryRecord::m_prevTopVMEntryFrame[sp], t5
-    storep t5, VM::topVMEntryFrame[t3]
+    loadp VMEntryRecord::m_prevTopEntryFrame[sp], t5
+    storep t5, VM::topEntryFrame[t3]
 
     if ARMv7
         subp cfr, CalleeRegisterSaveSize, t3
@@ -579,20 +579,7 @@ macro functionArityCheck(doneLabel, slowPath)
     jmp _llint_throw_from_slow_path_trampoline
 
 .noError:
-    # r1 points to ArityCheckData.
-    loadp CommonSlowPaths::ArityCheckData::thunkToCall[r1], t3
-    btpz t3, .proceedInline
-    
-    loadp CommonSlowPaths::ArityCheckData::paddedStackSpace[r1], a0
-    call t3
-    if ASSERT_ENABLED
-        loadp ReturnPC[cfr], t0
-        loadp [t0], t0
-    end
-    jmp .continue
-
-.proceedInline:
-    loadi CommonSlowPaths::ArityCheckData::paddedStackSpace[r1], t1
+    move r1, t1 # r1 contains slotsToAdd.
     btiz t1, .continue
     loadi PayloadOffset + ArgumentCount[cfr], t2
     addi CallFrameHeaderSlots, t2
@@ -647,7 +634,7 @@ end
 macro branchIfException(label)
     loadp Callee + PayloadOffset[cfr], t3
     andp MarkedBlockMask, t3
-    loadp MarkedBlock::m_vm[t3], t3
+    loadp MarkedBlockFooterOffset + MarkedBlock::Footer::m_vm[t3], t3
     btiz VM::m_exception[t3], .noException
     jmp label
 .noException:
@@ -955,6 +942,23 @@ _llint_op_to_string:
 .opToStringSlow:
     callOpcodeSlowPath(_slow_path_to_string)
     dispatch(constexpr op_to_string_length)
+
+
+_llint_op_to_object:
+    traceExecution()
+    loadi 8[PC], t0
+    loadi 4[PC], t1
+    loadConstantOrVariable(t0, t2, t3)
+    bineq t2, CellTag, .opToObjectSlow
+    bbb JSCell::m_type[t3], ObjectType, .opToObjectSlow
+    storei t2, TagOffset[cfr, t1, 8]
+    storei t3, PayloadOffset[cfr, t1, 8]
+    valueProfile(t2, t3, 16, t1)
+    dispatch(constexpr op_to_object_length)
+
+.opToObjectSlow:
+    callOpcodeSlowPath(_slow_path_to_object)
+    dispatch(constexpr op_to_object_length)
 
 
 _llint_op_negate:
@@ -1577,9 +1581,10 @@ _llint_op_get_by_val:
     andi IndexingShapeMask, t2
     bieq t2, Int32Shape, .opGetByValIsContiguous
     bineq t2, ContiguousShape, .opGetByValNotContiguous
+
 .opGetByValIsContiguous:
-    
     biaeq t1, -sizeof IndexingHeader + IndexingHeader::u.lengths.publicLength[t3], .opGetByValOutOfBounds
+    andi JSObject::m_butterflyIndexingMask[t0], t1
     loadi TagOffset[t3, t1, 8], t2
     loadi PayloadOffset[t3, t1, 8], t1
     jmp .opGetByValDone
@@ -1587,6 +1592,7 @@ _llint_op_get_by_val:
 .opGetByValNotContiguous:
     bineq t2, DoubleShape, .opGetByValNotDouble
     biaeq t1, -sizeof IndexingHeader + IndexingHeader::u.lengths.publicLength[t3], .opGetByValOutOfBounds
+    andi JSObject::m_butterflyIndexingMask[t0], t1
     loadd [t3, t1, 8], ft0
     bdnequn ft0, ft0, .opGetByValSlow
     # FIXME: This could be massively optimized.
@@ -1598,6 +1604,7 @@ _llint_op_get_by_val:
     subi ArrayStorageShape, t2
     bia t2, SlowPutArrayStorageShape - ArrayStorageShape, .opGetByValSlow
     biaeq t1, -sizeof IndexingHeader + IndexingHeader::u.lengths.vectorLength[t3], .opGetByValOutOfBounds
+    andi JSObject::m_butterflyIndexingMask[t0], t1
     loadi ArrayStorage::m_vector + TagOffset[t3, t1, 8], t2
     loadi ArrayStorage::m_vector + PayloadOffset[t3, t1, 8], t1
 
@@ -1796,6 +1803,32 @@ _llint_op_jneq_ptr:
     dispatch(constexpr op_jneq_ptr_length)
 
 
+macro compareUnsignedJump(integerCompare)
+    loadi 4[PC], t2
+    loadi 8[PC], t3
+    loadConstantOrVariable(t2, t0, t1)
+    loadConstantOrVariable2Reg(t3, t2, t3)
+    integerCompare(t1, t3, .jumpTarget)
+    dispatch(4)
+
+.jumpTarget:
+    dispatchBranch(12[PC])
+end
+
+
+macro compareUnsigned(integerCompareAndSet)
+    loadi 12[PC], t2
+    loadi 8[PC], t0
+    loadConstantOrVariable(t2, t3, t1)
+    loadConstantOrVariable2Reg(t0, t2, t0)
+    integerCompareAndSet(t0, t1, t0)
+    loadi 4[PC], t2
+    storei BooleanTag, TagOffset[cfr, t2, 8]
+    storei t0, PayloadOffset[cfr, t2, 8]
+    dispatch(4)
+end
+
+
 macro compare(integerCompare, doubleCompare, slowPath)
     loadi 4[PC], t2
     loadi 8[PC], t3
@@ -1967,7 +2000,7 @@ _llint_op_catch:
     # and have set VM::targetInterpreterPCForThrow.
     loadp Callee + PayloadOffset[cfr], t3
     andp MarkedBlockMask, t3
-    loadp MarkedBlock::m_vm[t3], t3
+    loadp MarkedBlockFooterOffset + MarkedBlock::Footer::m_vm[t3], t3
     restoreCalleeSavesFromVMEntryFrameCalleeSavesBuffer(t3, t0)
     loadp VM::callFrameForCatch[t3], cfr
     storep 0, VM::callFrameForCatch[t3]
@@ -1982,7 +2015,7 @@ _llint_op_catch:
 .isCatchableException:
     loadp Callee + PayloadOffset[cfr], t3
     andp MarkedBlockMask, t3
-    loadp MarkedBlock::m_vm[t3], t3
+    loadp MarkedBlockFooterOffset + MarkedBlock::Footer::m_vm[t3], t3
 
     loadi VM::m_exception[t3], t0
     storei 0, VM::m_exception[t3]
@@ -2020,7 +2053,7 @@ _llint_throw_from_slow_path_trampoline:
     # This essentially emulates the JIT's throwing protocol.
     loadp Callee[cfr], t1
     andp MarkedBlockMask, t1
-    loadp MarkedBlock::m_vm[t1], t1
+    loadp MarkedBlockFooterOffset + MarkedBlock::Footer::m_vm[t1], t1
     copyCalleeSavesToVMEntryFrameCalleeSavesBuffer(t1, t2)
     jmp VM::targetMachinePCForThrow[t1]
 
@@ -2039,7 +2072,7 @@ macro nativeCallTrampoline(executableOffsetToFunction)
     if X86 or X86_WIN
         subp 8, sp # align stack pointer
         andp MarkedBlockMask, t1
-        loadp MarkedBlock::m_vm[t1], t3
+        loadp MarkedBlockFooterOffset + MarkedBlock::Footer::m_vm[t1], t3
         storep cfr, VM::topCallFrame[t3]
         move cfr, a0  # a0 = ecx
         storep a0, [sp]
@@ -2049,7 +2082,7 @@ macro nativeCallTrampoline(executableOffsetToFunction)
         call executableOffsetToFunction[t1]
         loadp Callee + PayloadOffset[cfr], t3
         andp MarkedBlockMask, t3
-        loadp MarkedBlock::m_vm[t3], t3
+        loadp MarkedBlockFooterOffset + MarkedBlock::Footer::m_vm[t3], t3
         addp 8, sp
     elsif ARM or ARMv7 or ARMv7_TRADITIONAL or C_LOOP or MIPS
         if MIPS
@@ -2062,7 +2095,7 @@ macro nativeCallTrampoline(executableOffsetToFunction)
         end
         # t1 already contains the Callee.
         andp MarkedBlockMask, t1
-        loadp MarkedBlock::m_vm[t1], t1
+        loadp MarkedBlockFooterOffset + MarkedBlock::Footer::m_vm[t1], t1
         storep cfr, VM::topCallFrame[t1]
         move cfr, a0
         loadi Callee + PayloadOffset[cfr], t1
@@ -2075,7 +2108,7 @@ macro nativeCallTrampoline(executableOffsetToFunction)
         end
         loadp Callee + PayloadOffset[cfr], t3
         andp MarkedBlockMask, t3
-        loadp MarkedBlock::m_vm[t3], t3
+        loadp MarkedBlockFooterOffset + MarkedBlock::Footer::m_vm[t3], t3
         if MIPS
             addp 24, sp
         else
@@ -2091,6 +2124,64 @@ macro nativeCallTrampoline(executableOffsetToFunction)
     ret
 
 .handleException:
+if X86 or X86_WIN
+    subp 8, sp # align stack pointer
+end
+    storep cfr, VM::topCallFrame[t3]
+    jmp _llint_throw_from_slow_path_trampoline
+end
+
+
+macro internalFunctionCallTrampoline(offsetOfFunction)
+    functionPrologue()
+    storep 0, CodeBlock[cfr]
+    loadi Callee + PayloadOffset[cfr], t1
+    // Callee is still in t1 for code below
+    if X86 or X86_WIN
+        subp 8, sp # align stack pointer
+        andp MarkedBlockMask, t1
+        loadp MarkedBlockFooterOffset + MarkedBlock::Footer::m_vm[t1], t3
+        storep cfr, VM::topCallFrame[t3]
+        move cfr, a0  # a0 = ecx
+        storep a0, [sp]
+        loadi Callee + PayloadOffset[cfr], t1
+        checkStackPointerAlignment(t3, 0xdead0001)
+        call offsetOfFunction[t1]
+        loadp Callee + PayloadOffset[cfr], t3
+        andp MarkedBlockMask, t3
+        loadp MarkedBlockFooterOffset + MarkedBlock::Footer::m_vm[t3], t3
+        addp 8, sp
+    elsif ARM or ARMv7 or ARMv7_TRADITIONAL or C_LOOP or MIPS
+        subp 8, sp # align stack pointer
+        # t1 already contains the Callee.
+        andp MarkedBlockMask, t1
+        loadp MarkedBlockFooterOffset + MarkedBlock::Footer::m_vm[t1], t1
+        storep cfr, VM::topCallFrame[t1]
+        move cfr, a0
+        loadi Callee + PayloadOffset[cfr], t1
+        checkStackPointerAlignment(t3, 0xdead0001)
+        if C_LOOP
+            cloopCallNative offsetOfFunction[t1]
+        else
+            call offsetOfFunction[t1]
+        end
+        loadp Callee + PayloadOffset[cfr], t3
+        andp MarkedBlockMask, t3
+        loadp MarkedBlockFooterOffset + MarkedBlock::Footer::m_vm[t3], t3
+        addp 8, sp
+    else
+        error
+    end
+
+    btinz VM::m_exception[t3], .handleException
+
+    functionEpilogue()
+    ret
+
+.handleException:
+if X86 or X86_WIN
+    subp 8, sp # align stack pointer
+end
     storep cfr, VM::topCallFrame[t3]
     jmp _llint_throw_from_slow_path_trampoline
 end
@@ -2444,7 +2535,8 @@ _llint_op_get_parent_scope:
 _llint_op_profile_type:
     traceExecution()
     loadp CodeBlock[cfr], t1
-    loadp CodeBlock::m_vm[t1], t1
+    loadp CodeBlock::m_poisonedVM[t1], t1
+    unpoison(_g_CodeBlockPoison, t1, t2)
     # t1 is holding the pointer to the typeProfilerLog.
     loadp VM::m_typeProfilerLog[t1], t1
 

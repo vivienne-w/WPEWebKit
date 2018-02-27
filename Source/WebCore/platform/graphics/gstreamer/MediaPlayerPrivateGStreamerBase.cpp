@@ -29,7 +29,6 @@
 
 #include "GStreamerUtilities.h"
 #include "GraphicsContext.h"
-#include "GraphicsTypes.h"
 #include "ImageGStreamer.h"
 #include "ImageOrientation.h"
 #include "IntRect.h"
@@ -43,7 +42,7 @@
 #include <wtf/glib/GUniquePtr.h>
 #include <wtf/text/CString.h>
 #include <wtf/MathExtras.h>
-#include <wtf/UUID.h>
+#include <wtf/StringPrintStream.h>
 
 #include <gst/audio/streamvolume.h>
 #include <gst/video/gstvideometa.h>
@@ -140,9 +139,9 @@
 GST_DEBUG_CATEGORY(webkit_media_player_debug);
 #define GST_CAT_DEFAULT webkit_media_player_debug
 
-using namespace std;
 
 namespace WebCore {
+using namespace std;
 
 #if ENABLE(NATIVE_AUDIO)
 static const GstStreamVolumeFormat volumeFormat = GST_STREAM_VOLUME_FORMAT_LINEAR;
@@ -347,6 +346,19 @@ MediaPlayerPrivateGStreamerBase::~MediaPlayerPrivateGStreamerBase()
 void MediaPlayerPrivateGStreamerBase::setPipeline(GstElement* pipeline)
 {
     m_pipeline = pipeline;
+
+    GRefPtr<GstBus> bus = adoptGRef(gst_pipeline_get_bus(GST_PIPELINE(m_pipeline.get())));
+    gst_bus_set_sync_handler(bus.get(), [](GstBus*, GstMessage* message, gpointer userData) {
+        auto& player = *static_cast<MediaPlayerPrivateGStreamerBase*>(userData);
+
+        if (player.handleSyncMessage(message)) {
+            gst_message_unref(message);
+            return GST_BUS_DROP;
+        }
+
+        return GST_BUS_PASS;
+    }, this, nullptr);
+
 #if USE(HOLE_PUNCH_GSTREAMER)
     updateVideoRectangle();
 #endif
@@ -713,12 +725,17 @@ void MediaPlayerPrivateGStreamerBase::sizeChanged()
     notImplemented();
 }
 
-void MediaPlayerPrivateGStreamerBase::setMuted(bool muted)
+void MediaPlayerPrivateGStreamerBase::setMuted(bool mute)
 {
     if (!m_volumeElement)
         return;
 
-    g_object_set(m_volumeElement.get(), "mute", muted, nullptr);
+    bool currentValue = muted();
+    if (currentValue == mute)
+        return;
+
+    GST_INFO("Set muted to %s", toString(mute).utf8().data());
+    g_object_set(m_volumeElement.get(), "mute", mute, nullptr);
 }
 
 bool MediaPlayerPrivateGStreamerBase::muted() const
@@ -728,6 +745,7 @@ bool MediaPlayerPrivateGStreamerBase::muted() const
 
     gboolean muted;
     g_object_get(m_volumeElement.get(), "mute", &muted, nullptr);
+    GST_INFO("Player is muted: %s", toString(static_cast<bool>(muted)).utf8().data());
     return muted;
 }
 
@@ -832,11 +850,8 @@ void MediaPlayerPrivateGStreamerBase::pushTextureToCompositor()
         return;
 
     IntSize size = IntSize(GST_VIDEO_INFO_WIDTH(&videoInfo), GST_VIDEO_INFO_HEIGHT(&videoInfo));
-    std::unique_ptr<TextureMapperPlatformLayerBuffer> buffer = m_platformLayerProxy->getAvailableBuffer(size, GraphicsContext3D::DONT_CARE);
+    std::unique_ptr<TextureMapperPlatformLayerBuffer> buffer = m_platformLayerProxy->getAvailableBuffer(size, GL_DONT_CARE);
     if (UNLIKELY(!buffer)) {
-        if (UNLIKELY(!m_context3D))
-            m_context3D = GraphicsContext3D::create(GraphicsContext3DAttributes(), nullptr, GraphicsContext3D::RenderToCurrentGLContext);
-
         TextureMapperContextAttributes contextAttributes;
         contextAttributes.initialize();
 
@@ -878,6 +893,8 @@ void MediaPlayerPrivateGStreamerBase::triggerRepaint(GstSample* sample)
 
     if (!m_renderingCanBeAccelerated) {
         LockHolder locker(m_drawMutex);
+        if (m_drawCancelled)
+            return;
         m_drawTimer.startOneShot(0_s);
         m_drawCondition.wait(m_drawMutex);
         return;
@@ -889,6 +906,8 @@ void MediaPlayerPrivateGStreamerBase::triggerRepaint(GstSample* sample)
 #else
     {
         LockHolder lock(m_drawMutex);
+        if (m_drawCancelled)
+            return;
         if (!m_platformLayerProxy->scheduleUpdateOnCompositorThread([this] { this->pushTextureToCompositor(); }))
             return;
         m_drawCondition.wait(m_drawMutex);
@@ -911,11 +930,14 @@ void MediaPlayerPrivateGStreamerBase::repaintCancelledCallback(MediaPlayerPrivat
 
 void MediaPlayerPrivateGStreamerBase::cancelRepaint()
 {
+    LockHolder locker(m_drawMutex);
+
     if (!m_renderingCanBeAccelerated) {
         m_drawTimer.stop();
-        LockHolder locker(m_drawMutex);
-        m_drawCondition.notifyOne();
     }
+
+    m_drawCancelled = true;
+    m_drawCondition.notifyOne();
 }
 
 #if USE(GSTREAMER_GL)
@@ -1293,7 +1315,7 @@ void MediaPlayerPrivateGStreamerBase::setStreamVolumeElement(GstStreamVolume* vo
     } else
         GST_DEBUG("Not setting stream volume, trusting system one");
 
-    GST_DEBUG("Setting stream muted %d",  m_player->muted());
+    GST_DEBUG("Setting stream muted %s",  toString(m_player->muted()).utf8().data());
     g_object_set(m_volumeElement.get(), "mute", m_player->muted(), nullptr);
 
     g_signal_connect_swapped(m_volumeElement.get(), "notify::volume", G_CALLBACK(volumeChangedCallback), this);
@@ -1341,7 +1363,7 @@ unsigned MediaPlayerPrivateGStreamerBase::videoDecodedByteCount() const
 }
 
 #if ENABLE(ENCRYPTED_MEDIA)
-void MediaPlayerPrivateGStreamerBase::cdmInstanceAttached(const CDMInstance& instance)
+void MediaPlayerPrivateGStreamerBase::cdmInstanceAttached(CDMInstance& instance)
 {
     ASSERT(!m_cdmInstance);
     m_cdmInstance = &instance;
@@ -1349,7 +1371,7 @@ void MediaPlayerPrivateGStreamerBase::cdmInstanceAttached(const CDMInstance& ins
     m_protectionCondition.notifyAll();
 }
 
-void MediaPlayerPrivateGStreamerBase::cdmInstanceDetached(const CDMInstance& instance)
+void MediaPlayerPrivateGStreamerBase::cdmInstanceDetached(CDMInstance& instance)
 {
 #ifdef NDEBUG
     UNUSED_PARAM(instance);
@@ -1360,7 +1382,7 @@ void MediaPlayerPrivateGStreamerBase::cdmInstanceDetached(const CDMInstance& ins
     m_protectionCondition.notifyAll();
 }
 
-void MediaPlayerPrivateGStreamerBase::attemptToDecryptWithInstance(const CDMInstance& instance)
+void MediaPlayerPrivateGStreamerBase::attemptToDecryptWithInstance(CDMInstance& instance)
 {
     ASSERT(m_cdmInstance.get() == &instance);
     GST_TRACE("instance %p, current stored %p", &instance, m_cdmInstance.get());

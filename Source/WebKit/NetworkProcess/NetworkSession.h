@@ -25,26 +25,24 @@
 
 #pragma once
 
-#if USE(NETWORK_SESSION)
-
 #include <pal/SessionID.h>
 #include <wtf/HashSet.h>
 #include <wtf/Ref.h>
 #include <wtf/RefCounted.h>
 
 namespace WebCore {
+class AuthenticationChallenge;
 class NetworkStorageSession;
 }
 
 namespace WebKit {
 
-class LegacyCustomProtocolManager;
 class NetworkDataTask;
+struct NetworkSessionCreationParameters;
 
 class NetworkSession : public RefCounted<NetworkSession> {
 public:
-    static Ref<NetworkSession> create(PAL::SessionID, LegacyCustomProtocolManager* = nullptr);
-    static NetworkSession& defaultSession();
+    static Ref<NetworkSession> create(NetworkSessionCreationParameters&&);
     virtual ~NetworkSession();
 
     virtual void invalidateAndCancel();
@@ -56,6 +54,8 @@ public:
     void registerNetworkDataTask(NetworkDataTask& task) { m_dataTaskSet.add(&task); }
     void unregisterNetworkDataTask(NetworkDataTask& task) { m_dataTaskSet.remove(&task); }
 
+    static bool allowsSpecificHTTPSCertificateForHost(const WebCore::AuthenticationChallenge&);
+
 protected:
     NetworkSession(PAL::SessionID);
 
@@ -65,5 +65,3 @@ protected:
 };
 
 } // namespace WebKit
-
-#endif // USE(NETWORK_SESSION)

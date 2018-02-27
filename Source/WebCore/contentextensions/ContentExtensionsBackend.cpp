@@ -28,6 +28,8 @@
 
 #if ENABLE(CONTENT_EXTENSIONS)
 
+#include "Chrome.h"
+#include "ChromeClient.h"
 #include "CompiledContentExtension.h"
 #include "ContentExtension.h"
 #include "ContentExtensionsDebugging.h"
@@ -38,6 +40,7 @@
 #include "Frame.h"
 #include "FrameLoaderClient.h"
 #include "MainFrame.h"
+#include "Page.h"
 #include "ResourceLoadInfo.h"
 #include "URL.h"
 #include "UserContentController.h"
@@ -73,12 +76,14 @@ std::pair<Vector<Action>, Vector<String>> ContentExtensionsBackend::actionsForRe
 #if CONTENT_EXTENSIONS_PERFORMANCE_REPORTING
     double addedTimeStart = monotonicallyIncreasingTime();
 #endif
-    if (resourceLoadInfo.resourceURL.protocolIsData())
+    if (m_contentExtensions.isEmpty()
+        || !resourceLoadInfo.resourceURL.isValid()
+        || resourceLoadInfo.resourceURL.protocolIsData())
         return { };
 
     const String& urlString = resourceLoadInfo.resourceURL.string();
-    ASSERT_WITH_MESSAGE(urlString.containsOnlyASCII(), "A decoded URL should only contain ASCII characters. The matching algorithm assumes the input is ASCII.");
-    const CString& urlCString = urlString.utf8();
+    ASSERT_WITH_MESSAGE(urlString.isAllASCII(), "A decoded URL should only contain ASCII characters. The matching algorithm assumes the input is ASCII.");
+    const auto urlCString = urlString.utf8();
 
     Vector<Action> finalActions;
     Vector<String> stylesheetIdentifiers;
@@ -170,6 +175,7 @@ BlockedStatus ContentExtensionsBackend::processContentExtensionRulesForLoad(cons
     bool willBlockLoad = false;
     bool willBlockCookies = false;
     bool willMakeHTTPS = false;
+    HashSet<std::pair<String, String>> notifications;
     for (const auto& action : actions.first) {
         switch (action.type()) {
         case ContentExtensions::ActionType::BlockLoad:
@@ -183,6 +189,9 @@ BlockedStatus ContentExtensionsBackend::processContentExtensionRulesForLoad(cons
                 initiatingDocumentLoader.addPendingContentExtensionDisplayNoneSelector(action.extensionIdentifier(), action.stringArgument(), action.actionID());
             else if (currentDocument)
                 currentDocument->extensionStyleSheets().addDisplayNoneSelector(action.extensionIdentifier(), action.stringArgument(), action.actionID());
+            break;
+        case ContentExtensions::ActionType::Notify:
+            notifications.add(std::make_pair(action.extensionIdentifier(), action.stringArgument()));
             break;
         case ContentExtensions::ActionType::MakeHTTPS: {
             if ((url.protocolIs("http") || url.protocolIs("ws"))
@@ -213,7 +222,7 @@ BlockedStatus ContentExtensionsBackend::processContentExtensionRulesForLoad(cons
         if (willBlockLoad)
             currentDocument->addConsoleMessage(MessageSource::ContentBlocker, MessageLevel::Info, makeString("Content blocker prevented frame displaying ", mainDocumentURL.string(), " from loading a resource from ", url.string()));
     }
-    return { willBlockLoad, willBlockCookies, willMakeHTTPS };
+    return { willBlockLoad, willBlockCookies, willMakeHTTPS, WTFMove(notifications) };
 }
 
 BlockedStatus ContentExtensionsBackend::processContentExtensionRulesForPingLoad(const URL& url, const URL& mainDocumentURL)
@@ -240,13 +249,14 @@ BlockedStatus ContentExtensionsBackend::processContentExtensionRulesForPingLoad(
                 willMakeHTTPS = true;
             break;
         case ContentExtensions::ActionType::CSSDisplayNoneSelector:
+        case ContentExtensions::ActionType::Notify:
             break;
         case ContentExtensions::ActionType::IgnorePreviousRules:
             RELEASE_ASSERT_NOT_REACHED();
         }
     }
 
-    return { willBlockLoad, willBlockCookies, willMakeHTTPS };
+    return { willBlockLoad, willBlockCookies, willMakeHTTPS, { } };
 }
 
 const String& ContentExtensionsBackend::displayNoneCSSRule()
@@ -255,8 +265,11 @@ const String& ContentExtensionsBackend::displayNoneCSSRule()
     return rule;
 }
 
-void applyBlockedStatusToRequest(const BlockedStatus& status, ResourceRequest& request)
+void applyBlockedStatusToRequest(const BlockedStatus& status, Page* page, ResourceRequest& request)
 {
+    if (page && !status.notifications.isEmpty())
+        page->chrome().client().contentRuleListNotification(request.url(), status.notifications);
+
     if (status.blockedCookies)
         request.setAllowCookies(false);
 

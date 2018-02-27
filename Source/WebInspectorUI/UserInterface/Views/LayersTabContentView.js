@@ -27,15 +27,18 @@ WI.LayersTabContentView = class LayersTabContentView extends WI.ContentBrowserTa
 {
     constructor()
     {
-        let {image, title} = WI.LayersTabContentView.tabInfo();
-        let tabBarItem = new WI.GeneralTabBarItem(image, title);
+        let tabBarItem = WI.GeneralTabBarItem.fromTabInfo(WI.LayersTabContentView.tabInfo());
 
         const navigationSidebarPanelConstructor = null;
         const detailsSidebarPanelConstructors = [WI.LayerDetailsSidebarPanel];
         const disableBackForward = true;
         super("layers", "layers", tabBarItem, navigationSidebarPanelConstructor, detailsSidebarPanelConstructors, disableBackForward);
 
+        this._layerDetailsSidebarPanel = this.detailsSidebarPanels[0];
+        this._layerDetailsSidebarPanel.addEventListener(WI.LayerDetailsSidebarPanel.Event.SelectedLayerChanged, this._detailsSidebarSelectedLayerChanged, this);
+
         this._layers3DContentView = new WI.Layers3DContentView;
+        this._layers3DContentView.addEventListener(WI.Layers3DContentView.Event.SelectedLayerChanged, this._contentViewSelectedLayerChanged, this);
     }
 
     // Static
@@ -63,6 +66,18 @@ WI.LayersTabContentView = class LayersTabContentView extends WI.ContentBrowserTa
         super.shown();
 
         this.contentBrowser.showContentView(this._layers3DContentView);
+    }
+
+    // Private
+
+    _detailsSidebarSelectedLayerChanged(event)
+    {
+        this._layers3DContentView.selectLayerById(event.data.layerId);
+    }
+
+    _contentViewSelectedLayerChanged(event)
+    {
+        this._layerDetailsSidebarPanel.selectNodeByLayerId(event.data.layerId);
     }
 };
 

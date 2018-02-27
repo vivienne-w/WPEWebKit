@@ -25,12 +25,12 @@
 
 #pragma once
 
-#if USE(NETWORK_SESSION)
-
 #include "NetworkDataTask.h"
 #include "NetworkResourceLoadParameters.h"
 #include <WebCore/ContentExtensionsBackend.h>
 #include <WebCore/ResourceError.h>
+#include <WebCore/ResourceResponse.h>
+#include <wtf/CompletionHandler.h>
 
 namespace WebCore {
 class ContentSecurityPolicy;
@@ -41,11 +41,10 @@ class URL;
 namespace WebKit {
 
 class NetworkCORSPreflightChecker;
-class NetworkConnectionToWebProcess;
 
 class PingLoad final : private NetworkDataTaskClient {
 public:
-    PingLoad(NetworkResourceLoadParameters&&, WebCore::HTTPHeaderMap&& originalRequestHeaders, Ref<NetworkConnectionToWebProcess>&&);
+    PingLoad(NetworkResourceLoadParameters&&, WebCore::HTTPHeaderMap&& originalRequestHeaders, WTF::CompletionHandler<void(const WebCore::ResourceError&, const WebCore::ResourceResponse&)>&&);
     
 private:
     ~PingLoad();
@@ -77,11 +76,11 @@ private:
     WebCore::SecurityOrigin& securityOrigin() const;
 
     const WebCore::ResourceRequest& currentRequest() const;
-    void didFinish(const WebCore::ResourceError& = { });
+    void didFinish(const WebCore::ResourceError& = { }, const WebCore::ResourceResponse& response = { });
     
     NetworkResourceLoadParameters m_parameters;
     WebCore::HTTPHeaderMap m_originalRequestHeaders; // Needed for CORS checks.
-    Ref<NetworkConnectionToWebProcess> m_connection;
+    WTF::CompletionHandler<void(const WebCore::ResourceError&, const WebCore::ResourceResponse&)> m_completionHandler;
     RefPtr<NetworkDataTask> m_task;
     WebCore::Timer m_timeoutTimer;
     std::unique_ptr<NetworkCORSPreflightChecker> m_corsPreflightChecker;
@@ -97,5 +96,3 @@ private:
 };
 
 }
-
-#endif // USE(NETWORK_SESSION)

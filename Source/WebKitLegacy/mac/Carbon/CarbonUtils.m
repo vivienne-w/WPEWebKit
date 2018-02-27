@@ -29,7 +29,6 @@
 #ifndef __LP64__
 
 #include "CarbonUtils.h"
-#import <WebKitSystemInterface.h>
 #import <pal/spi/cocoa/FoundationSPI.h>
 
 extern CGImageRef _NSCreateImageRef( unsigned char *const bitmapData[5], int pixelsWide, int pixelsHigh, int bitsPerSample, int samplesPerPixel, int bitsPerPixel, int bytesPerRow, BOOL isPlanar, BOOL hasAlpha, NSString *colorSpaceName, CGColorSpaceRef customColorSpace, id sourceObj);
@@ -88,7 +87,10 @@ static void
 PoolCleaner( EventLoopTimerRef inTimer, EventLoopIdleTimerMessage inState, void *inUserData )
 {
     if ( inState == kEventLoopIdleTimerStarted ) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wcast-qual"
         CFStringRef mode = CFRunLoopCopyCurrentMode( (CFRunLoopRef)GetCFRunLoopFromEventLoop( GetCurrentEventLoop() ));
+#pragma clang diagnostic pop
         EventLoopRef thisLoop = GetCurrentEventLoop ();
         if ( CFEqual( mode, kCFRunLoopDefaultMode ) && thisLoop == poolLoop) {
             unsigned currentNumPools = getNSAutoreleasePoolCount()-1;            

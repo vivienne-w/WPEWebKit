@@ -27,8 +27,7 @@ WI.NetworkTabContentView = class NetworkTabContentView extends WI.TabContentView
 {
     constructor(identifier)
     {
-        let {image, title} = WI.NetworkTabContentView.tabInfo();
-        let tabBarItem = new WI.GeneralTabBarItem(image, title);
+        let tabBarItem = WI.GeneralTabBarItem.fromTabInfo(WI.NetworkTabContentView.tabInfo());
 
         super(identifier || "network", "network", tabBarItem);
 
@@ -38,6 +37,10 @@ WI.NetworkTabContentView = class NetworkTabContentView extends WI.TabContentView
         const disableFindBanner = true;
         this._contentBrowser = new WI.ContentBrowser(null, this, disableBackForward, disableFindBanner);
         this._contentBrowser.showContentView(this._networkTableContentView);
+
+        let filterNavigationItems = this._networkTableContentView.filterNavigationItems;
+        for (let i = 0; i < filterNavigationItems.length; ++i)
+            this._contentBrowser.navigationBar.insertNavigationItem(filterNavigationItems[i], i);
 
         this.addSubview(this._contentBrowser);
     }
@@ -54,7 +57,7 @@ WI.NetworkTabContentView = class NetworkTabContentView extends WI.TabContentView
 
     static isTabAllowed()
     {
-        return !!window.NetworkAgent && !!window.PageAgent && WI.settings.experimentalEnableNewNetworkTab.value;
+        return !!window.NetworkAgent;
     }
 
     // Protected
@@ -94,11 +97,16 @@ WI.NetworkTabContentView = class NetworkTabContentView extends WI.TabContentView
         return representedObject instanceof WI.Resource;
     }
 
+    showRepresentedObject(representedObject, cookie)
+    {
+        console.assert(this._contentBrowser.currentContentView === this._networkTableContentView);
+        this._networkTableContentView.showRepresentedObject(representedObject, cookie);
+    }
+
     get supportsSplitContentBrowser()
     {
         return true;
     }
 };
 
-// FIXME: When removing LegacyNetworkTabContentView this should move back to just "network".
-WI.NetworkTabContentView.Type = "new-network";
+WI.NetworkTabContentView.Type = "network";

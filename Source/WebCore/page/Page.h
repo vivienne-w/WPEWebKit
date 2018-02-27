@@ -27,7 +27,6 @@
 #include "LayoutRect.h"
 #include "LengthBox.h"
 #include "MediaProducer.h"
-#include "PageVisibilityState.h"
 #include "Pagination.h"
 #include "RTCController.h"
 #include "Region.h"
@@ -36,6 +35,7 @@
 #include "Timer.h"
 #include "UserInterfaceLayoutDirection.h"
 #include "ViewportArguments.h"
+#include "VisibilityState.h"
 #include "WheelEventTestTrigger.h"
 #include <memory>
 #include <pal/SessionID.h>
@@ -131,7 +131,7 @@ class ActivityStateChangeObserver;
 class VisitedLinkStore;
 class WebGLStateTracker;
 
-typedef uint64_t LinkHash;
+typedef uint64_t SharedStringHash;
 
 enum FindDirection {
     FindDirectionForward,
@@ -149,7 +149,7 @@ enum class DidWrap : bool;
 class Page : public Supplementable<Page> {
     WTF_MAKE_NONCOPYABLE(Page);
     WTF_MAKE_FAST_ALLOCATED;
-    friend class Settings;
+    friend class SettingsBase;
 
 public:
     WEBCORE_EXPORT static void updateStyleForAllPagesAfterGlobalChangeInEnvironment();
@@ -374,6 +374,9 @@ public:
     void setIsClosing() { m_isClosing = true; }
     bool isClosing() const { return m_isClosing; }
 
+    void setIsRestoringCachedPage(bool value) { m_isRestoringCachedPage = value; }
+    bool isRestoringCachedPage() const { return m_isRestoringCachedPage; }
+
     void addActivityStateChangeObserver(ActivityStateChangeObserver&);
     void removeActivityStateChangeObserver(ActivityStateChangeObserver&);
 
@@ -398,7 +401,7 @@ public:
     JSC::Debugger* debugger() const { return m_debugger; }
 
     WEBCORE_EXPORT void invalidateStylesForAllLinks();
-    WEBCORE_EXPORT void invalidateStylesForLink(LinkHash);
+    WEBCORE_EXPORT void invalidateStylesForLink(SharedStringHash);
 
     void invalidateInjectedStyleSheetCacheInAllFrames();
 
@@ -423,7 +426,7 @@ public:
     void setEditable(bool isEditable) { m_isEditable = isEditable; }
     bool isEditable() { return m_isEditable; }
 
-    WEBCORE_EXPORT PageVisibilityState visibilityState() const;
+    WEBCORE_EXPORT VisibilityState visibilityState() const;
     WEBCORE_EXPORT void resumeAnimatingImages();
 
     WEBCORE_EXPORT void addLayoutMilestones(LayoutMilestones);
@@ -588,6 +591,11 @@ public:
     bool isLowPowerModeEnabled() const;
     WEBCORE_EXPORT void setLowPowerModeEnabledOverrideForTesting(std::optional<bool>);
 
+    WEBCORE_EXPORT void applicationWillResignActive();
+    WEBCORE_EXPORT void applicationDidEnterBackground();
+    WEBCORE_EXPORT void applicationWillEnterForeground();
+    WEBCORE_EXPORT void applicationDidBecomeActive();
+
 private:
     struct Navigation {
         String domain;
@@ -617,6 +625,8 @@ private:
     Vector<Ref<PluginViewBase>> pluginViews();
 
     void handleLowModePowerChange(bool);
+
+    void forEachDocument(const WTF::Function<void(Document&)>&);
 
     enum class TimerThrottlingState { Disabled, Enabled, EnabledIncreasing };
     void hiddenPageDOMTimerThrottlingStateChanged();
@@ -780,6 +790,7 @@ private:
     PAL::SessionID m_sessionID;
 
     bool m_isClosing { false };
+    bool m_isRestoringCachedPage { false };
 
     MediaProducer::MediaStateFlags m_mediaState { MediaProducer::IsNotPlaying };
     

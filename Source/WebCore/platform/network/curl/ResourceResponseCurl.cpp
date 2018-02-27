@@ -28,6 +28,8 @@
 #if USE(CURL)
 #include "ResourceResponse.h"
 
+#include "CurlContext.h"
+#include "CurlResponse.h"
 #include "HTTPParsers.h"
 
 namespace WebCore {
@@ -64,10 +66,10 @@ bool ResourceResponse::isAppendableHeader(const String &key)
     };
 
     // Custom headers start with 'X-', and need no further checking.
-    if (key.startsWith("x-", /* caseSensitive */ false))
+    if (startsWithLettersIgnoringASCIICase(key, "x-"))
         return true;
 
-    for (auto& header : appendableHeaders) {
+    for (const auto& header : appendableHeaders) {
         if (equalIgnoringASCIICase(key, header))
             return true;
     }
@@ -75,18 +77,46 @@ bool ResourceResponse::isAppendableHeader(const String &key)
     return false;
 }
 
+ResourceResponse::ResourceResponse(const CurlResponse& response)
+    : ResourceResponseBase(response.url, "", response.expectedContentLength, "")
+{
+    setHTTPStatusCode(response.statusCode);
+
+    for (const auto& header : response.headers)
+        appendHTTPHeaderField(header);
+
+    switch (response.httpVersion) {
+    case CURL_HTTP_VERSION_1_0:
+        setHTTPVersion("HTTP/1.0");
+        break;
+    case CURL_HTTP_VERSION_1_1:
+        setHTTPVersion("HTTP/1.1");
+        break;
+    case CURL_HTTP_VERSION_2_0:
+    case CURL_HTTP_VERSION_2TLS:
+    case CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE:
+        setHTTPVersion("HTTP/2");
+        break;
+    case CURL_HTTP_VERSION_NONE:
+    default:
+        break;
+    }
+    setMimeType(extractMIMETypeFromMediaType(httpHeaderField(HTTPHeaderName::ContentType)).convertToASCIILowercase());
+    setTextEncodingName(extractCharsetFromMediaType(httpHeaderField(HTTPHeaderName::ContentType)));
+}
+
 void ResourceResponse::appendHTTPHeaderField(const String& header)
 {
-    int splitPosistion = header.find(":");
-    if (splitPosistion != notFound) {
-        String key = header.left(splitPosistion).stripWhiteSpace();
-        String value = header.substring(splitPosistion + 1).stripWhiteSpace();
+    auto splitPosition = header.find(':');
+    if (splitPosition != notFound) {
+        auto key = header.left(splitPosition).stripWhiteSpace();
+        auto value = header.substring(splitPosition + 1).stripWhiteSpace();
 
         if (isAppendableHeader(key))
             addHTTPHeaderField(key, value);
         else
             setHTTPHeaderField(key, value);
-    } else if (header.startsWith("HTTP", false)) {
+    } else if (startsWithLettersIgnoringASCIICase(header, "http")) {
         // This is the first line of the response.
         setStatusLine(header);
     }
@@ -94,23 +124,20 @@ void ResourceResponse::appendHTTPHeaderField(const String& header)
 
 void ResourceResponse::setStatusLine(const String& header)
 {
-    String statusLine = header.stripWhiteSpace();
+    auto statusLine = header.stripWhiteSpace();
 
-    int httpVersionEndPosition = statusLine.find(" ");
-    int statusCodeEndPosition = notFound;
+    auto httpVersionEndPosition = statusLine.find(' ');
+    auto statusCodeEndPosition = notFound;
 
     // Extract the http version
     if (httpVersionEndPosition != notFound) {
-        String httpVersion = statusLine.left(httpVersionEndPosition);
-        setHTTPVersion(httpVersion.stripWhiteSpace());
-
         statusLine = statusLine.substring(httpVersionEndPosition + 1).stripWhiteSpace();
-        statusCodeEndPosition = statusLine.find(" ");
+        statusCodeEndPosition = statusLine.find(' ');
     }
 
     // Extract the http status text
     if (statusCodeEndPosition != notFound) {
-        String statusText = statusLine.substring(statusCodeEndPosition + 1);
+        auto statusText = statusLine.substring(statusCodeEndPosition + 1);
         setHTTPStatusText(statusText.stripWhiteSpace());
     }
 }
@@ -120,20 +147,45 @@ String ResourceResponse::platformSuggestedFilename() const
     return filenameFromHTTPContentDisposition(httpHeaderField(HTTPHeaderName::ContentDisposition));
 }
 
-bool ResourceResponse::isRedirection() const
+bool ResourceResponse::shouldRedirect()
 {
     auto statusCode = httpStatusCode();
-    return (300 <= statusCode) && (statusCode < 400) && (statusCode != 304);
+    if (statusCode < 300 || 400 <= statusCode)
+        return false;
+
+    // Some 3xx status codes aren't actually redirects.
+    if (statusCode == 300 || statusCode == 304 || statusCode == 305 || statusCode == 306)
+        return false;
+
+    if (httpHeaderField(HTTPHeaderName::Location).isEmpty())
+        return false;
+
+    return true;
+}
+
+bool ResourceResponse::isMovedPermanently() const
+{
+    return httpStatusCode() == 301;
+}
+
+bool ResourceResponse::isFound() const
+{
+    return httpStatusCode() == 302;
+}
+
+bool ResourceResponse::isSeeOther() const
+{
+    return httpStatusCode() == 303;
 }
 
 bool ResourceResponse::isNotModified() const
 {
-    return (httpStatusCode() == 304);
+    return httpStatusCode() == 304;
 }
 
 bool ResourceResponse::isUnauthorized() const
 {
-    return (httpStatusCode() == 401);
+    return httpStatusCode() == 401;
 }
 
 }

@@ -33,7 +33,9 @@ WI.CanvasManager = class CanvasManager extends WI.Object
 
         this._canvasIdentifierMap = new Map;
         this._shaderProgramIdentifierMap = new Map;
+
         this._recordingCanvas = null;
+        this._recordingFrameMap = new Map;
 
         if (window.CanvasAgent)
             CanvasAgent.enable();
@@ -53,6 +55,35 @@ WI.CanvasManager = class CanvasManager extends WI.Object
 
     get recordingCanvas() { return this._recordingCanvas; }
 
+    importRecording()
+    {
+        WI.loadDataFromFile((data, filename) => {
+            if (!data)
+                return;
+
+            let payload = null;
+            try {
+                payload = JSON.parse(data);
+            } catch (e) {
+                WI.Recording.synthesizeError(e);
+                return;
+            }
+
+            let recording = WI.Recording.fromPayload(payload);
+            if (!recording) {
+                WI.Recording.synthesizeError(WI.UIString("unsupported version."));
+                return;
+            }
+
+            let extensionStart = filename.lastIndexOf(".");
+            if (extensionStart !== -1)
+                filename = filename.substring(0, extensionStart);
+            recording.createDisplayName(filename);
+
+            this.dispatchEventToListeners(WI.CanvasManager.Event.RecordingImported, {recording});
+        });
+    }
+
     startRecording(canvas, singleFrame)
     {
         console.assert(!this._recordingCanvas, "Recording already started.");
@@ -61,14 +92,14 @@ WI.CanvasManager = class CanvasManager extends WI.Object
 
         this._recordingCanvas = canvas;
 
-        CanvasAgent.requestRecording(canvas.identifier, singleFrame, (error) => {
-            if (!error)
+        CanvasAgent.startRecording(canvas.identifier, singleFrame, (error) => {
+            if (error) {
+                console.error(error);
+                this._recordingCanvas = null;
                 return;
+            }
 
-            console.error(error);
-            this._recordingCanvas = null;
-
-            this.dispatchEventToListeners(WI.CanvasManager.Event.RecordingFinished, {canvas, recording: null});
+            this.dispatchEventToListeners(WI.CanvasManager.Event.RecordingStarted, {canvas});
         });
     }
 
@@ -78,12 +109,15 @@ WI.CanvasManager = class CanvasManager extends WI.Object
         if (!this._recordingCanvas)
             return;
 
-        let canvasIdentifier = this._recordingCanvas.identifier;
+        let canvas = this._recordingCanvas;
         this._recordingCanvas = null;
 
-        CanvasAgent.cancelRecording(canvasIdentifier, (error) => {
-            if (error)
-                console.error(error);
+        CanvasAgent.stopRecording(canvas.identifier, (error) => {
+            if (!error)
+                return;
+
+            console.error(error);
+            this.dispatchEventToListeners(WI.CanvasManager.Event.RecordingStopped, {canvas, recording: null});
         });
     }
 
@@ -96,9 +130,7 @@ WI.CanvasManager = class CanvasManager extends WI.Object
         let canvas = WI.Canvas.fromPayload(canvasPayload);
         this._canvasIdentifierMap.set(canvas.identifier, canvas);
 
-        canvas.frame.canvasCollection.add(canvas);
-
-        this.dispatchEventToListeners(WI.CanvasManager.Event.CanvasWasAdded, {canvas});
+        this.dispatchEventToListeners(WI.CanvasManager.Event.CanvasAdded, {canvas});
     }
 
     canvasRemoved(canvasIdentifier)
@@ -110,14 +142,7 @@ WI.CanvasManager = class CanvasManager extends WI.Object
         if (!canvas)
             return;
 
-        for (let program of canvas.shaderProgramCollection.items) {
-            this._shaderProgramIdentifierMap.delete(program.identifier);
-            this._dispatchShaderProgramRemoved(program);
-        }
-
-        canvas.frame.canvasCollection.remove(canvas);
-
-        this.dispatchEventToListeners(WI.CanvasManager.Event.CanvasWasRemoved, {canvas});
+        this._removeCanvas(canvas);
     }
 
     canvasMemoryChanged(canvasIdentifier, memoryCost)
@@ -144,21 +169,66 @@ WI.CanvasManager = class CanvasManager extends WI.Object
         canvas.cssCanvasClientNodesChanged();
     }
 
-    recordingFinished(canvasIdentifier, recordingPayload)
+    recordingProgress(canvasIdentifier, framesPayload, bufferUsed)
     {
         // Called from WI.CanvasObserver.
-
-        this._recordingCanvas = null;
 
         let canvas = this._canvasIdentifierMap.get(canvasIdentifier);
         console.assert(canvas);
         if (!canvas)
             return;
 
-        let recording = WI.Recording.fromPayload(recordingPayload);
-        recording.source = canvas;
+        let existingFrames = this._recordingFrameMap.get(canvasIdentifier);
+        if (!existingFrames) {
+            existingFrames = [];
+            this._recordingFrameMap.set(canvasIdentifier, existingFrames);
+        }
 
-        this.dispatchEventToListeners(WI.CanvasManager.Event.RecordingFinished, {canvas, recording});
+        existingFrames.push(...framesPayload.map(WI.RecordingFrame.fromPayload));
+
+        this.dispatchEventToListeners(WI.CanvasManager.Event.RecordingProgress, {
+            canvas,
+            frameCount: existingFrames.length,
+            bufferUsed,
+        });
+    }
+
+    recordingFinished(canvasIdentifier, recordingPayload)
+    {
+        // Called from WI.CanvasObserver.
+
+        let canvas = this._canvasIdentifierMap.get(canvasIdentifier);
+        console.assert(canvas);
+
+        let fromConsole = canvas !== this._recordingCanvas;
+        if (!fromConsole)
+            this._recordingCanvas = null;
+
+        if (!canvas)
+            return;
+
+        let frames = this._recordingFrameMap.take(canvasIdentifier);
+        let recording = recordingPayload ? WI.Recording.fromPayload(recordingPayload, frames) : null;
+        if (recording) {
+            recording.source = canvas;
+            recording.createDisplayName(recordingPayload.name);
+
+            canvas.recordingCollection.add(recording);
+        }
+
+        this.dispatchEventToListeners(WI.CanvasManager.Event.RecordingStopped, {canvas, recording, fromConsole});
+    }
+
+    extensionEnabled(canvasIdentifier, extension)
+    {
+        // Called from WI.CanvasObserver.
+
+        let canvas = this._canvasIdentifierMap.get(canvasIdentifier);
+        console.assert(canvas);
+        if (!canvas)
+            return;
+
+        canvas.enableExtension(extension);
     }
 
     programCreated(canvasIdentifier, programIdentifier)
@@ -196,6 +266,16 @@ WI.CanvasManager = class CanvasManager extends WI.Object
 
     // Private
 
+    _removeCanvas(canvas)
+    {
+        for (let program of canvas.shaderProgramCollection.items) {
+            this._shaderProgramIdentifierMap.delete(program.identifier);
+            this._dispatchShaderProgramRemoved(program);
+        }
+
+        this.dispatchEventToListeners(WI.CanvasManager.Event.CanvasRemoved, {canvas});
+    }
+
     _mainResourceDidChange(event)
     {
         console.assert(event.target instanceof WI.Frame);
@@ -204,12 +284,11 @@ WI.CanvasManager = class CanvasManager extends WI.Object
 
         WI.Canvas.resetUniqueDisplayNameNumbers();
 
-        this._shaderProgramIdentifierMap.clear();
+        for (let canvas of this._canvasIdentifierMap.values())
+            this._removeCanvas(canvas);
 
-        if (this._canvasIdentifierMap.size) {
-            this._canvasIdentifierMap.clear();
-            this.dispatchEventToListeners(WI.CanvasManager.Event.Cleared);
-        }
+        this._shaderProgramIdentifierMap.clear();
+        this._canvasIdentifierMap.clear();
     }
 
     _dispatchShaderProgramRemoved(program)
@@ -219,10 +298,12 @@ WI.CanvasManager = class CanvasManager extends WI.Object
 };
 
 WI.CanvasManager.Event = {
-    Cleared: "canvas-manager-cleared",
-    CanvasWasAdded: "canvas-manager-canvas-was-added",
-    CanvasWasRemoved: "canvas-manager-canvas-was-removed",
-    RecordingFinished: "canvas-managger-recording-finished",
+    CanvasAdded: "canvas-manager-canvas-was-added",
+    CanvasRemoved: "canvas-manager-canvas-was-removed",
+    RecordingImported: "canvas-manager-recording-imported",
+    RecordingStarted: "canvas-manager-recording-started",
+    RecordingProgress: "canvas-manager-recording-progress",
+    RecordingStopped: "canvas-manager-recording-stopped",
     ShaderProgramAdded: "canvas-manager-shader-program-added",
     ShaderProgramRemoved: "canvas-manager-shader-program-removed",
 };

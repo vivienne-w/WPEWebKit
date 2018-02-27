@@ -366,6 +366,6 @@ void BitmapTextureGL::copyFromExternalTexture(GLuint sourceTextureID)
     glDeleteFramebuffers(1, &copyFbo);
 }
 
-}; // namespace WebCore
+} // namespace WebCore
 
 #endif // USE(TEXTURE_MAPPER_GL)

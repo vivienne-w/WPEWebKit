@@ -23,13 +23,15 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
-#ifndef AuthenticationChallenge_h
-#define AuthenticationChallenge_h
+
+#pragma once
 
 #include "AuthenticationChallengeBase.h"
 #include "AuthenticationClient.h"
 
 namespace WebCore {
+
+class CurlResponse;
 
 class AuthenticationChallenge final : public AuthenticationChallengeBase {
 public:
@@ -42,17 +44,15 @@ public:
     {
     }
 
-    AuthenticationChallenge(uint16_t, long, unsigned, const ResourceResponse&, AuthenticationClient* = nullptr);
+    AuthenticationChallenge(const CurlResponse&, unsigned, const ResourceResponse&, AuthenticationClient* = nullptr);
     AuthenticationClient* authenticationClient() const { return m_authenticationClient.get(); }
 
 private:
     ProtectionSpaceServerType protectionSpaceServerTypeFromURI(const URL&);
-    ProtectionSpace protectionSpaceFromHandle(uint16_t, long, const ResourceResponse&);
+    ProtectionSpace protectionSpaceFromHandle(const CurlResponse&, const ResourceResponse&);
     void removeLeadingAndTrailingQuotes(String&);
 
     RefPtr<AuthenticationClient> m_authenticationClient;
 };
 
-}
-
-#endif
+} // namespace WebCore

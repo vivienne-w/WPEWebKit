@@ -45,7 +45,7 @@ struct CDMKeySystemConfiguration;
 
 class CDMInstance : public RefCounted<CDMInstance> {
 public:
-    virtual ~CDMInstance() { }
+    virtual ~CDMInstance() = default;
 
     enum class ImplementationType {
         Mock,
@@ -53,6 +53,7 @@ public:
 #if USE(OPENCDM)
         OpenCDM,
 #endif
+        FairPlayStreaming,
     };
 
     virtual ImplementationType implementationType() const = 0;
@@ -70,6 +71,7 @@ public:
     virtual SuccessValue setDistinctiveIdentifiersAllowed(bool) = 0;
     virtual SuccessValue setPersistentStateAllowed(bool) = 0;
     virtual SuccessValue setServerCertificate(Ref<SharedBuffer>&&) = 0;
+    virtual SuccessValue setStorageDirectory(const String&) = 0;
 
     using LicenseCallback = Function<void(Ref<SharedBuffer>&& message, const String& sessionId, bool needsIndividualization, SuccessValue succeeded)>;
     virtual void requestLicense(LicenseType, const AtomicString& initDataType, Ref<SharedBuffer>&& initData, LicenseCallback) = 0;

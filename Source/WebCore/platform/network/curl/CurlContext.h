@@ -26,7 +26,6 @@
 
 #pragma once
 
-#include "CookieJarCurl.h"
 #include "CurlSSLHandle.h"
 #include "URL.h"
 
@@ -83,7 +82,7 @@ public:
 private:
     static void lockCallback(CURL*, curl_lock_data, curl_lock_access, void*);
     static void unlockCallback(CURL*, curl_lock_data, void*);
-    static Lock* mutexFor(curl_lock_data);
+    static StaticLock* mutexFor(curl_lock_data);
 
     CURLSH* m_shareHandle { nullptr };
 };
@@ -92,7 +91,7 @@ private:
 
 class CurlContext : public CurlGlobal {
     WTF_MAKE_NONCOPYABLE(CurlContext);
-
+    friend NeverDestroyed<CurlContext>;
 public:
     struct ProxyInfo {
         String host;
@@ -104,20 +103,11 @@ public:
         const String url() const;
     };
 
-    static CurlContext& singleton()
-    {
-        static CurlContext shared;
-        return shared;
-    }
+    static CurlContext& singleton();
 
     virtual ~CurlContext();
 
     const CurlShareHandle& shareHandle() { return m_shareHandle; }
-
-    // Cookie
-    const char* getCookieJarFileName() const { return m_cookieJarFileName.data(); }
-    void setCookieJarFileName(const char* cookieJarFileName) { m_cookieJarFileName = CString(cookieJarFileName); }
-    CookieJarCurl& cookieJar() { return *m_cookieJar; }
 
     // Proxy
     const ProxyInfo& proxyInfo() const { return m_proxy; }
@@ -127,6 +117,9 @@ public:
     // SSL
     CurlSSLHandle& sslHandle() { return m_sslHandle; }
 
+    // HTTP/2
+    bool isHttp2Enabled() const;
+
 #ifndef NDEBUG
     FILE* getLogFile() const { return m_logFile; }
     bool isVerbose() const { return m_verbose; }
@@ -134,14 +127,11 @@ public:
 
 private:
     ProxyInfo m_proxy;
-    CString m_cookieJarFileName;
     CurlShareHandle m_shareHandle;
-    std::unique_ptr<CookieJarCurl> m_cookieJar;
     CurlSSLHandle m_sslHandle;
 
     CurlContext();
-    void initCookieSession();
-
+    void initShareHandle();
 
 #ifndef NDEBUG
     FILE* m_logFile { nullptr };
@@ -224,9 +214,6 @@ public:
     CURLcode perform();
     CURLcode pause(int);
 
-    CURLcode errorCode() const { return m_errorCode; }
-    void setErrorCode(CURLcode errorCode) { m_errorCode = errorCode; }
-
     static const String errorDescription(CURLcode);
 
     void enableShareHandle();
@@ -238,6 +225,7 @@ public:
     void appendRequestHeader(const String& name);
     void removeRequestHeader(const String& name);
 
+    void enableHttp();
     void enableHttpGetRequest();
     void enableHttpHeadRequest();
     void enableHttpPostRequest();
@@ -250,9 +238,6 @@ public:
     void enableAcceptEncoding();
     void enableAllowedProtocols();
 
-    void enableFollowLocation();
-    void enableAutoReferer();
-
     void enableHttpAuthentication(long);
     void setHttpAuthUserPass(const String&, const String&);
 
@@ -263,13 +248,10 @@ public:
     void setSslCertType(const char*);
     void setSslKeyPassword(const char*);
 
-    void enableCookieJarIfExists();
-    void setCookieList(const char*);
-    void fetchCookieList(CurlSList &cookies) const;
-
     void enableProxyIfExists();
 
     void enableTimeout();
+    void setTimeout(long timeoutMilliseconds);
 
     // Callback function
     void setHeaderCallbackFunction(curl_write_callback, void*);
@@ -278,11 +260,12 @@ public:
     void setSslCtxCallbackFunction(curl_ssl_ctx_callback, void*);
 
     // Status
-    URL getEffectiveURL();
     std::optional<uint16_t> getPrimaryPort();
     std::optional<long> getResponseCode();
+    std::optional<long> getHttpConnectCode();
     std::optional<long long> getContentLength();
     std::optional<long> getHttpAuthAvail();
+    std::optional<long> getHttpVersion();
     std::optional<NetworkLoadMetrics> getNetworkLoadMetrics();
 
     static long long maxCurlOffT();
@@ -298,9 +281,8 @@ private:
 
     CURL* m_handle { nullptr };
     char m_errorBuffer[CURL_ERROR_SIZE] { };
-    CURLcode m_errorCode;
 
     CurlSList m_requestHeaders;
 };
 
-}
+} // namespace WebCore

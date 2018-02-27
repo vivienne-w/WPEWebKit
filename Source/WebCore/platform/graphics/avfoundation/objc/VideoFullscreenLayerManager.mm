@@ -113,7 +113,7 @@ void VideoFullscreenLayerManager::setVideoFullscreenLayer(PlatformLayer *videoFu
 
         CAContext *newContext = [m_videoLayer context];
         if (oldContext && newContext && oldContext != newContext) {
-#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
+#if PLATFORM(MAC)
             oldContext.commitPriority = 0;
             newContext.commitPriority = 1;
 #endif
@@ -121,15 +121,11 @@ void VideoFullscreenLayerManager::setVideoFullscreenLayer(PlatformLayer *videoFu
             [newContext setFencePort:fencePort];
             mach_port_deallocate(mach_task_self(), fencePort);
         }
-
-        [CATransaction setCompletionBlock:BlockPtr<void ()>::fromCallable([completionHandler = WTFMove(completionHandler)] {
-            completionHandler();
-        }).get()];
-    } else {
-        [CATransaction setCompletionBlock:BlockPtr<void ()>::fromCallable([completionHandler = WTFMove(completionHandler)] {
-            completionHandler();
-        }).get()];
     }
+
+    [CATransaction setCompletionBlock:BlockPtr<void ()>::fromCallable([completionHandler = WTFMove(completionHandler)] {
+        completionHandler();
+    }).get()];
 
     [CATransaction commit];
 }

@@ -28,7 +28,6 @@
 
 #if USE(APPKIT)
 
-#import "WebKitSystemInterface.h"
 #import <WebCore/KeyboardEvent.h>
 #import <WebCore/PlatformEventFactoryMac.h>
 #import <WebCore/Scrollbar.h>
@@ -84,6 +83,11 @@ static WebMouseEvent::Button mouseButtonForEvent(NSEvent *event)
     default:
         return WebMouseEvent::NoButton;
     }
+}
+
+static unsigned short currentlyPressedMouseButtons()
+{
+    return static_cast<unsigned short>([NSEvent pressedMouseButtons]);
 }
 
 static WebEvent::Type mouseEventTypeForEvent(NSEvent* event)
@@ -355,6 +359,7 @@ WebMouseEvent WebEventFactory::createWebMouseEvent(NSEvent *event, NSEvent *last
 #endif
 
     WebMouseEvent::Button button = mouseButtonForEvent(event);
+    unsigned short buttons = currentlyPressedMouseButtons();
     float deltaX = [event deltaX];
     float deltaY = [event deltaY];
     float deltaZ = [event deltaZ];
@@ -371,7 +376,7 @@ WebMouseEvent WebEventFactory::createWebMouseEvent(NSEvent *event, NSEvent *last
     force = pressure + stage;
 #endif
 
-    return WebMouseEvent(type, button, IntPoint(position), IntPoint(globalPosition), deltaX, deltaY, deltaZ, clickCount, modifiers, timestamp, force, WebMouseEvent::SyntheticClickType::NoTap, eventNumber, menuTypeForEvent);
+    return WebMouseEvent(type, button, buttons, IntPoint(position), IntPoint(globalPosition), deltaX, deltaY, deltaZ, clickCount, modifiers, timestamp, force, WebMouseEvent::SyntheticClickType::NoTap, eventNumber, menuTypeForEvent);
 }
 
 WebWheelEvent WebEventFactory::createWebWheelEvent(NSEvent *event, NSView *windowView)

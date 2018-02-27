@@ -32,6 +32,11 @@
 #import "TestWKWebView.h"
 #import <WebKit/WKWebViewPrivate.h>
 
+#if PLATFORM(IOS)
+#import "UIKitSPI.h"
+#import <UIKit/UIKit.h>
+#endif
+
 namespace TestWebKitAPI {
 
 static RetainPtr<EditingTestHarness> setUpEditorStateTestHarness()
@@ -228,6 +233,86 @@ TEST(EditorStateTests, TypingAttributeLinkColor)
     [testHarness selectAllAndExpectEditorStateWith:@{ @"text-color": @"rgb(0, 0, 238)" }];
     EXPECT_WK_STREQ("https://www.apple.com/", [[testHarness webView] stringByEvaluatingJavaScript:@"document.querySelector('a').href"]);
 }
+
+#if PLATFORM(IOS)
+
+static void checkContentViewHasTextWithFailureDescription(TestWKWebView *webView, BOOL expectedToHaveText, NSString *description)
+{
+    BOOL hasText = webView.textInputContentView.hasText;
+    if (expectedToHaveText)
+        EXPECT_TRUE(hasText);
+    else
+        EXPECT_FALSE(hasText);
+
+    if (expectedToHaveText != hasText)
+        NSLog(@"Expected -[%@ hasText] to be %@, but observed: %@ (%@)", [webView.textInputContentView class], expectedToHaveText ? @"YES" : @"NO", hasText ? @"YES" : @"NO", description);
+}
+
+TEST(EditorStateTests, ContentViewHasTextInContentEditableElement)
+{
+    auto testHarness = setUpEditorStateTestHarness();
+    TestWKWebView *webView = [testHarness webView];
+
+    checkContentViewHasTextWithFailureDescription(webView, NO, @"before inserting any content");
+    [testHarness insertHTML:@"<img src='icon.png'></img>"];
+    checkContentViewHasTextWithFailureDescription(webView, NO, @"after inserting an image element");
+    [testHarness insertText:@"A"];
+    checkContentViewHasTextWithFailureDescription(webView, YES, @"after inserting text");
+    [testHarness selectAll];
+    checkContentViewHasTextWithFailureDescription(webView, YES, @"after selecting everything");
+    [testHarness deleteBackwards];
+    checkContentViewHasTextWithFailureDescription(webView, NO, @"after deleting everything");
+    [testHarness insertParagraph];
+    checkContentViewHasTextWithFailureDescription(webView, YES, @"after inserting a newline");
+    [testHarness deleteBackwards];
+    checkContentViewHasTextWithFailureDescription(webView, NO, @"after deleting the newline");
+    [testHarness insertText:@"B"];
+    checkContentViewHasTextWithFailureDescription(webView, YES, @"after inserting text again");
+    [webView stringByEvaluatingJavaScript:@"document.body.blur()"];
+    [webView waitForNextPresentationUpdate];
+    checkContentViewHasTextWithFailureDescription(webView, NO, @"after losing focus");
+}
+
+TEST(EditorStateTests, ContentViewHasTextInTextarea)
+{
+    auto webView = adoptNS([[TestWKWebView alloc] initWithFrame:NSMakeRect(0, 0, 400, 400)]);
+    auto testHarness = adoptNS([[EditingTestHarness alloc] initWithWebView:webView.get()]);
+    [webView synchronouslyLoadHTMLString:@"<textarea id='textarea'></textarea>"];
+    [webView stringByEvaluatingJavaScript:@"textarea.focus()"];
+    [webView waitForNextPresentationUpdate];
+
+    checkContentViewHasTextWithFailureDescription(webView.get(), NO, @"before inserting any content");
+    [testHarness insertText:@"A"];
+    checkContentViewHasTextWithFailureDescription(webView.get(), YES, @"after inserting text");
+    [testHarness selectAll];
+    checkContentViewHasTextWithFailureDescription(webView.get(), YES, @"after selecting everything");
+    [testHarness deleteBackwards];
+    checkContentViewHasTextWithFailureDescription(webView.get(), NO, @"after deleting everything");
+    [testHarness insertParagraph];
+    checkContentViewHasTextWithFailureDescription(webView.get(), YES, @"after inserting a newline");
+    [testHarness deleteBackwards];
+    checkContentViewHasTextWithFailureDescription(webView.get(), NO, @"after deleting the newline");
+    [testHarness insertText:@"B"];
+    checkContentViewHasTextWithFailureDescription(webView.get(), YES, @"after inserting text again");
+    [webView stringByEvaluatingJavaScript:@"textarea.blur()"];
+    [webView waitForNextPresentationUpdate];
+    checkContentViewHasTextWithFailureDescription(webView.get(), NO, @"after losing focus");
+}
+
+TEST(EditorStateTests, CaretColorInContentEditable)
+{
+    auto webView = adoptNS([[TestWKWebView alloc] initWithFrame:CGRectMake(0, 0, 320, 500)]);
+    [webView synchronouslyLoadHTMLString:@"<body style=\"caret-color: red;\" contenteditable=\"true\"></body>"];
+    [webView stringByEvaluatingJavaScript:@"document.body.focus()"];
+    UIView<UITextInputTraits_Private> *textInput = (UIView<UITextInputTraits_Private> *) [webView textInputContentView];
+    UIColor *insertionPointColor = textInput.insertionPointColor;
+    UIColor *redColor = [UIColor redColor];
+    auto colorSpace = adoptCF(CGColorSpaceCreateWithName(kCGColorSpaceGenericRGB));
+    auto cgInsertionPointColor = adoptCF(CGColorCreateCopyByMatchingToColorSpace(colorSpace.get(), kCGRenderingIntentDefault, insertionPointColor.CGColor, NULL));
+    auto cgRedColor = adoptCF(CGColorCreateCopyByMatchingToColorSpace(colorSpace.get(), kCGRenderingIntentDefault, redColor.CGColor, NULL));
+    EXPECT_TRUE(CGColorEqualToColor(cgInsertionPointColor.get(), cgRedColor.get()));
+}
+#endif
 
 } // namespace TestWebKitAPI
 

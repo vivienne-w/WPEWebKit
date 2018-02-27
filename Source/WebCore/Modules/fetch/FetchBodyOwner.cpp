@@ -108,7 +108,7 @@ void FetchBodyOwner::arrayBuffer(Ref<DeferredPromise>&& promise)
 void FetchBodyOwner::blob(Ref<DeferredPromise>&& promise)
 {
     if (isBodyNullOrOpaque()) {
-        promise->resolve<IDLInterface<Blob>>(Blob::create({ }, Blob::normalizedContentType(extractMIMETypeFromMediaType(m_contentType))));
+        promise->resolve<IDLInterface<Blob>>(Blob::create(Vector<uint8_t> { }, Blob::normalizedContentType(extractMIMETypeFromMediaType(m_contentType))));
         return;
     }
     if (isDisturbedOrLocked()) {
@@ -287,20 +287,25 @@ void FetchBodyOwner::BlobLoader::didFail(const ResourceError&)
 
 RefPtr<ReadableStream> FetchBodyOwner::readableStream(JSC::ExecState& state)
 {
-    if (isBodyNull())
+    if (isBodyNullOrOpaque())
         return nullptr;
 
-    if (!m_body->hasReadableStream()) {
-        ASSERT(!m_readableStreamSource);
-        if (isDisturbed()) {
-            m_body->setReadableStream(ReadableStream::create(state, nullptr));
-            m_body->readableStream()->lock();
-        } else {
-            m_readableStreamSource = adoptRef(*new FetchBodySource(*this));
-            m_body->setReadableStream(ReadableStream::create(state, m_readableStreamSource));
-        }
-    }
+    if (!m_body->hasReadableStream())
+        createReadableStream(state);
+
     return m_body->readableStream();
+}
+
+void FetchBodyOwner::createReadableStream(JSC::ExecState& state)
+{
+    ASSERT(!m_readableStreamSource);
+    if (isDisturbed()) {
+        m_body->setReadableStream(ReadableStream::create(state, nullptr));
+        m_body->readableStream()->lock();
+    } else {
+        m_readableStreamSource = adoptRef(*new FetchBodySource(*this));
+        m_body->setReadableStream(ReadableStream::create(state, m_readableStreamSource));
+    }
 }
 
 void FetchBodyOwner::consumeBodyAsStream()

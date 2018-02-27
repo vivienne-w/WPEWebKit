@@ -41,13 +41,13 @@
 #include "FrameTree.h"
 #include "FrameView.h"
 #include "HistoryItem.h"
-#include "LinkHash.h"
 #include "Logging.h"
 #include "MainFrame.h"
 #include "Page.h"
 #include "PageCache.h"
 #include "ScrollingCoordinator.h"
 #include "SerializedScriptValue.h"
+#include "SharedStringHash.h"
 #include "VisitedLinkStore.h"
 #include <wtf/text/CString.h>
 
@@ -55,7 +55,7 @@ namespace WebCore {
 
 static inline void addVisitedLink(Page& page, const URL& url)
 {
-    page.visitedLinkStore().addVisitedLink(page, visitedLinkHash(url.string()));
+    page.visitedLinkStore().addVisitedLink(page, computeSharedStringHash(url.string()));
 }
 
 HistoryController::HistoryController(Frame& frame)
@@ -65,9 +65,7 @@ HistoryController::HistoryController(Frame& frame)
 {
 }
 
-HistoryController::~HistoryController()
-{
-}
+HistoryController::~HistoryController() = default;
 
 void HistoryController::saveScrollPositionAndViewStateToItem(HistoryItem* item)
 {
@@ -135,7 +133,7 @@ void HistoryController::restoreScrollPositionAndViewState()
     if (!m_currentItem)
         return;
 
-    FrameView* view = m_frame.view();
+    auto view = makeRefPtr(m_frame.view());
 
     // FIXME: There is some scrolling related work that needs to happen whenever a page goes into the
     // page cache and similar work that needs to occur when it comes out. This is where we do the work
@@ -157,6 +155,8 @@ void HistoryController::restoreScrollPositionAndViewState()
 #if !PLATFORM(IOS)
     // Don't restore scroll point on iOS as FrameLoaderClient::restoreViewState() does that.
     if (view && !view->wasScrolledByUser()) {
+        view->scrollToFocusedElementImmediatelyIfNeeded();
+
         Page* page = m_frame.page();
         auto desiredScrollPosition = m_currentItem->shouldRestoreScrollPosition() ? m_currentItem->scrollPosition() : view->scrollPosition();
         LOG(Scrolling, "HistoryController::restoreScrollPositionAndViewState scrolling to %d,%d", desiredScrollPosition.x(), desiredScrollPosition.y());

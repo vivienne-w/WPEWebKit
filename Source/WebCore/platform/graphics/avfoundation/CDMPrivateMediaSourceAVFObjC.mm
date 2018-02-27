@@ -34,7 +34,6 @@
 #import "LegacyCDM.h"
 #import "MediaPlayerPrivateMediaSourceAVFObjC.h"
 #import "VideoToolboxSoftLink.h"
-#import "WebCoreSystemInterface.h"
 #import <wtf/NeverDestroyed.h>
 #import <wtf/text/StringView.h>
 #import <yarr/RegularExpression.h>
@@ -45,7 +44,7 @@ namespace WebCore {
 
 static RegularExpression& validKeySystemRE()
 {
-    static NeverDestroyed<RegularExpression> keySystemRE("^com\\.apple\\.fps\\.[23]_\\d+(?:,\\d+)*$", TextCaseInsensitive);
+    static NeverDestroyed<RegularExpression> keySystemRE("^com\\.apple\\.fps\\.[23]_\\d+(?:,\\d+)*$", JSC::Yarr::TextCaseInsensitive);
     return keySystemRE;
 }
 
@@ -110,7 +109,7 @@ bool CDMPrivateMediaSourceAVFObjC::supportsMIMEType(const String& mimeType)
     return MediaPlayerPrivateMediaSourceAVFObjC::supportsType(parameters) != MediaPlayer::IsNotSupported;
 }
 
-std::unique_ptr<CDMSession> CDMPrivateMediaSourceAVFObjC::createSession(CDMSessionClient* client)
+std::unique_ptr<LegacyCDMSession> CDMPrivateMediaSourceAVFObjC::createSession(LegacyCDMSessionClient* client)
 {
     String keySystem = m_cdm->keySystem(); // Local copy for StringView usage
     StringView keySystemStringView { keySystem };

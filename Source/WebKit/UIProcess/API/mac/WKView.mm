@@ -1245,7 +1245,7 @@ static WebCore::UserInterfaceLayoutDirection toUserInterfaceLayoutDirection(NSUs
 // FIXME: This returns an autoreleased object. Should it really be prefixed 'create'?
 - (NSWindow *)createFullScreenWindow
 {
-    return _data->_impl->createFullScreenWindow();
+    return _data->_impl->fullScreenWindow();
 }
 
 - (void)beginDeferringViewInWindowChanges
@@ -1605,6 +1605,10 @@ static _WKOverlayScrollbarStyle toAPIScrollbarStyle(std::optional<WebCore::Scrol
     });
 }
 
+- (void)_setShouldSuppressFirstResponderChanges:(BOOL)shouldSuppress
+{
+    _data->_impl->setShouldSuppressFirstResponderChanges(shouldSuppress);
+}
 @end
 
 #endif // PLATFORM(MAC)

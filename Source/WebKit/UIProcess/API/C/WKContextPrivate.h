@@ -89,9 +89,11 @@ WK_EXPORT void WKContextWarmInitialProcess(WKContextRef context);
 WK_EXPORT void WKContextSetUsesNetworkProcess(WKContextRef, bool);
 
 WK_EXPORT void WKContextTerminateNetworkProcess(WKContextRef);
+WK_EXPORT void WKContextTerminateServiceWorkerProcess(WKContextRef);
 
 WK_EXPORT void WKContextSetAllowsAnySSLCertificateForWebSocketTesting(WKContextRef, bool);
-    
+WK_EXPORT void WKContextSetAllowsAnySSLCertificateForServiceWorkerTesting(WKContextRef, bool);
+
 // Test only. Should be called before any secondary processes are started.
 WK_EXPORT void WKContextUseTestingNetworkSession(WKContextRef context);
 
@@ -104,6 +106,8 @@ WK_EXPORT void WKContextSetInvalidMessageFunction(WKContextInvalidMessageFunctio
 WK_EXPORT void WKContextSetMemoryCacheDisabled(WKContextRef, bool disabled);
 
 WK_EXPORT void WKContextSetFontWhitelist(WKContextRef, WKArrayRef);
+
+WK_EXPORT void WKContextPreconnectToServer(WKContextRef context, WKURLRef serverURL);
 
 WK_EXPORT WKProcessID WKContextGetNetworkProcessIdentifier(WKContextRef context);
 WK_EXPORT WKProcessID WKContextGetDatabaseProcessIdentifier(WKContextRef context);

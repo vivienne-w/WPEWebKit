@@ -1,9 +1,9 @@
 list(APPEND JavaScriptCore_LIBRARIES
     ${GLIB_LIBRARIES}
 )
-list(APPEND JavaScriptCore_INCLUDE_DIRECTORIES
+
+list(APPEND JavaScriptCore_SYSTEM_INCLUDE_DIRECTORIES
     ${GLIB_INCLUDE_DIRS}
-    ${WTF_DIR}
 )
 
 list(APPEND JavaScriptCore_SOURCES
@@ -18,6 +18,11 @@ list(APPEND JavaScriptCore_SOURCES
     inspector/remote/glib/RemoteInspectorGlib.cpp
     inspector/remote/glib/RemoteInspectorServer.cpp
     inspector/remote/glib/RemoteInspectorUtils.cpp
+)
+
+list(APPEND JavaScriptCore_FORWARDING_HEADERS
+    inspector/remote/glib/RemoteInspectorServer.h
+    inspector/remote/glib/RemoteInspectorUtils.h
 )
 
 set(WPE_INSTALLED_JAVASCRIPTCORE_HEADERS

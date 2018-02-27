@@ -47,20 +47,6 @@
 
 namespace WebCore {
 
-bool WebContentReader::readFilenames(const Vector<String>&)
-{
-    return false;
-}
-
-bool WebContentReader::readHTML(const String& string)
-{
-    if (!frame.document())
-        return false;
-
-    addFragment(createFragmentFromMarkup(*frame.document(), string, emptyString(), DisallowScriptingAndPluginContent));
-    return true;
-}
-
 bool WebContentReader::readURL(const URL& url, const String& title)
 {
     if (url.isEmpty())

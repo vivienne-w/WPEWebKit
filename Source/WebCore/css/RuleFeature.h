@@ -33,16 +33,19 @@ namespace WebCore {
 class RuleData;
 class StyleRule;
 
+enum class MatchElement { Subject, Parent, Ancestor, DirectSibling, IndirectSibling, AnySibling, ParentSibling, AncestorSibling, Host };
+constexpr unsigned matchElementCount = static_cast<unsigned>(MatchElement::Host) + 1;
+
 struct RuleFeature {
-    RuleFeature(StyleRule* rule, unsigned selectorIndex, bool hasDocumentSecurityOrigin)
+    RuleFeature(StyleRule* rule, unsigned selectorIndex, std::optional<MatchElement> matchElement = std::nullopt)
         : rule(rule)
         , selectorIndex(selectorIndex)
-        , hasDocumentSecurityOrigin(hasDocumentSecurityOrigin) 
-    { 
+        , matchElement(matchElement)
+    {
     }
     StyleRule* rule;
     unsigned selectorIndex;
-    bool hasDocumentSecurityOrigin;
+    std::optional<MatchElement> matchElement;
 };
 
 struct RuleFeatureSet {
@@ -53,12 +56,13 @@ struct RuleFeatureSet {
 
     HashSet<AtomicString> idsInRules;
     HashSet<AtomicString> idsMatchingAncestorsInRules;
-    HashSet<AtomicString> classesInRules;
     HashSet<AtomicString> attributeCanonicalLocalNamesInRules;
     HashSet<AtomicString> attributeLocalNamesInRules;
     Vector<RuleFeature> siblingRules;
     Vector<RuleFeature> uncommonAttributeRules;
-    HashMap<AtomicString, std::unique_ptr<Vector<RuleFeature>>> ancestorClassRules;
+    
+    HashMap<AtomicString, std::unique_ptr<Vector<RuleFeature>>> classRules;
+    HashSet<AtomicString> classesAffectingHost;
 
     struct AttributeRules {
         WTF_MAKE_FAST_ALLOCATED;
@@ -72,12 +76,16 @@ struct RuleFeatureSet {
     bool usesFirstLetterRules { false };
 
 private:
+    static MatchElement computeNextMatchElement(MatchElement, CSSSelector::RelationType);
+    static MatchElement computeSubSelectorMatchElement(MatchElement, const CSSSelector&);
+
     struct SelectorFeatures {
         bool hasSiblingSelector { false };
-        Vector<AtomicString, 32> classesMatchingAncestors;
+
+        Vector<std::pair<AtomicString, MatchElement>, 32> classes;
         Vector<const CSSSelector*> attributeSelectorsMatchingAncestors;
     };
-    void recursivelyCollectFeaturesFromSelector(SelectorFeatures&, const CSSSelector&, bool matchesAncestor = false);
+    void recursivelyCollectFeaturesFromSelector(SelectorFeatures&, const CSSSelector&, MatchElement = MatchElement::Subject);
 };
 
 } // namespace WebCore

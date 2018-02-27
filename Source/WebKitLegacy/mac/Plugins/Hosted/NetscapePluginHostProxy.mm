@@ -35,7 +35,6 @@
 #import "NetscapePluginInstanceProxy.h"
 #import "WebFrameInternal.h"
 #import "WebHostedNetscapePluginView.h"
-#import "WebKitSystemInterface.h"
 #import <JavaScriptCore/IdentifierInlines.h>
 #import <WebCore/CommonVM.h>
 #import <WebCore/Frame.h>
@@ -118,7 +117,7 @@ NetscapePluginHostProxy::NetscapePluginHostProxy(mach_port_t clientPort, mach_po
     
     CFRunLoopAddSource(CFRunLoopGetCurrent(), deathPortSource.get(), kCFRunLoopDefaultMode);
     
-    m_clientPortSource = adoptCF(MSHCreateMIGServerSource(nullptr, 0, (mig_subsystem_t)&WKWebKitPluginClient_subsystem, 0, m_clientPort, nullptr));
+    m_clientPortSource = adoptCF(MSHCreateMIGServerSource(nullptr, 0, reinterpret_cast<mig_subsystem_t>(const_cast<struct WKWebKitPluginClient_subsystem*>(&WKWebKitPluginClient_subsystem)), 0, m_clientPort, nullptr));
     CFRunLoopAddSource(CFRunLoopGetCurrent(), m_clientPortSource.get(), kCFRunLoopDefaultMode);
     CFRunLoopAddSource(CFRunLoopGetCurrent(), m_clientPortSource.get(), (CFStringRef)NSEventTrackingRunLoopMode);
 }

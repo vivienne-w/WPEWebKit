@@ -26,12 +26,9 @@
 #include "config.h"
 #include "PingLoad.h"
 
-#if USE(NETWORK_SESSION)
-
 #include "AuthenticationManager.h"
 #include "Logging.h"
 #include "NetworkCORSPreflightChecker.h"
-#include "NetworkConnectionToWebProcess.h"
 #include "SessionTracker.h"
 #include "WebCompiledContentRuleList.h"
 #include "WebErrors.h"
@@ -45,10 +42,10 @@ namespace WebKit {
 
 using namespace WebCore;
 
-PingLoad::PingLoad(NetworkResourceLoadParameters&& parameters, HTTPHeaderMap&& originalRequestHeaders, Ref<NetworkConnectionToWebProcess>&& connection)
+PingLoad::PingLoad(NetworkResourceLoadParameters&& parameters, HTTPHeaderMap&& originalRequestHeaders, WTF::CompletionHandler<void(const ResourceError&, const ResourceResponse&)>&& completionHandler)
     : m_parameters(WTFMove(parameters))
     , m_originalRequestHeaders(WTFMove(originalRequestHeaders))
-    , m_connection(WTFMove(connection))
+    , m_completionHandler(WTFMove(completionHandler))
     , m_timeoutTimer(*this, &PingLoad::timeoutTimerFired)
     , m_isSameOriginRequest(securityOrigin().canRequest(m_parameters.request.url()))
 {
@@ -78,9 +75,9 @@ PingLoad::~PingLoad()
     }
 }
 
-void PingLoad::didFinish(const ResourceError& error)
+void PingLoad::didFinish(const ResourceError& error, const ResourceResponse& response)
 {
-    m_connection->didFinishPingLoad(m_parameters.identifier, error);
+    m_completionHandler(error, response);
     delete this;
 }
 
@@ -176,7 +173,7 @@ void PingLoad::didReceiveResponseNetworkSession(ResourceResponse&& response, Res
 {
     RELEASE_LOG_IF_ALLOWED("didReceiveResponseNetworkSession - httpStatusCode: %d", response.httpStatusCode());
     completionHandler(PolicyAction::Ignore);
-    didFinish();
+    didFinish({ }, response);
 }
 
 void PingLoad::didReceiveData(Ref<SharedBuffer>&&)
@@ -324,12 +321,10 @@ ContentExtensions::ContentExtensionsBackend& PingLoad::contentExtensionsBackend(
 ContentExtensions::BlockedStatus PingLoad::processContentExtensionRulesForLoad(ResourceRequest& request)
 {
     auto status = contentExtensionsBackend().processContentExtensionRulesForPingLoad(request.url(), m_parameters.mainDocumentURL);
-    applyBlockedStatusToRequest(status, request);
+    applyBlockedStatusToRequest(status, nullptr, request);
     return status;
 }
 
 #endif // ENABLE(CONTENT_EXTENSIONS)
 
 } // namespace WebKit
-
-#endif // USE(NETWORK_SESSION)

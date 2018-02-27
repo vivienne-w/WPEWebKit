@@ -36,7 +36,6 @@
 #include "JSArrayInlines.h"
 #include "JSCBuiltins.h"
 #include "JSCInlines.h"
-#include "JSStringBuilder.h"
 #include "JSStringJoiner.h"
 #include "Lookup.h"
 #include "ObjectConstructor.h"
@@ -82,7 +81,7 @@ void ArrayPrototype::finishCreation(VM& vm, JSGlobalObject* globalObject)
 {
     Base::finishCreation(vm);
     ASSERT(inherits(vm, info()));
-    vm.prototypeMap.addPrototype(this);
+    didBecomePrototype();
 
     putDirectWithoutTransition(vm, vm.propertyNames->toString, globalObject->arrayProtoToStringFunction(), static_cast<unsigned>(PropertyAttribute::DontEnum));
     putDirectWithoutTransition(vm, vm.propertyNames->builtinNames().valuesPublicName(), globalObject->arrayProtoValuesFunction(), static_cast<unsigned>(PropertyAttribute::DontEnum));
@@ -202,7 +201,7 @@ ALWAYS_INLINE bool speciesWatchpointIsValid(ExecState* exec, JSObject* thisObjec
     }
 
     return !thisObject->hasCustomProperties()
-        && arrayPrototype == thisObject->getPrototypeDirect()
+        && arrayPrototype == thisObject->getPrototypeDirect(globalObject->vm())
         && globalObject->arraySpeciesWatchpoint().stateOnJSThread() == IsWatched;
 }
 
@@ -254,6 +253,7 @@ static ALWAYS_INLINE std::pair<SpeciesConstructResult, JSObject*> speciesConstru
 
     MarkedArgumentBuffer args;
     args.append(jsNumber(length));
+    ASSERT(!args.hasOverflowed());
     JSObject* newObject = construct(exec, constructor, args, "Species construction did not get a valid constructor");
     RETURN_IF_EXCEPTION(scope, exceptionResult());
     return std::make_pair(SpeciesConstructResult::CreatedObject, newObject);
@@ -380,6 +380,9 @@ void unshift(ExecState* exec, JSObject* thisObj, unsigned header, unsigned curre
     }
 }
 
+static bool canUseFastJoin(const JSObject*);
+static JSValue fastJoin(ExecState&, JSObject*, StringView, unsigned);
+
 EncodedJSValue JSC_HOST_CALL arrayProtoFuncToString(ExecState* exec)
 {
     VM& vm = exec->vm();
@@ -424,6 +427,12 @@ EncodedJSValue JSC_HOST_CALL arrayProtoFuncToString(ExecState* exec)
     if (JSValue earlyReturnValue = checker.earlyReturnValue())
         return JSValue::encode(earlyReturnValue);
 
+    if (LIKELY(canUseFastJoin(thisArray))) {
+        const LChar comma = ',';
+        scope.release();
+        return JSValue::encode(fastJoin(*exec, thisArray, { &comma, 1 }, length));
+    }
+
     JSStringJoiner joiner(*exec, ',', length);
     RETURN_IF_EXCEPTION(scope, encodedJSValue());
 
@@ -462,6 +471,7 @@ EncodedJSValue JSC_HOST_CALL arrayProtoFuncToLocaleString(ExecState* exec)
 
 #if ENABLE(INTL)
     ArgList arguments(exec);
+#endif
     for (unsigned i = 0; i < length; ++i) {
         JSValue element = thisObject->getIndex(exec, i);
         RETURN_IF_EXCEPTION(scope, encodedJSValue());
@@ -473,31 +483,17 @@ EncodedJSValue JSC_HOST_CALL arrayProtoFuncToLocaleString(ExecState* exec)
             CallData callData;
             CallType callType = getCallData(conversionFunction, callData);
             if (callType != CallType::None) {
+#if ENABLE(INTL)
                 element = call(exec, conversionFunction, callType, callData, element, arguments);
+#else
+                element = call(exec, conversionFunction, callType, callData, element, *vm.emptyList);
+#endif
                 RETURN_IF_EXCEPTION(scope, encodedJSValue());
             }
         }
         stringJoiner.append(*exec, element);
         RETURN_IF_EXCEPTION(scope, encodedJSValue());
     }
-#else // !ENABLE(INTL)
-    for (unsigned i = 0; i < length; ++i) {
-        JSValue element = thisObject->getIndex(exec, i);
-        RETURN_IF_EXCEPTION(scope, encodedJSValue());
-        if (element.isUndefinedOrNull())
-            continue;
-        JSValue conversionFunction = element.get(exec, vm.propertyNames->toLocaleString);
-        RETURN_IF_EXCEPTION(scope, encodedJSValue());
-        CallData callData;
-        CallType callType = getCallData(conversionFunction, callData);
-        if (callType != CallType::None) {
-            element = call(exec, conversionFunction, callType, callData, element, *vm.emptyList);
-            RETURN_IF_EXCEPTION(scope, encodedJSValue());
-        }
-        stringJoiner.append(*exec, element);
-        RETURN_IF_EXCEPTION(scope, encodedJSValue());
-    }
-#endif // !ENABLE(INTL)
 
     scope.release();
     return JSValue::encode(stringJoiner.join(*exec));
@@ -522,10 +518,9 @@ template<typename T> static inline bool containsHole(T* data, unsigned length)
     return false;
 }
 
-static inline bool holesMustForwardToPrototype(ExecState& state, JSObject* object)
+static inline bool holesMustForwardToPrototype(VM& vm, JSObject* object)
 {
-    auto& vm = state.vm();
-    return object->structure(vm)->holesMustForwardToPrototype(vm);
+    return object->structure(vm)->holesMustForwardToPrototype(vm, object);
 }
 
 static JSValue slowJoin(ExecState& exec, JSObject* thisObject, JSString* separator, uint64_t length)
@@ -595,10 +590,33 @@ static inline JSValue fastJoin(ExecState& state, JSObject* thisObject, StringVie
     auto scope = DECLARE_THROW_SCOPE(vm);
 
     switch (thisObject->indexingType()) {
-    case ALL_CONTIGUOUS_INDEXING_TYPES:
     case ALL_INT32_INDEXING_TYPES: {
         auto& butterfly = *thisObject->butterfly();
-        if (length > butterfly.publicLength())
+        if (UNLIKELY(length > butterfly.publicLength()))
+            break;
+        JSStringJoiner joiner(state, separator, length);
+        RETURN_IF_EXCEPTION(scope, { });
+        auto data = butterfly.contiguous().data();
+        bool holesKnownToBeOK = false;
+        for (unsigned i = 0; i < length; ++i) {
+            JSValue value = data[i].get();
+            if (LIKELY(value))
+                joiner.appendNumber(vm, value.asInt32());
+            else {
+                if (!holesKnownToBeOK) {
+                    if (holesMustForwardToPrototype(vm, thisObject))
+                        goto generalCase;
+                    holesKnownToBeOK = true;
+                }
+                joiner.appendEmptyString();
+            }
+        }
+        scope.release();
+        return joiner.join(state);
+    }
+    case ALL_CONTIGUOUS_INDEXING_TYPES: {
+        auto& butterfly = *thisObject->butterfly();
+        if (UNLIKELY(length > butterfly.publicLength()))
             break;
         JSStringJoiner joiner(state, separator, length);
         RETURN_IF_EXCEPTION(scope, { });
@@ -610,7 +628,7 @@ static inline JSValue fastJoin(ExecState& state, JSObject* thisObject, StringVie
                     goto generalCase;
             } else {
                 if (!holesKnownToBeOK) {
-                    if (holesMustForwardToPrototype(state, thisObject))
+                    if (holesMustForwardToPrototype(vm, thisObject))
                         goto generalCase;
                     holesKnownToBeOK = true;
                 }
@@ -622,7 +640,7 @@ static inline JSValue fastJoin(ExecState& state, JSObject* thisObject, StringVie
     }
     case ALL_DOUBLE_INDEXING_TYPES: {
         auto& butterfly = *thisObject->butterfly();
-        if (length > butterfly.publicLength())
+        if (UNLIKELY(length > butterfly.publicLength()))
             break;
         JSStringJoiner joiner(state, separator, length);
         RETURN_IF_EXCEPTION(scope, { });
@@ -630,11 +648,11 @@ static inline JSValue fastJoin(ExecState& state, JSObject* thisObject, StringVie
         bool holesKnownToBeOK = false;
         for (unsigned i = 0; i < length; ++i) {
             double value = data[i];
-            if (!isHole(value))
-                joiner.append(state, jsDoubleNumber(value));
+            if (LIKELY(!isHole(value)))
+                joiner.appendNumber(vm, value);
             else {
                 if (!holesKnownToBeOK) {
-                    if (thisObject->structure(vm)->holesMustForwardToPrototype(vm))
+                    if (holesMustForwardToPrototype(vm, thisObject))
                         goto generalCase;
                     holesKnownToBeOK = true;
                 }
@@ -764,10 +782,10 @@ EncodedJSValue JSC_HOST_CALL arrayProtoFuncPush(ExecState* exec)
     auto scope = DECLARE_THROW_SCOPE(vm);
     JSValue thisValue = exec->thisValue().toThis(exec, StrictMode);
 
-    if (isJSArray(thisValue) && exec->argumentCount() == 1) {
+    if (LIKELY(isJSArray(thisValue) && exec->argumentCount() == 1)) {
         JSArray* array = asArray(thisValue);
         scope.release();
-        array->push(exec, exec->uncheckedArgument(0));
+        array->pushInline(exec, exec->uncheckedArgument(0));
         return JSValue::encode(jsNumber(array->length()));
     }
     
@@ -816,7 +834,7 @@ EncodedJSValue JSC_HOST_CALL arrayProtoFuncReverse(ExecState* exec)
         if (length > butterfly.publicLength())
             break;
         auto data = butterfly.contiguous().data();
-        if (containsHole(data, length) && holesMustForwardToPrototype(*exec, thisObject))
+        if (containsHole(data, length) && holesMustForwardToPrototype(vm, thisObject))
             break;
         std::reverse(data, data + length);
         return JSValue::encode(thisObject);
@@ -826,7 +844,7 @@ EncodedJSValue JSC_HOST_CALL arrayProtoFuncReverse(ExecState* exec)
         if (length > butterfly.publicLength())
             break;
         auto data = butterfly.contiguousDouble().data();
-        if (containsHole(data, length) && holesMustForwardToPrototype(*exec, thisObject))
+        if (containsHole(data, length) && holesMustForwardToPrototype(vm, thisObject))
             break;
         std::reverse(data, data + length);
         return JSValue::encode(thisObject);
@@ -835,7 +853,7 @@ EncodedJSValue JSC_HOST_CALL arrayProtoFuncReverse(ExecState* exec)
         auto& storage = *thisObject->butterfly()->arrayStorage();
         if (length > storage.vectorLength())
             break;
-        if (storage.hasHoles() && holesMustForwardToPrototype(*exec, thisObject))
+        if (storage.hasHoles() && holesMustForwardToPrototype(vm, thisObject))
             break;
         auto data = storage.vector().data();
         std::reverse(data, data + length);
@@ -1120,9 +1138,10 @@ EncodedJSValue JSC_HOST_CALL arrayProtoFuncIndexOf(ExecState* exec)
         RETURN_IF_EXCEPTION(scope, encodedJSValue());
         if (!e)
             continue;
-        if (JSValue::strictEqual(exec, searchElement, e))
-            return JSValue::encode(jsNumber(index));
+        bool isEqual = JSValue::strictEqual(exec, searchElement, e);
         RETURN_IF_EXCEPTION(scope, encodedJSValue());
+        if (isEqual)
+            return JSValue::encode(jsNumber(index));
     }
 
     return JSValue::encode(jsNumber(-1));
@@ -1146,6 +1165,7 @@ EncodedJSValue JSC_HOST_CALL arrayProtoFuncLastIndexOf(ExecState* exec)
     if (exec->argumentCount() >= 2) {
         JSValue fromValue = exec->uncheckedArgument(1);
         double fromDouble = fromValue.toInteger(exec);
+        RETURN_IF_EXCEPTION(scope, encodedJSValue());
         if (fromDouble < 0) {
             fromDouble += length;
             if (fromDouble < 0)
@@ -1174,7 +1194,7 @@ static bool moveElements(ExecState* exec, VM& vm, JSArray* target, unsigned targ
 {
     auto scope = DECLARE_THROW_SCOPE(vm);
 
-    if (LIKELY(!hasAnyArrayStorage(source->indexingType()) && !source->structure()->holesMustForwardToPrototype(vm))) {
+    if (LIKELY(!hasAnyArrayStorage(source->indexingType()) && !holesMustForwardToPrototype(vm, source))) {
         for (unsigned i = 0; i < sourceLength; ++i) {
             JSValue value = source->tryGetIndexQuickly(i);
             if (value) {

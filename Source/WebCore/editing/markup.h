@@ -29,6 +29,8 @@
 #include "FragmentScriptingPermission.h"
 #include "HTMLInterchange.h"
 #include <wtf/Forward.h>
+#include <wtf/Function.h>
+#include <wtf/HashMap.h>
 
 namespace WebCore {
 
@@ -41,8 +43,15 @@ class Frame;
 class HTMLElement;
 class URL;
 class Node;
+class Page;
 class QualifiedName;
 class Range;
+
+void replaceSubresourceURLs(Ref<DocumentFragment>&&, HashMap<AtomicString, AtomicString>&&);
+void removeSubresourceURLAttributes(Ref<DocumentFragment>&&, WTF::Function<bool(const URL&)> shouldRemoveURL);
+
+std::unique_ptr<Page> createPageForSanitizingWebContent();
+String sanitizeMarkup(const String&, std::optional<WTF::Function<void(DocumentFragment&)>> fragmentSanitizer = std::nullopt);
 
 enum EChildrenOnly { IncludeNode, ChildrenOnly };
 enum EAbsoluteURLs { DoNotResolveURLs, ResolveAllURLs, ResolveNonLocalURLs };

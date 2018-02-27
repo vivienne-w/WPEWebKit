@@ -86,6 +86,7 @@ set(WebKit_INCLUDE_DIRECTORIES
     "${WEBKIT_DIR}/WebProcess/WebStorage"
     "${DERIVED_SOURCES_WEBKIT_DIR}"
     "${DERIVED_SOURCES_WEBKIT_DIR}/include"
+    "${CMAKE_SOURCE_DIR}/Source"
     "${CMAKE_SOURCE_DIR}/WebKitLibraries"
 )
 
@@ -96,9 +97,6 @@ set(WebKit_SYSTEM_INCLUDE_DIRECTORIES
 )
 
 set(WebKit_SOURCES
-    NetworkProcess/CustomProtocols/LegacyCustomProtocolManager.cpp
-
-    NetworkProcess/Downloads/BlobDownloadClient.cpp
     NetworkProcess/Downloads/Download.cpp
     NetworkProcess/Downloads/DownloadManager.cpp
     NetworkProcess/Downloads/PendingDownload.cpp
@@ -118,6 +116,7 @@ set(WebKit_SOURCES
     NetworkProcess/NetworkSession.cpp
     NetworkProcess/NetworkSocketStream.cpp
     NetworkProcess/PingLoad.cpp
+    NetworkProcess/PreconnectTask.cpp
 
     NetworkProcess/cache/CacheStorageEngine.cpp
     NetworkProcess/cache/CacheStorageEngineCache.cpp
@@ -179,10 +178,15 @@ set(WebKit_SOURCES
     Shared/SessionTracker.cpp
     Shared/ShareableBitmap.cpp
     Shared/ShareableResource.cpp
+    Shared/SharedStringHashStore.cpp
+    Shared/SharedStringHashTableReadOnly.cpp
+    Shared/SharedStringHashTable.cpp
     Shared/StatisticsData.cpp
+    Shared/TouchBarMenuData.cpp
+    Shared/TouchBarMenuItemData.cpp
+    Shared/URLSchemeTaskParameters.cpp
     Shared/UpdateInfo.cpp
     Shared/UserData.cpp
-    Shared/VisitedLinkTable.cpp
     Shared/WebBackForwardListItem.cpp
     Shared/WebCompiledContentRuleList.cpp
     Shared/WebCompiledContentRuleListData.cpp
@@ -206,7 +210,7 @@ set(WebKit_SOURCES
     Shared/WebPageGroupData.cpp
     Shared/WebPlatformTouchPoint.cpp
     Shared/WebPopupItem.cpp
-    Shared/WebPreferencesKeys.cpp
+    Shared/WebPreferencesDefaultValues.cpp
     Shared/WebPreferencesStore.cpp
     Shared/WebProcessCreationParameters.cpp
     Shared/WebRenderLayer.cpp
@@ -215,6 +219,7 @@ set(WebKit_SOURCES
     Shared/WebUserContentControllerDataTypes.cpp
     Shared/WebWheelEvent.cpp
     Shared/WebsiteDataStoreParameters.cpp
+    Shared/WebsitePoliciesData.cpp
 
     Shared/API/APIArray.cpp
     Shared/API/APIData.cpp
@@ -280,6 +285,7 @@ set(WebKit_SOURCES
 
     StorageProcess/IndexedDB/WebIDBConnectionToClient.cpp
 
+    StorageProcess/ServiceWorker/WebSWOriginStore.cpp
     StorageProcess/ServiceWorker/WebSWServerConnection.cpp
 
     UIProcess/BackgroundProcessResponsivenessTimer.cpp
@@ -296,6 +302,7 @@ set(WebKit_SOURCES
     UIProcess/ResponsivenessTimer.cpp
     UIProcess/StatisticsRequest.cpp
     UIProcess/TextCheckerCompletion.cpp
+    UIProcess/UIMessagePortChannelProvider.cpp
     UIProcess/UserMediaPermissionCheckProxy.cpp
     UIProcess/UserMediaPermissionRequestManagerProxy.cpp
     UIProcess/UserMediaPermissionRequestProxy.cpp
@@ -307,6 +314,7 @@ set(WebKit_SOURCES
     UIProcess/WebContextClient.cpp
     UIProcess/WebContextConnectionClient.cpp
     UIProcess/WebContextInjectedBundleClient.cpp
+    UIProcess/WebContextMenuListenerProxy.cpp
     UIProcess/WebContextMenuProxy.cpp
     UIProcess/WebCookieManagerProxy.cpp
     UIProcess/WebCookieManagerProxyClient.cpp
@@ -425,8 +433,6 @@ set(WebKit_SOURCES
 
     UIProcess/Launcher/ProcessLauncher.cpp
 
-    UIProcess/Network/CustomProtocols/LegacyCustomProtocolManagerProxy.cpp
-
     UIProcess/Network/NetworkProcessProxy.cpp
 
     UIProcess/Notifications/NotificationPermissionRequestManagerProxy.cpp
@@ -540,7 +546,11 @@ set(WebKit_SOURCES
     WebProcess/Plugins/Netscape/NetscapePluginNone.cpp
     WebProcess/Plugins/Netscape/NetscapePluginStream.cpp
 
+    WebProcess/Storage/ServiceWorkerClientFetch.cpp
     WebProcess/Storage/WebSWClientConnection.cpp
+    WebProcess/Storage/WebSWContextManagerConnection.cpp
+    WebProcess/Storage/WebSWOriginTable.cpp
+    WebProcess/Storage/WebServiceWorkerFetchTaskClient.cpp
     WebProcess/Storage/WebServiceWorkerProvider.cpp
     WebProcess/Storage/WebToStorageProcessConnection.cpp
 
@@ -556,6 +566,7 @@ set(WebKit_SOURCES
     WebProcess/WebCoreSupport/WebFrameLoaderClient.cpp
     WebProcess/WebCoreSupport/WebGeolocationClient.cpp
     WebProcess/WebCoreSupport/WebInspectorClient.cpp
+    WebProcess/WebCoreSupport/WebMessagePortChannelProvider.cpp
     WebProcess/WebCoreSupport/WebNotificationClient.cpp
     WebProcess/WebCoreSupport/WebPerformanceLoggingClient.cpp
     WebProcess/WebCoreSupport/WebPlatformStrategies.cpp
@@ -595,14 +606,12 @@ set(WebKit_SOURCES
 )
 
 set(WebKit_MESSAGES_IN_FILES
-    NetworkProcess/cache/CacheStorageEngineConnection.messages.in
-
-    NetworkProcess/CustomProtocols/LegacyCustomProtocolManager.messages.in
-
     NetworkProcess/NetworkConnectionToWebProcess.messages.in
     NetworkProcess/NetworkProcess.messages.in
     NetworkProcess/NetworkResourceLoader.messages.in
     NetworkProcess/NetworkSocketStream.messages.in
+
+    NetworkProcess/cache/CacheStorageEngineConnection.messages.in
 
     NetworkProcess/webrtc/NetworkRTCMonitor.messages.in
     NetworkProcess/webrtc/NetworkRTCProvider.messages.in
@@ -645,8 +654,6 @@ set(WebKit_MESSAGES_IN_FILES
 
     UIProcess/Network/NetworkProcessProxy.messages.in
 
-    UIProcess/Network/CustomProtocols/LegacyCustomProtocolManagerProxy.messages.in
-
     UIProcess/Plugins/PluginProcessProxy.messages.in
 
     UIProcess/Storage/StorageProcessProxy.messages.in
@@ -683,7 +690,9 @@ set(WebKit_MESSAGES_IN_FILES
     WebProcess/Plugins/PluginProcessConnectionManager.messages.in
     WebProcess/Plugins/PluginProxy.messages.in
 
+    WebProcess/Storage/ServiceWorkerClientFetch.messages.in
     WebProcess/Storage/WebSWClientConnection.messages.in
+    WebProcess/Storage/WebSWContextManagerConnection.messages.in
 
     WebProcess/UserContent/WebUserContentController.messages.in
 
@@ -699,6 +708,10 @@ set(WebKit_MESSAGES_IN_FILES
     WebProcess/WebStorage/StorageAreaMap.messages.in
 )
 
+set(WebKit_LIBRARIES
+    WebCore
+)
+
 set(WebProcess_LIBRARIES
     WebKit
 )
@@ -710,18 +723,6 @@ set(NetworkProcess_LIBRARIES
 set(StorageProcess_LIBRARIES
     WebKit
 )
-
-if (APPLE)
-    set(WebKit_LIBRARIES
-        PRIVATE WebCore
-        PUBLIC JavaScriptCore
-    )
-else ()
-    set(WebKit_LIBRARIES
-        WebCore
-        JavaScriptCore
-    )
-endif ()
 
 set(PluginProcess_LIBRARIES
     WebKit
@@ -738,6 +739,7 @@ if (ENABLE_GRAPHICS_CONTEXT_3D)
         list(APPEND WebKit_LIBRARIES
             ${LIBEPOXY_LIBRARIES}
         )
+        add_definitions(${LIBEPOXY_DEFINITIONS})
     else ()
         if (USE_OPENGL)
             list(APPEND WebKit_SYSTEM_INCLUDE_DIRECTORIES
@@ -806,6 +808,7 @@ if (UNIX)
         if (SHM_OPEN_REQUIRES_LIBRT)
             list(APPEND WebKit_LIBRARIES rt)
         endif ()
+        unset(CMAKE_REQUIRED_LIBRARIES)
     endif ()
 endif ()
 
@@ -899,19 +902,40 @@ list(APPEND WebKit_HEADERS
     ${DERIVED_SOURCES_WEBKIT_DIR}/WebAutomationSessionProxyScriptSource.h
 )
 
+set(WebKit_WEB_PREFERENCES_TEMPLATES
+    ${WEBKIT_DIR}/Scripts/PreferencesTemplates/WebPageUpdatePreferences.cpp.erb
+    ${WEBKIT_DIR}/Scripts/PreferencesTemplates/WebPreferencesDefinitions.h.erb
+    ${WEBKIT_DIR}/Scripts/PreferencesTemplates/WebPreferencesExperimentalFeatures.cpp.erb
+    ${WEBKIT_DIR}/Scripts/PreferencesTemplates/WebPreferencesKeys.cpp.erb
+    ${WEBKIT_DIR}/Scripts/PreferencesTemplates/WebPreferencesKeys.h.erb
+    ${WEBKIT_DIR}/Scripts/PreferencesTemplates/WebPreferencesStoreDefaultsMap.cpp.erb
+)
+
+add_custom_command(
+    OUTPUT ${DERIVED_SOURCES_WEBKIT_DIR}/WebPageUpdatePreferences.cpp ${DERIVED_SOURCES_WEBKIT_DIR}/WebPreferencesDefinitions.h ${DERIVED_SOURCES_WEBKIT_DIR}/WebPreferencesExperimentalFeatures.cpp ${DERIVED_SOURCES_WEBKIT_DIR}/WebPreferencesKeys.cpp ${DERIVED_SOURCES_WEBKIT_DIR}/WebPreferencesKeys.h ${DERIVED_SOURCES_WEBKIT_DIR}/WebPreferencesStoreDefaultsMap.cpp
+    MAIN_DEPENDENCY ${WEBKIT_DIR}/Shared/WebPreferences.yaml
+    DEPENDS ${WebKit_WEB_PREFERENCES_TEMPLATES}
+    COMMAND ${RUBY_EXECUTABLE} ${WEBKIT_DIR}/Scripts/GeneratePreferences.rb --input ${WEBKIT_DIR}/Shared/WebPreferences.yaml --outputDir "${DERIVED_SOURCES_WEBKIT_DIR}"
+    VERBATIM)
+
+list(APPEND WebKit_HEADERS
+    ${DERIVED_SOURCES_WEBKIT_DIR}/WebPreferencesDefinitions.h
+    ${DERIVED_SOURCES_WEBKIT_DIR}/WebPreferencesKeys.h
+)
+
+list(APPEND WebKit_SOURCES
+    ${DERIVED_SOURCES_WEBKIT_DIR}/WebPageUpdatePreferences.cpp
+    ${DERIVED_SOURCES_WEBKIT_DIR}/WebPreferencesExperimentalFeatures.cpp
+    ${DERIVED_SOURCES_WEBKIT_DIR}/WebPreferencesKeys.cpp
+    ${DERIVED_SOURCES_WEBKIT_DIR}/WebPreferencesStoreDefaultsMap.cpp
+)
+
+
 list(APPEND WebKit_SOURCES ${WebKit_DERIVED_SOURCES})
 
 WEBKIT_FRAMEWORK(WebKit)
 add_dependencies(WebKit WebCore ${WEBKIT_EXTRA_DEPENDENCIES})
 ADD_WEBKIT_PREFIX_HEADER(WebKit)
-
-if (COMPILER_IS_GCC_OR_CLANG AND NOT APPLE)
-    target_link_libraries(WebKit -Wl,--start-group WebCore WebCoreDerivedSources -Wl,--end-group)
-endif ()
-
-if (WebKit_VERSION_SCRIPT)
-    WEBKIT_ADD_TARGET_PROPERTIES(WebKit LINK_FLAGS "${WebKit_VERSION_SCRIPT}")
-endif ()
 
 add_executable(WebProcess ${WebProcess_SOURCES})
 ADD_WEBKIT_PREFIX_HEADER(WebProcess)
@@ -929,27 +953,23 @@ if (WebKit_NetworkProcess_OUTPUT_NAME)
     set_target_properties(NetworkProcess PROPERTIES OUTPUT_NAME ${WebKit_NetworkProcess_OUTPUT_NAME})
 endif ()
 
-if (NOT "${PORT}" STREQUAL "Mac")
-    add_executable(StorageProcess ${StorageProcess_SOURCES})
-    ADD_WEBKIT_PREFIX_HEADER(StorageProcess)
-    target_link_libraries(StorageProcess ${StorageProcess_LIBRARIES})
-    install(TARGETS StorageProcess DESTINATION "${LIBEXEC_INSTALL_DIR}")
+add_executable(StorageProcess ${StorageProcess_SOURCES})
+ADD_WEBKIT_PREFIX_HEADER(StorageProcess)
+target_link_libraries(StorageProcess ${StorageProcess_LIBRARIES})
+install(TARGETS StorageProcess DESTINATION "${LIBEXEC_INSTALL_DIR}")
 
-    if (COMPILER_IS_GCC_OR_CLANG)
-        WEBKIT_ADD_TARGET_CXX_FLAGS(StorageProcess -Wno-unused-parameter)
-    endif ()
-
-    if (WebKit_StorageProcess_OUTPUT_NAME)
-        set_target_properties(StorageProcess PROPERTIES OUTPUT_NAME ${WebKit_StorageProcess_OUTPUT_NAME})
-    endif ()
+if (WebKit_StorageProcess_OUTPUT_NAME)
+    set_target_properties(StorageProcess PROPERTIES OUTPUT_NAME ${WebKit_StorageProcess_OUTPUT_NAME})
 endif ()
 
 if (COMPILER_IS_GCC_OR_CLANG)
     WEBKIT_ADD_TARGET_CXX_FLAGS(WebKit -Wno-unused-parameter)
     WEBKIT_ADD_TARGET_CXX_FLAGS(WebProcess -Wno-unused-parameter)
     WEBKIT_ADD_TARGET_CXX_FLAGS(NetworkProcess -Wno-unused-parameter)
+    WEBKIT_ADD_TARGET_CXX_FLAGS(StorageProcess -Wno-unused-parameter)
 endif ()
 
+# FIXME: Mac should build a plugin process.
 if (ENABLE_PLUGIN_PROCESS AND NOT "${PORT}" STREQUAL "Mac")
     add_definitions(-DENABLE_PLUGIN_PROCESS=1)
     add_executable(PluginProcess ${PluginProcess_SOURCES})
@@ -967,34 +987,10 @@ if (ENABLE_PLUGIN_PROCESS AND NOT "${PORT}" STREQUAL "Mac")
 endif ()
 
 if ("${PORT}" STREQUAL "Mac")
-    set(_web_xpc_dir ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/WebKit.framework/XPCServices/com.apple.WebKit.WebContent.Development.xpc/Contents)
-    make_directory(${_web_xpc_dir}/MacOS)
-    make_directory(${_web_xpc_dir}/Resources)
-    make_directory(${_web_xpc_dir}/_CodeSignature)
-
-    add_custom_target(WebContentProcessNib COMMAND
-        ibtool --compile ${_web_xpc_dir}/Resources/WebContentProcess.nib ${WEBKIT_DIR}/Resources/WebContentProcess.xib
-        VERBATIM)
-    add_dependencies(WebKit WebContentProcessNib)
-
-    # FIXME: This shouldn't be two operations.
-    file(COPY ${WEBKIT_DIR}/WebProcess/EntryPoint/mac/XPCService/WebContentService/Info-OSX.plist DESTINATION ${_web_xpc_dir})
-    file(RENAME ${_web_xpc_dir}/Info-OSX.plist ${_web_xpc_dir}/Info.plist)
-
-    set_target_properties(WebProcess PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${_web_xpc_dir}/MacOS")
-
-
-    set(_net_xpc_dir ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/WebKit.framework/XPCServices/com.apple.WebKit.Networking.Development.xpc/Contents)
-    make_directory(${_net_xpc_dir}/MacOS)
-    make_directory(${_net_xpc_dir}/_CodeSignature)
-
-    # FIXME: This shouldn't be two operations.
-    file(COPY ${WEBKIT_DIR}/NetworkProcess/EntryPoint/mac/XPCService/NetworkService/Info-OSX.plist DESTINATION ${_net_xpc_dir})
-    file(RENAME ${_net_xpc_dir}/Info-OSX.plist ${_net_xpc_dir}/Info.plist)
-
-    set_target_properties(NetworkProcess PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${_net_xpc_dir}/MacOS")
+    WEBKIT_DEFINE_XPC_SERVICES()
 else ()
     WEBKIT_POPULATE_LIBRARY_VERSION(WEBKIT)
+
     set_target_properties(WebKit PROPERTIES VERSION ${WEBKIT_VERSION} SOVERSION ${WEBKIT_VERSION_MAJOR})
 
     install(TARGETS WebKit WebProcess NetworkProcess

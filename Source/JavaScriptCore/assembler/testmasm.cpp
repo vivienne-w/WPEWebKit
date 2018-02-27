@@ -174,6 +174,18 @@ void testSimple()
     }), 42);
 }
 
+void testGetEffectiveAddress(size_t pointer, ptrdiff_t length, int32_t offset, CCallHelpers::Scale scale)
+{
+    CHECK_EQ(compileAndRun<size_t>([=] (CCallHelpers& jit) {
+        jit.emitFunctionPrologue();
+        jit.move(CCallHelpers::TrustedImmPtr(bitwise_cast<void*>(pointer)), GPRInfo::regT0);
+        jit.move(CCallHelpers::TrustedImmPtr(bitwise_cast<void*>(length)), GPRInfo::regT1);
+        jit.getEffectiveAddress(CCallHelpers::BaseIndex(GPRInfo::regT0, GPRInfo::regT1, scale, offset), GPRInfo::returnValueGPR);
+        jit.emitFunctionEpilogue();
+        jit.ret();
+    }), pointer + offset + (static_cast<size_t>(1) << static_cast<int>(scale)) * length);
+}
+
 // branchTruncateDoubleToInt32(), when encountering Infinity, -Infinity or a
 // Nan, should either yield 0 in dest or fail.
 void testBranchTruncateDoubleToInt32(double val, int32_t expected)
@@ -764,6 +776,8 @@ void run(const char* filter)
     };
 
     RUN(testSimple());
+    RUN(testGetEffectiveAddress(0xff00, 42, 8, CCallHelpers::TimesEight));
+    RUN(testGetEffectiveAddress(0xff00, -200, -300, CCallHelpers::TimesEight));
     RUN(testBranchTruncateDoubleToInt32(0, 0));
     RUN(testBranchTruncateDoubleToInt32(42, 42));
     RUN(testBranchTruncateDoubleToInt32(42.7, 42));
@@ -794,7 +808,7 @@ void run(const char* filter)
 
     Lock lock;
 
-    Vector<RefPtr<Thread>> threads;
+    Vector<Ref<Thread>> threads;
     for (unsigned i = filter ? 1 : WTF::numberOfProcessorCores(); i--;) {
         threads.append(
             Thread::create(
@@ -814,7 +828,7 @@ void run(const char* filter)
                 }));
     }
 
-    for (RefPtr<Thread> thread : threads)
+    for (auto& thread : threads)
         thread->waitForCompletion();
     crashLock.lock();
     dataLog("Completed ", numberOfTests, " tests\n");

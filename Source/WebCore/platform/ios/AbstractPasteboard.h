@@ -43,6 +43,7 @@ NS_ASSUME_NONNULL_BEGIN
 #endif
 
 - (NSArray<NSString *> *)pasteboardTypes;
+- (NSData *)dataForPasteboardType:(NSString *)pasteboardType;
 - (NSArray *)dataForPasteboardType:(NSString *)pasteboardType inItemSet:(NSIndexSet *)itemSet;
 - (NSArray *)valuesForPasteboardType:(NSString *)pasteboardType inItemSet:(NSIndexSet *)itemSet;
 - (NSInteger)changeCount;
@@ -55,7 +56,8 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)setItems:(NSArray<NSDictionary *> *)items;
 - (NSArray<NSString *> *)pasteboardTypesByFidelityForItemAtIndex:(NSUInteger)index;
 @property (readonly, nonatomic) NSInteger numberOfFiles;
-@property (readonly, nonatomic) NSArray<NSURL *> *droppedFileURLs;
+@property (readonly, nonatomic) NSArray<NSURL *> *allDroppedFileURLs;
+- (nullable NSURL *)preferredFileUploadURLAtIndex:(NSUInteger)index fileType:(NSString *_Nullable *_Nullable)outFileType;
 - (void)updateSupportedTypeIdentifiers:(NSArray<NSString *> *)types;
 
 @end

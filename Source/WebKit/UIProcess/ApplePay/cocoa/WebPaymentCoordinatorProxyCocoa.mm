@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016-2017 Apple Inc. All rights reserved.
+ * Copyright (C) 2016-2018 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -39,7 +39,7 @@
 #import <wtf/SoftLinking.h>
 
 #if PLATFORM(MAC)
-SOFT_LINK_PRIVATE_FRAMEWORK(PassKit)
+SOFT_LINK_PRIVATE_FRAMEWORK_OPTIONAL(PassKit)
 #else
 SOFT_LINK_FRAMEWORK(PassKit)
 #endif
@@ -50,20 +50,13 @@ SOFT_LINK_CLASS(PassKit, PKPaymentMerchantSession);
 SOFT_LINK_CLASS(PassKit, PKPaymentRequest);
 SOFT_LINK_CLASS(PassKit, PKPaymentSummaryItem);
 SOFT_LINK_CLASS(PassKit, PKShippingMethod);
-SOFT_LINK_CONSTANT(PassKit, PKPaymentNetworkAmex, NSString *);
-SOFT_LINK_CONSTANT(PassKit, PKPaymentNetworkCarteBancaire, NSString *);
-SOFT_LINK_CONSTANT(PassKit, PKPaymentNetworkChinaUnionPay, NSString *);
-SOFT_LINK_CONSTANT(PassKit, PKPaymentNetworkDiscover, NSString *);
-SOFT_LINK_CONSTANT(PassKit, PKPaymentNetworkInterac, NSString *);
-SOFT_LINK_CONSTANT(PassKit, PKPaymentNetworkJCB, NSString *);
-SOFT_LINK_CONSTANT(PassKit, PKPaymentNetworkMasterCard, NSString *);
-SOFT_LINK_CONSTANT(PassKit, PKPaymentNetworkPrivateLabel, NSString *);
-SOFT_LINK_CONSTANT(PassKit, PKPaymentNetworkVisa, NSString *);
 
 #if (PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101300) || (PLATFORM(IOS) && __IPHONE_OS_VERSION_MIN_REQUIRED >= 110000)
 SOFT_LINK_FRAMEWORK(Contacts)
 SOFT_LINK_CONSTANT(Contacts, CNPostalAddressStreetKey, NSString *);
+SOFT_LINK_CONSTANT(Contacts, CNPostalAddressSubLocalityKey, NSString *);
 SOFT_LINK_CONSTANT(Contacts, CNPostalAddressCityKey, NSString *);
+SOFT_LINK_CONSTANT(Contacts, CNPostalAddressSubAdministrativeAreaKey, NSString *);
 SOFT_LINK_CONSTANT(Contacts, CNPostalAddressStateKey, NSString *);
 SOFT_LINK_CONSTANT(Contacts, CNPostalAddressPostalCodeKey, NSString *);
 SOFT_LINK_CONSTANT(Contacts, CNPostalAddressCountryKey, NSString *);
@@ -150,7 +143,7 @@ static WebCore::ApplePaySessionPaymentRequest::ShippingMethod toShippingMethod(P
     WebCore::ApplePaySessionPaymentRequest::ShippingMethod result;
     result.label = shippingMethod.label;
     result.detail = shippingMethod.detail;
-    result.amount = [shippingMethod.amount decimalNumberByMultiplyingByPowerOf10:2].integerValue;
+    result.amount = shippingMethod.amount.stringValue;
     result.identifier = shippingMethod.identifier;
 
     return result;
@@ -300,11 +293,23 @@ namespace WebKit {
 
 bool WebPaymentCoordinatorProxy::platformCanMakePayments()
 {
+#if PLATFORM(MAC)
+    if (!PassKitLibrary())
+        return false;
+#endif
+
     return [getPKPaymentAuthorizationViewControllerClass() canMakePayments];
 }
 
 void WebPaymentCoordinatorProxy::platformCanMakePaymentsWithActiveCard(const String& merchantIdentifier, const String& domainName, WTF::Function<void (bool)>&& completionHandler)
 {
+#if PLATFORM(MAC)
+    if (!PassKitLibrary()) {
+        completionHandler(false);
+        return;
+    }
+#endif
+
 #if (PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101300) || (PLATFORM(IOS) && __IPHONE_OS_VERSION_MIN_REQUIRED >= 110000)
     if (!canLoad_PassKit_PKCanMakePaymentsWithMerchantIdentifierDomainAndSourceApplication()) {
         RunLoop::main().dispatch([completionHandler = WTFMove(completionHandler)] {
@@ -342,6 +347,13 @@ void WebPaymentCoordinatorProxy::platformCanMakePaymentsWithActiveCard(const Str
 
 void WebPaymentCoordinatorProxy::platformOpenPaymentSetup(const String& merchantIdentifier, const String& domainName, WTF::Function<void (bool)>&& completionHandler)
 {
+#if PLATFORM(MAC)
+    if (!PassKitLibrary()) {
+        completionHandler(false);
+        return;
+    }
+#endif
+
     auto passLibrary = adoptNS([allocPKPassLibraryInstance() init]);
     [passLibrary openPaymentSetupForMerchantIdentifier:merchantIdentifier domain:domainName completion:BlockPtr<void (BOOL)>::fromCallable([completionHandler = WTFMove(completionHandler)](BOOL result) mutable {
         RunLoop::main().dispatch([completionHandler = WTFMove(completionHandler), result] {
@@ -397,14 +409,16 @@ static PKPaymentSummaryItemType toPKPaymentSummaryItemType(WebCore::ApplePaySess
     }
 }
 
-static RetainPtr<NSDecimalNumber> toDecimalNumber(int64_t value)
+static NSDecimalNumber *toDecimalNumber(const String& amount)
 {
-    return adoptNS([[NSDecimalNumber alloc] initWithMantissa:llabs(value) exponent:-2 isNegative:value < 0]);
+    if (!amount)
+        return [NSDecimalNumber zero];
+    return [NSDecimalNumber decimalNumberWithString:amount locale:@{ NSLocaleDecimalSeparator : @"." }];
 }
 
 static RetainPtr<PKPaymentSummaryItem> toPKPaymentSummaryItem(const WebCore::ApplePaySessionPaymentRequest::LineItem& lineItem)
 {
-    return [getPKPaymentSummaryItemClass() summaryItemWithLabel:lineItem.label amount:toDecimalNumber(lineItem.amount.value_or(0)).get() type:toPKPaymentSummaryItemType(lineItem.type)];
+    return [getPKPaymentSummaryItemClass() summaryItemWithLabel:lineItem.label amount:toDecimalNumber(lineItem.amount) type:toPKPaymentSummaryItemType(lineItem.type)];
 }
 
 static RetainPtr<NSArray> toPKPaymentSummaryItems(const WebCore::ApplePaySessionPaymentRequest::TotalAndLineItems& totalAndLineItems)
@@ -436,39 +450,11 @@ static PKMerchantCapability toPKMerchantCapabilities(const WebCore::ApplePaySess
     return result;
 }
 
-static NSString *toSupportedNetwork(const String& supportedNetwork)
-{
-    if (supportedNetwork == "amex")
-        return getPKPaymentNetworkAmex();
-    if (supportedNetwork == "carteBancaire")
-        return getPKPaymentNetworkCarteBancaire();
-    if (supportedNetwork == "chinaUnionPay")
-        return getPKPaymentNetworkChinaUnionPay();
-    if (supportedNetwork == "discover")
-        return getPKPaymentNetworkDiscover();
-    if (supportedNetwork == "interac")
-        return getPKPaymentNetworkInterac();
-    if (supportedNetwork == "jcb")
-        return getPKPaymentNetworkJCB();
-    if (supportedNetwork == "masterCard")
-        return getPKPaymentNetworkMasterCard();
-    if (supportedNetwork == "privateLabel")
-        return getPKPaymentNetworkPrivateLabel();
-    if (supportedNetwork == "visa")
-        return getPKPaymentNetworkVisa();
-
-    return nil;
-}
-
 static RetainPtr<NSArray> toSupportedNetworks(const Vector<String>& supportedNetworks)
 {
-    auto result = adoptNS([[NSMutableArray alloc] init]);
-
-    for (auto& supportedNetwork : supportedNetworks) {
-        if (auto network = toSupportedNetwork(supportedNetwork))
-            [result addObject:network];
-    }
-
+    auto result = adoptNS([[NSMutableArray alloc] initWithCapacity:supportedNetworks.size()]);
+    for (auto& supportedNetwork : supportedNetworks)
+        [result addObject:supportedNetwork];
     return result;
 }
 
@@ -491,7 +477,7 @@ static PKShippingType toPKShippingType(WebCore::ApplePaySessionPaymentRequest::S
 
 static RetainPtr<PKShippingMethod> toPKShippingMethod(const WebCore::ApplePaySessionPaymentRequest::ShippingMethod& shippingMethod)
 {
-    RetainPtr<PKShippingMethod> result = [getPKShippingMethodClass() summaryItemWithLabel:shippingMethod.label amount:toDecimalNumber(shippingMethod.amount).get()];
+    RetainPtr<PKShippingMethod> result = [getPKShippingMethodClass() summaryItemWithLabel:shippingMethod.label amount:toDecimalNumber(shippingMethod.amount)];
     [result setIdentifier:shippingMethod.identifier];
     [result setDetail:shippingMethod.detail];
 
@@ -512,6 +498,19 @@ static RetainPtr<NSSet> toNSSet(const Vector<String>& strings)
 }
 #endif
 
+#if (PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101300 && __MAC_OS_X_VERSION_MAX_ALLOWED >= 101304) \
+    || (PLATFORM(IOS) && __IPHONE_OS_VERSION_MIN_REQUIRED >= 110300 && __IPHONE_OS_VERSION_MAX_ALLOWED >= 110300)
+static PKPaymentRequestAPIType toAPIType(WebCore::ApplePaySessionPaymentRequest::Requester requester)
+{
+    switch (requester) {
+    case WebCore::ApplePaySessionPaymentRequest::Requester::ApplePayJS:
+        return PKPaymentRequestAPITypeWebJS;
+    case WebCore::ApplePaySessionPaymentRequest::Requester::PaymentRequest:
+        return PKPaymentRequestAPITypeWebPaymentRequest;
+    }
+}
+#endif
+
 RetainPtr<PKPaymentRequest> toPKPaymentRequest(WebPageProxy& webPageProxy, const WebCore::URL& originatingURL, const Vector<WebCore::URL>& linkIconURLs, const WebCore::ApplePaySessionPaymentRequest& paymentRequest)
 {
     auto result = adoptNS([allocPKPaymentRequestInstance() init]);
@@ -526,6 +525,11 @@ RetainPtr<PKPaymentRequest> toPKPaymentRequest(WebPageProxy& webPageProxy, const
         [result setThumbnailURLs:thumbnailURLs.get()];
     } else if (!linkIconURLs.isEmpty())
         [result setThumbnailURL:linkIconURLs[0]];
+
+#if (PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101300 && __MAC_OS_X_VERSION_MAX_ALLOWED >= 101304) \
+    || (PLATFORM(IOS) && __IPHONE_OS_VERSION_MIN_REQUIRED >= 110300 && __IPHONE_OS_VERSION_MAX_ALLOWED >= 110300)
+    [result setAPIType:toAPIType(paymentRequest.requester())];
+#endif
 
     [result setCountryCode:paymentRequest.countryCode()];
     [result setCurrencyCode:paymentRequest.currencyCode()];
@@ -654,6 +658,11 @@ static RetainPtr<NSError> toNSError(const WebCore::PaymentError& error)
             postalAddressKey = getCNPostalAddressStreetKey();
             break;
 
+        case WebCore::PaymentError::ContactField::SubLocality:
+            pkContactField = getPKContactFieldPostalAddress();
+            postalAddressKey = getCNPostalAddressSubLocalityKey();
+            break;
+
         case WebCore::PaymentError::ContactField::Locality:
             pkContactField = getPKContactFieldPostalAddress();
             postalAddressKey = getCNPostalAddressCityKey();
@@ -662,6 +671,11 @@ static RetainPtr<NSError> toNSError(const WebCore::PaymentError& error)
         case WebCore::PaymentError::ContactField::PostalCode:
             pkContactField = getPKContactFieldPostalAddress();
             postalAddressKey = getCNPostalAddressPostalCodeKey();
+            break;
+
+        case WebCore::PaymentError::ContactField::SubAdministrativeArea:
+            pkContactField = getPKContactFieldPostalAddress();
+            postalAddressKey = getCNPostalAddressSubAdministrativeAreaKey();
             break;
 
         case WebCore::PaymentError::ContactField::AdministrativeArea:
@@ -852,7 +866,21 @@ void WebPaymentCoordinatorProxy::platformCompletePaymentMethodSelection(const st
     m_paymentAuthorizationViewControllerDelegate->_didSelectPaymentMethodCompletion = nullptr;
 }
 
+Vector<String> WebPaymentCoordinatorProxy::platformAvailablePaymentNetworks()
+{
+#if PLATFORM(MAC)
+    if (!PassKitLibrary())
+        return { };
+#endif
+    
+    NSArray<PKPaymentNetwork> *availableNetworks = [getPKPaymentRequestClass() availableNetworks];
+    Vector<String> result;
+    result.reserveInitialCapacity(availableNetworks.count);
+    for (PKPaymentNetwork network in availableNetworks)
+        result.uncheckedAppend(network);
+    return result;
 }
 
-#endif
+} // namespace WebKit
 
+#endif // ENABLE(APPLE_PAY)

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006-2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2006-2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -40,6 +40,7 @@
 #import "Frame.h"
 #import "FrameLoader.h"
 #import "FrameSelection.h"
+#import "HTMLAttachmentElement.h"
 #import "HTMLConverter.h"
 #import "HTMLImageElement.h"
 #import "HTMLSpanElement.h"
@@ -50,7 +51,9 @@
 #import "Text.h"
 #import "WebContentReader.h"
 #import "WebCoreNSURLExtras.h"
+#import "markup.h"
 #import <pal/spi/cocoa/NSAttributedStringSPI.h>
+#import <pal/spi/cocoa/NSKeyedArchiverSPI.h>
 #import <wtf/BlockObjCExceptions.h>
 
 namespace WebCore {
@@ -140,23 +143,43 @@ static RefPtr<SharedBuffer> archivedDataForAttributedString(NSAttributedString *
     if (!attributedString.length)
         return nullptr;
 
-    return SharedBuffer::create([NSKeyedArchiver archivedDataWithRootObject:attributedString]);
+    return SharedBuffer::create(securelyArchivedDataWithRootObject(attributedString));
 }
+
+String Editor::selectionInHTMLFormat()
+{
+    if (auto range = selectedRange())
+        return createMarkup(*range, nullptr, AnnotateForInterchange, false, ResolveNonLocalURLs);
+    return { };
+}
+
+#if ENABLE(ATTACHMENT_ELEMENT)
+
+void Editor::getPasteboardTypesAndDataForAttachment(HTMLAttachmentElement& attachment, Vector<String>& outTypes, Vector<RefPtr<SharedBuffer>>& outData)
+{
+    auto attachmentRange = Range::create(attachment.document(), { &attachment, Position::PositionIsBeforeAnchor }, { &attachment, Position::PositionIsAfterAnchor });
+    client()->getClientPasteboardDataForRange(attachmentRange.ptr(), outTypes, outData);
+    // FIXME: We should additionally write the attachment as a web archive here, such that drag and drop within the
+    // same page doesn't destroy and recreate attachments unnecessarily. This is also needed to preserve the attachment
+    // display mode when dragging and dropping or cutting and pasting. For the time being, this is disabled because
+    // inserting attachment elements from web archive data sometimes causes attachment data to be lost; this requires
+    // further investigation.
+}
+
+#endif
 
 void Editor::writeSelectionToPasteboard(Pasteboard& pasteboard)
 {
     NSAttributedString *attributedString = attributedStringFromRange(*selectedRange());
 
     PasteboardWebContent content;
+    content.contentOrigin = m_frame.document()->originIdentifierForPasteboard();
     content.canSmartCopyOrDelete = canSmartCopyOrDelete();
     content.dataInWebArchiveFormat = selectionInWebArchiveFormat();
     content.dataInRTFDFormat = attributedString.containsAttachments ? dataInRTFDFormat(attributedString) : nullptr;
     content.dataInRTFFormat = dataInRTFFormat(attributedString);
     content.dataInAttributedStringFormat = archivedDataForAttributedString(attributedString);
-    // FIXME: Why don't we want this on iOS?
-#if PLATFORM(MAC)
     content.dataInHTMLFormat = selectionInHTMLFormat();
-#endif
     content.dataInStringFormat = stringSelectionForPasteboardWithImageAltText();
     client()->getClientPasteboardDataForRange(selectedRange().get(), content.clientTypes, content.clientData);
 
@@ -168,15 +191,13 @@ void Editor::writeSelection(PasteboardWriterData& pasteboardWriterData)
     NSAttributedString *attributedString = attributedStringFromRange(*selectedRange());
 
     PasteboardWriterData::WebContent webContent;
+    webContent.contentOrigin = m_frame.document()->originIdentifierForPasteboard();
     webContent.canSmartCopyOrDelete = canSmartCopyOrDelete();
     webContent.dataInWebArchiveFormat = selectionInWebArchiveFormat();
     webContent.dataInRTFDFormat = attributedString.containsAttachments ? dataInRTFDFormat(attributedString) : nullptr;
     webContent.dataInRTFFormat = dataInRTFFormat(attributedString);
     webContent.dataInAttributedStringFormat = archivedDataForAttributedString(attributedString);
-    // FIXME: Why don't we want this on iOS?
-#if PLATFORM(MAC)
     webContent.dataInHTMLFormat = selectionInHTMLFormat();
-#endif
     webContent.dataInStringFormat = stringSelectionForPasteboardWithImageAltText();
     client()->getClientPasteboardDataForRange(selectedRange().get(), webContent.clientTypes, webContent.clientData);
 
@@ -217,9 +238,10 @@ void Editor::replaceSelectionWithAttributedString(NSAttributedString *attributed
         return;
 
     if (m_frame.selection().selection().isContentRichlyEditable()) {
-        RefPtr<DocumentFragment> fragment = createFragmentAndAddResources(m_frame, attributedString);
-        if (fragment && shouldInsertFragment(*fragment, selectedRange().get(), EditorInsertAction::Pasted))
-            pasteAsFragment(fragment.releaseNonNull(), false, false, mailBlockquoteHandling);
+        if (auto fragment = createFragmentAndAddResources(m_frame, attributedString)) {
+            if (shouldInsertFragment(*fragment, selectedRange().get(), EditorInsertAction::Pasted))
+                pasteAsFragment(fragment.releaseNonNull(), false, false, mailBlockquoteHandling);
+        }
     } else {
         String text = attributedString.string;
         if (shouldInsertText(text, selectedRange().get(), EditorInsertAction::Pasted))

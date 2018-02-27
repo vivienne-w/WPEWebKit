@@ -32,19 +32,13 @@
 
 #if USE(CURL)
 
-#include "CachedResourceLoader.h"
 #include "CredentialStorage.h"
-#include "CurlCacheManager.h"
 #include "CurlContext.h"
-#include "CurlJobManager.h"
-#include "CurlSSLHandle.h"
 #include "FileSystem.h"
 #include "Logging.h"
-#include "MIMETypeRegistry.h"
-#include "NetworkingContext.h"
 #include "ResourceHandleInternal.h"
 #include "SynchronousLoaderClient.h"
-#include <wtf/text/Base64.h>
+#include <wtf/CompletionHandler.h>
 
 namespace WebCore {
 
@@ -54,9 +48,7 @@ ResourceHandleInternal::~ResourceHandleInternal()
         m_delegate->releaseHandle();
 }
 
-ResourceHandle::~ResourceHandle()
-{
-}
+ResourceHandle::~ResourceHandle() = default;
 
 bool ResourceHandle::start()
 {
@@ -72,13 +64,22 @@ bool ResourceHandle::start()
     if (d->m_context && !d->m_context->isValid())
         return false;
 
+    // Only allow the POST and GET methods for non-HTTP requests.
+    const ResourceRequest& request = firstRequest();
+    if (!request.url().protocolIsInHTTPFamily() && request.httpMethod() != "GET" && request.httpMethod() != "POST") {
+        scheduleFailure(InvalidURLFailure); // Error must not be reported immediately
+        return true;
+    }
+
     d->m_delegate = adoptRef(new ResourceHandleCurlDelegate(this));
-    return d->m_delegate->start();
+    d->m_delegate->start();
+    return true;
 }
 
 void ResourceHandle::cancel()
 {
-    d->m_delegate->cancel();
+    if (d->m_delegate)
+        d->m_delegate->cancel();
 }
 
 #if OS(WINDOWS)
@@ -94,7 +95,7 @@ void ResourceHandle::setClientCertificateInfo(const String& host, const String& 
 {
     ASSERT(isMainThread());
 
-    if (fileExists(certificate))
+    if (FileSystem::fileExists(certificate))
         CurlContext::singleton().sslHandle().setClientCertificateInfo(host, certificate, key);
     else
         LOG(Network, "Invalid client certificate file: %s!\n", certificate.latin1().data());
@@ -114,7 +115,8 @@ void ResourceHandle::platformSetDefersLoading(bool defers)
 {
     ASSERT(isMainThread());
 
-    d->m_delegate->setDefersLoading(defers);
+    if (d->m_delegate)
+        d->m_delegate->setDefersLoading(defers);
 }
 
 bool ResourceHandle::shouldUseCredentialStorage()
@@ -136,7 +138,8 @@ void ResourceHandle::didReceiveAuthenticationChallenge(const AuthenticationChall
             urlToStore = challenge.failureResponse().url();
         CredentialStorage::defaultCredentialStorage().set(partition, credential, challenge.protectionSpace(), urlToStore);
         
-        d->m_delegate->setAuthentication(credential.user(), credential.password());
+        if (d->m_delegate)
+            d->m_delegate->setAuthentication(credential.user(), credential.password());
 
         d->m_user = String();
         d->m_pass = String();
@@ -161,16 +164,19 @@ void ResourceHandle::didReceiveAuthenticationChallenge(const AuthenticationChall
                     CredentialStorage::defaultCredentialStorage().set(partition, credential, challenge.protectionSpace(), challenge.failureResponse().url());
                 }
 
-                d->m_delegate->setAuthentication(credential.user(), credential.password());
+                if (d->m_delegate)
+                    d->m_delegate->setAuthentication(credential.user(), credential.password());
                 return;
             }
         }
     }
 
     d->m_currentWebChallenge = challenge;
-    
-    if (client())
+
+    if (client()) {
+        auto protectedThis = makeRef(*this);
         client()->didReceiveAuthenticationChallenge(this, d->m_currentWebChallenge);
+    }
 }
 
 void ResourceHandle::receivedCredential(const AuthenticationChallenge& challenge, const Credential& credential)
@@ -194,7 +200,9 @@ void ResourceHandle::receivedCredential(const AuthenticationChallenge& challenge
         }
     }
 
-    d->m_delegate->setAuthentication(credential.user(), credential.password());
+    if (d->m_delegate)
+        d->m_delegate->setAuthentication(credential.user(), credential.password());
+
     clearAuthentication();
 }
 
@@ -205,8 +213,14 @@ void ResourceHandle::receivedRequestToContinueWithoutCredential(const Authentica
     if (challenge != d->m_currentWebChallenge)
         return;
 
-    d->m_delegate->setAuthentication("", "");
     clearAuthentication();
+
+    didReceiveResponse(ResourceResponse(d->m_response), [this, protectedThis = makeRef(*this)] {
+        ASSERT(isMainThread());
+
+        if (d->m_delegate)
+            d->m_delegate->continueDidReceiveResponse();
+    });
 }
 
 void ResourceHandle::receivedCancellation(const AuthenticationChallenge& challenge)
@@ -216,8 +230,10 @@ void ResourceHandle::receivedCancellation(const AuthenticationChallenge& challen
     if (challenge != d->m_currentWebChallenge)
         return;
 
-    if (client())
+    if (client()) {
+        auto protectedThis = makeRef(*this);
         client()->receivedCancellation(this, challenge);
+    }
 }
 
 void ResourceHandle::receivedRequestToPerformDefaultHandling(const AuthenticationChallenge&)
@@ -235,7 +251,10 @@ void ResourceHandle::platformLoadResourceSynchronously(NetworkingContext* contex
     ASSERT(isMainThread());
 
     SynchronousLoaderClient client;
-    RefPtr<ResourceHandle> handle = adoptRef(new ResourceHandle(context, request, &client, false, false));
+    bool defersLoading = false;
+    bool shouldContentSniff = true;
+    bool shouldContentEncodingSniff = true;
+    RefPtr<ResourceHandle> handle = adoptRef(new ResourceHandle(context, request, &client, defersLoading, shouldContentSniff, shouldContentEncodingSniff));
 
     handle->d->m_delegate = adoptRef(new ResourceHandleCurlDelegate(handle.get()));
     handle->d->m_delegate->dispatchSynchronousJob();
@@ -243,6 +262,14 @@ void ResourceHandle::platformLoadResourceSynchronously(NetworkingContext* contex
     error = client.error();
     data.swap(client.mutableData());
     response = client.response();
+}
+
+void ResourceHandle::platformContinueSynchronousDidReceiveResponse()
+{
+    ASSERT(isMainThread());
+
+    if (d->m_delegate)
+        d->m_delegate->platformContinueSynchronousDidReceiveResponse();
 }
 
 } // namespace WebCore

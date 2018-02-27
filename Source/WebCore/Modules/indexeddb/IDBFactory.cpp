@@ -40,9 +40,9 @@
 #include "ScriptExecutionContext.h"
 #include "SecurityOrigin.h"
 
-using namespace JSC;
 
 namespace WebCore {
+using namespace JSC;
 
 static bool shouldThrowSecurityException(ScriptExecutionContext& context)
 {
@@ -74,9 +74,7 @@ IDBFactory::IDBFactory(IDBClient::IDBConnectionProxy& connectionProxy)
 {
 }
 
-IDBFactory::~IDBFactory()
-{
-}
+IDBFactory::~IDBFactory() = default;
 
 ExceptionOr<Ref<IDBOpenDBRequest>> IDBFactory::open(ScriptExecutionContext& context, const String& name, std::optional<uint64_t> version)
 {

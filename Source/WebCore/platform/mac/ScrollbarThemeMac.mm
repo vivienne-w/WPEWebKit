@@ -34,7 +34,6 @@
 #include "PlatformMouseEvent.h"
 #include "ScrollAnimatorMac.h"
 #include "ScrollView.h"
-#include "WebCoreSystemInterface.h"
 #include <Carbon/Carbon.h>
 #include <pal/spi/cg/CoreGraphicsSPI.h>
 #include <pal/spi/mac/NSScrollerImpSPI.h>
@@ -46,23 +45,25 @@
 
 // FIXME: There are repainting problems due to Aqua scroll bar buttons' visual overflow.
 
-using namespace WebCore;
+namespace WebCore {
 
+    typedef HashMap<Scrollbar*, RetainPtr<NSScrollerImp>> ScrollerImpMap;
+
+    static ScrollerImpMap* scrollbarMap()
+    {
+        static ScrollerImpMap* map = new ScrollerImpMap;
+        return map;
+    }
+
+}
+
+using WebCore::ScrollbarTheme;
+using WebCore::ScrollbarThemeMac;
+using WebCore::scrollbarMap;
+using WebCore::ScrollerImpMap;
 @interface NSColor (WebNSColorDetails)
 + (NSImage *)_linenPatternImage;
 @end
-
-namespace WebCore {
-
-typedef HashMap<Scrollbar*, RetainPtr<NSScrollerImp>> ScrollerImpMap;
-
-static ScrollerImpMap* scrollbarMap()
-{
-    static ScrollerImpMap* map = new ScrollerImpMap;
-    return map;
-}
-
-}
 
 @interface WebScrollbarPrefsObserver : NSObject
 {
@@ -153,7 +154,7 @@ static NSControlSize scrollbarControlSizeToNSControlSize(ScrollbarControlSize co
 
 void ScrollbarThemeMac::didCreateScrollerImp(Scrollbar& scrollbar)
 {
-#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
+#if PLATFORM(MAC)
     NSScrollerImp *scrollerImp = painterForScrollbar(scrollbar);
     ASSERT(scrollerImp);
     scrollerImp.userInterfaceLayoutDirection = scrollbar.scrollableArea().shouldPlaceBlockDirectionScrollbarOnLeft() ? NSUserInterfaceLayoutDirectionRightToLeft : NSUserInterfaceLayoutDirectionLeftToRight;
@@ -194,7 +195,7 @@ NSScrollerImp *ScrollbarThemeMac::painterForScrollbar(Scrollbar& scrollbar)
 
 bool ScrollbarThemeMac::isLayoutDirectionRTL(Scrollbar& scrollbar)
 {
-#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
+#if PLATFORM(MAC)
     NSScrollerImp *scrollerImp = painterForScrollbar(scrollbar);
     ASSERT(scrollerImp);
     return scrollerImp.userInterfaceLayoutDirection == NSUserInterfaceLayoutDirectionRightToLeft;

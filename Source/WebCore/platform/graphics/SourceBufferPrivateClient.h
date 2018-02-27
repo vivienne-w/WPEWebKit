@@ -43,7 +43,7 @@ class VideoTrackPrivate;
 
 class SourceBufferPrivateClient {
 public:
-    virtual ~SourceBufferPrivateClient() { }
+    virtual ~SourceBufferPrivateClient() = default;
 
 #if ENABLE(VIDEO_TRACK)
     struct InitializationSegment {

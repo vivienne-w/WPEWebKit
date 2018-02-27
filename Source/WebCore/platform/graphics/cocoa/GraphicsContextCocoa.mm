@@ -26,6 +26,7 @@
 #import "config.h"
 #import "GraphicsContext.h"
 
+#import "DisplayListRecorder.h"
 #import "GraphicsContextCG.h"
 #import "GraphicsContextPlatformPrivateCG.h"
 #import "IntRect.h"
@@ -112,15 +113,23 @@ static bool drawFocusRingToContextAtTime(CGContextRef context, CGPathRef focusRi
 }
 #endif // !PLATFORM(IOS)
 
-void GraphicsContext::drawFocusRing(const Path& path, float /* width */, float /* offset */, const Color&)
+void GraphicsContext::drawFocusRing(const Path& path, float width, float offset, const Color& color)
 {
 #if PLATFORM(MAC)
     if (paintingDisabled() || path.isNull())
         return;
 
+    if (m_impl) {
+        m_impl->drawFocusRing(path, width, offset, color);
+        return;
+    }
+
     drawFocusRingToContext(platformContext(), path.platformPath());
 #else
     UNUSED_PARAM(path);
+    UNUSED_PARAM(width);
+    UNUSED_PARAM(offset);
+    UNUSED_PARAM(color);
 #endif
 }
 
@@ -129,13 +138,19 @@ void GraphicsContext::drawFocusRing(const Path& path, double timeOffset, bool& n
 {
     if (paintingDisabled() || path.isNull())
         return;
-    
+
+    if (m_impl) // FIXME: implement animated focus ring drawing.
+        return;
+
     needsRedraw = drawFocusRingToContextAtTime(platformContext(), path.platformPath(), timeOffset);
 }
 
 void GraphicsContext::drawFocusRing(const Vector<FloatRect>& rects, double timeOffset, bool& needsRedraw)
 {
     if (paintingDisabled())
+        return;
+
+    if (m_impl) // FIXME: implement animated focus ring drawing.
         return;
 
     RetainPtr<CGMutablePathRef> focusRingPath = adoptCF(CGPathCreateMutable());
@@ -146,11 +161,16 @@ void GraphicsContext::drawFocusRing(const Vector<FloatRect>& rects, double timeO
 }
 #endif
 
-void GraphicsContext::drawFocusRing(const Vector<FloatRect>& rects, float, float offset, const Color&)
+void GraphicsContext::drawFocusRing(const Vector<FloatRect>& rects, float width, float offset, const Color& color)
 {
 #if !PLATFORM(IOS)
     if (paintingDisabled())
         return;
+
+    if (m_impl) {
+        m_impl->drawFocusRing(rects, width, offset, color);
+        return;
+    }
 
     RetainPtr<CGMutablePathRef> focusRingPath = adoptCF(CGPathCreateMutable());
     for (auto& rect : rects)
@@ -159,11 +179,13 @@ void GraphicsContext::drawFocusRing(const Vector<FloatRect>& rects, float, float
     drawFocusRingToContext(platformContext(), focusRingPath.get());
 #else
     UNUSED_PARAM(rects);
+    UNUSED_PARAM(width);
     UNUSED_PARAM(offset);
+    UNUSED_PARAM(color);
 #endif
 }
 
-#if !PLATFORM(IOS)
+#if PLATFORM(MAC)
 static NSImage *findImage(NSString* firstChoiceName, NSString* secondChoiceName, bool& usingDot)
 {
     // Eventually we should be able to get rid of the secondChoiceName. For the time being we need both to keep
@@ -175,6 +197,9 @@ static NSImage *findImage(NSString* firstChoiceName, NSString* secondChoiceName,
     usingDot = image;
     return image;
 }
+static NSImage *spellingImage = nullptr;
+static NSImage *grammarImage = nullptr;
+static NSImage *correctionImage = nullptr;
 #else
 static RetainPtr<CGPatternRef> createDotPattern(bool& usingDot, const char* resourceName)
 {
@@ -183,20 +208,18 @@ static RetainPtr<CGPatternRef> createDotPattern(bool& usingDot, const char* reso
     usingDot = true;
     return adoptCF(WKCreatePatternFromCGImage(image.get()));
 }
-#endif // !PLATFORM(IOS)
-
-static NSImage *spellingImage = nullptr;
-static NSImage *grammarImage = nullptr;
-static NSImage *correctionImage = nullptr;
+#endif // PLATFORM(MAC)
 
 void GraphicsContext::updateDocumentMarkerResources()
 {
+#if PLATFORM(MAC)
     [spellingImage release];
     spellingImage = nullptr;
     [grammarImage release];
     grammarImage = nullptr;
     [correctionImage release];
     correctionImage = nullptr;
+#endif
 }
 
 static inline void setPatternPhaseInUserSpace(CGContextRef context, CGPoint phasePoint)
@@ -331,7 +354,10 @@ void GraphicsContext::drawLineForDocumentMarker(const FloatPoint& point, float w
 
         // FIXME: Rather than getting the NSImage and then picking the CGImage from it, we should do what iOS does and
         // just load the CGImage in the first place.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
         CGImageRef cgImage = [image CGImageForProposedRect:&dotRect context:[NSGraphicsContext graphicsContextWithGraphicsPort:context flipped:NO] hints:nullptr];
+#pragma clang diagnostic pop
         CGContextDrawTiledImage(context, NSRectToCGRect(dotRect), cgImage);
     } else {
         CGContextSetFillColorWithColor(context, [fallbackColor CGColor]);
@@ -342,27 +368,4 @@ void GraphicsContext::drawLineForDocumentMarker(const FloatPoint& point, float w
 #endif
 }
 
-CGColorSpaceRef linearRGBColorSpaceRef()
-{
-    static CGColorSpaceRef linearSRGBSpace = nullptr;
-
-    if (linearSRGBSpace)
-        return linearSRGBSpace;
-
-    RetainPtr<NSString> iccProfilePath = [[NSBundle bundleWithIdentifier:@"com.apple.WebCore"] pathForResource:@"linearSRGB" ofType:@"icc"];
-    RetainPtr<NSData> iccProfileData = adoptNS([[NSData alloc] initWithContentsOfFile:iccProfilePath.get()]);
-
-    if (iccProfileData)
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-        linearSRGBSpace = CGColorSpaceCreateWithICCProfile((CFDataRef)iccProfileData.get());
-#pragma clang diagnostic pop
-
-    // If we fail to load the linearized sRGB ICC profile, fall back to sRGB.
-    if (!linearSRGBSpace)
-        return sRGBColorSpaceRef();
-
-    return linearSRGBSpace;
-}
-
-}
+} // namespace WebCore

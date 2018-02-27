@@ -37,12 +37,16 @@ namespace WebKit {
 class WebIDBConnectionToClient;
 class WebSWServerConnection;
 
-class StorageToWebProcessConnection : public RefCounted<StorageToWebProcessConnection>, public IPC::Connection::Client, public IPC::MessageSender {
+class StorageToWebProcessConnection : public RefCounted<StorageToWebProcessConnection>, private IPC::Connection::Client, private IPC::MessageSender {
 public:
     static Ref<StorageToWebProcessConnection> create(IPC::Connection::Identifier);
     ~StorageToWebProcessConnection();
 
     IPC::Connection& connection() { return m_connection.get(); }
+
+#if ENABLE(SERVICE_WORKER)
+    void workerContextProcessConnectionCreated();
+#endif
 
 private:
     StorageToWebProcessConnection(IPC::Connection::Identifier);
@@ -68,10 +72,8 @@ private:
 #endif // ENABLE(INDEXED_DATABASE)
 
 #if ENABLE(SERVICE_WORKER)
-    void establishSWServerConnection(PAL::SessionID, uint64_t& serverConnectionIdentifier);
-    void removeSWServerConnection(uint64_t serverConnectionIdentifier);
-    HashMap<PAL::SessionID, std::unique_ptr<WebCore::SWServer>> m_swServers;
-    HashMap<uint64_t, std::unique_ptr<WebSWServerConnection>> m_swConnections;
+    void establishSWServerConnection(PAL::SessionID, WebCore::SWServerConnectionIdentifier&);
+    HashMap<WebCore::SWServerConnectionIdentifier, std::unique_ptr<WebSWServerConnection>> m_swConnections;
 #endif
 
     Ref<IPC::Connection> m_connection;
