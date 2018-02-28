@@ -78,7 +78,7 @@
 #include <wtf/RunLoop.h>
 #include <wtf/text/WTFString.h>
 
-#if HAVE(ACCESSIBILITY) && (PLATFORM(GTK) || PLATFORM(EFL))
+#if HAVE(ACCESSIBILITY) && (PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(WPE))
 #include "WebPageAccessibilityObject.h"
 #include <wtf/glib/GRefPtr.h>
 #endif
@@ -701,7 +701,7 @@ public:
     void cancelComposition();
 #endif
 
-#if HAVE(ACCESSIBILITY) && (PLATFORM(GTK) || PLATFORM(EFL))
+#if HAVE(ACCESSIBILITY) && (PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(WPE))
     void updateAccessibilityTree();
 #endif
 
@@ -1315,7 +1315,7 @@ private:
 
     RetainPtr<NSDictionary> m_dataDetectionContext;
 
-#elif HAVE(ACCESSIBILITY) && (PLATFORM(GTK) || PLATFORM(EFL))
+#elif HAVE(ACCESSIBILITY) && (PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(WPE))
     GRefPtr<WebPageAccessibilityObject> m_accessibilityObject;
 #endif
 

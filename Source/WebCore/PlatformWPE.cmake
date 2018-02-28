@@ -277,4 +277,34 @@ if (ENABLE_SUBTLE_CRYPTO)
     )
 endif ()
 
+if (ENABLE_ACCESSIBILITY)
+    list(APPEND WebCore_SOURCES
+        accessibility/atk/AXObjectCacheAtk.cpp
+        accessibility/atk/AccessibilityObjectAtk.cpp
+        accessibility/atk/AccessibilityObjectAtk.cpp
+        accessibility/atk/WebKitAccessibleHyperlink.cpp
+        accessibility/atk/WebKitAccessibleInterfaceAction.cpp
+        accessibility/atk/WebKitAccessibleInterfaceComponent.cpp
+        accessibility/atk/WebKitAccessibleInterfaceDocument.cpp
+        accessibility/atk/WebKitAccessibleInterfaceEditableText.cpp
+        accessibility/atk/WebKitAccessibleInterfaceHyperlinkImpl.cpp
+        accessibility/atk/WebKitAccessibleInterfaceHypertext.cpp
+        accessibility/atk/WebKitAccessibleInterfaceImage.cpp
+        accessibility/atk/WebKitAccessibleInterfaceSelection.cpp
+        accessibility/atk/WebKitAccessibleInterfaceTable.cpp
+        accessibility/atk/WebKitAccessibleInterfaceTableCell.cpp
+        accessibility/atk/WebKitAccessibleInterfaceText.cpp
+        accessibility/atk/WebKitAccessibleInterfaceValue.cpp
+        accessibility/atk/WebKitAccessibleUtil.cpp
+        accessibility/atk/WebKitAccessibleWrapperAtk.cpp
+    )
+
+    list(APPEND WebCore_INCLUDE_DIRECTORIES
+        ${ATK_INCLUDE_DIRS}
+    )
+
+    list(APPEND WebCore_LIBRARIES
+        ${ATK_LIBRARIES}
+    )
+endif ()
 
