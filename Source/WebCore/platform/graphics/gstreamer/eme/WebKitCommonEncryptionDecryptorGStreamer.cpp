@@ -208,8 +208,8 @@ static GstFlowReturn webkitMediaCommonEncryptionDecryptTransformInPlace(GstBaseT
 
     GstProtectionMeta* protectionMeta = reinterpret_cast<GstProtectionMeta*>(gst_buffer_get_protection_meta(buffer));
     if (!protectionMeta) {
-        GST_DEBUG_OBJECT(self, "Failed to get GstProtection metadata from buffer %p, assuming it's not encrypted", buffer);
-        return GST_FLOW_OK;
+        GST_ERROR_OBJECT(self, "Failed to get GstProtection metadata from buffer %p", buffer);
+        return GST_FLOW_NOT_SUPPORTED;
     }
 
     unsigned ivSize;

@@ -28,6 +28,7 @@
 #include "GStreamerEMEUtilities.h"
 #include "GStreamerMediaDescription.h"
 #include "MediaSampleGStreamer.h"
+#include "GStreamerUtilities.h"
 #include "InbandTextTrackPrivateGStreamer.h"
 #include "MediaDescription.h"
 #include "SourceBufferPrivateGStreamer.h"
@@ -106,6 +107,75 @@ static void appendPipelineStateChangeMessageCallback(GstBus*, GstMessage* messag
 {
     appendPipeline->handleStateChangeMessage(message);
 }
+
+// Auxiliary class to compute the sample duration when GStreamer provides an invalid one.
+class BufferMetadataCompleter {
+public:
+    BufferMetadataCompleter()
+        : m_sampleDuration(MediaTime::invalidTime())
+        , m_lastPts(MediaTime::invalidTime())
+        , m_lastDts(MediaTime::invalidTime())
+        , m_ptsOffset(MediaTime::invalidTime())
+    {
+    }
+
+    void completeMissingMetadata(GstBuffer* buffer)
+    {
+        if (buffer) {
+	    GST_TRACE("Before: PTS=%" GST_TIME_FORMAT "  DTS=%" GST_TIME_FORMAT "  DUR=%" GST_TIME_FORMAT "\n", 
+			    GST_TIME_ARGS(GST_BUFFER_PTS(buffer)),
+			    GST_TIME_ARGS(GST_BUFFER_DTS(buffer)),
+			    GST_TIME_ARGS(GST_BUFFER_DURATION(buffer)));
+
+            if (!GST_BUFFER_DURATION_IS_VALID(buffer)) {
+                if (m_sampleDuration.isValid()) {
+                    // Some containers like webm and audio/x-opus don't supply a duration. Let's use the one supplied by the caps.
+                    GST_BUFFER_DURATION(buffer) = toGstClockTime(m_sampleDuration);
+                } else if (m_lastPts.isValid()) {
+                    m_sampleDuration = MediaTime(GST_BUFFER_PTS(buffer), GST_SECOND) - m_lastPts;
+                    GST_BUFFER_DURATION(buffer) = toGstClockTime(m_sampleDuration);
+                } else if (GST_BUFFER_PTS_IS_VALID(buffer)) {
+                    // Some containers like webm don't supply a duration. Let's assume 60fps and let the gap sample hack fill the gaps if the duration was actually longer.
+                    // The duration for the next samples will be computed using PTS differences.
+                    GST_BUFFER_DURATION(buffer) = toGstClockTime(MediaTime(1, 60));
+                }
+            }
+
+            if (!GST_BUFFER_DTS_IS_VALID(buffer) && GST_BUFFER_PTS_IS_VALID(buffer)) {
+                // If we had a last DTS and the PTS hasn't varied too much (continuous samples), DTS++.
+                if (m_lastDts.isValid() && abs(m_lastPts + MediaTime(GST_BUFFER_DURATION(buffer), GST_SECOND) - MediaTime(GST_BUFFER_PTS(buffer), GST_SECOND)) < MediaTime(1, 2))
+                    GST_BUFFER_DTS(buffer) = toGstClockTime(m_lastDts + MediaTime(GST_BUFFER_DURATION(buffer), GST_SECOND));
+                else
+                    GST_BUFFER_DTS(buffer) = toGstClockTime(MediaTime(GST_BUFFER_PTS(buffer), GST_SECOND) + MediaTime(GST_BUFFER_DURATION(buffer), GST_SECOND));
+		GST_TRACE("DTS FILLED: %" GST_TIME_FORMAT "\n", GST_TIME_ARGS(GST_BUFFER_DTS(buffer)));
+            }
+
+            // If the first sample (DTS=0) doesn't start with PTS=0, compute a negative offset.
+            if (!GST_BUFFER_DTS(buffer) && GST_BUFFER_PTS(buffer) && !m_ptsOffset.isValid()) {
+                m_ptsOffset = MediaTime(GST_BUFFER_DTS(buffer), GST_SECOND) - MediaTime(GST_BUFFER_PTS(buffer), GST_SECOND);
+                GST_TRACE("Setting an offset of %s\n", m_ptsOffset.toString().utf8().data());
+            }
+
+            // Apply the offset to zero-align the first sample and also correct the next ones.
+            if (m_ptsOffset.isValid())
+                GST_BUFFER_PTS(buffer) += toGstClockTime(m_ptsOffset);
+
+            m_lastPts = MediaTime(GST_BUFFER_PTS(buffer), GST_SECOND);
+            m_lastDts = MediaTime(GST_BUFFER_DTS(buffer), GST_SECOND);
+
+	    GST_TRACE("After: PTS=%" GST_TIME_FORMAT "  DTS=%" GST_TIME_FORMAT "  DUR=%" GST_TIME_FORMAT "\n", 
+			    GST_TIME_ARGS(GST_BUFFER_PTS(buffer)),
+			    GST_TIME_ARGS(GST_BUFFER_DTS(buffer)),
+			    GST_TIME_ARGS(GST_BUFFER_DURATION(buffer)));
+        }
+    }
+
+private:
+    MediaTime m_sampleDuration;
+    MediaTime m_lastPts;
+    MediaTime m_lastDts;
+    MediaTime m_ptsOffset;
+};
 
 AppendPipeline::AppendPipeline(Ref<MediaSourceClientGStreamerMSE> mediaSourceClient, Ref<SourceBufferPrivateGStreamer> sourceBufferPrivate, MediaPlayerPrivateGStreamerMSE& playerPrivate)
     : m_mediaSourceClient(mediaSourceClient.get())
@@ -190,15 +260,19 @@ AppendPipeline::~AppendPipeline()
 {
     ASSERT(WTF::isMainThread());
 
-    GST_TRACE("Destroying AppendPipeline (%p)", this);
-
-    setAppendState(AppendState::Invalid);
+    {
+        LockHolder locker(m_newSampleLock);
+        setAppendState(AppendState::Invalid);
+        m_newSampleCondition.notifyOne();
+    }
 
     {
         LockHolder locker(m_padAddRemoveLock);
         m_playerPrivate = nullptr;
         m_padAddRemoveCondition.notifyOne();
     }
+
+    GST_TRACE("Destroying AppendPipeline (%p)", this);
 
     // FIXME: Maybe notify appendComplete here?
 
@@ -248,9 +322,15 @@ void AppendPipeline::clearPlayerPrivate()
     ASSERT(WTF::isMainThread());
     GST_DEBUG("cleaning private player");
 
-    // Make sure that AppendPipeline won't process more data from now on and
-    // instruct handleNewSample to abort itself from now on as well.
-    setAppendState(AppendState::Invalid);
+    {
+        LockHolder locker(m_newSampleLock);
+        // Make sure that AppendPipeline won't process more data from now on and
+        // instruct handleNewSample to abort itself from now on as well.
+        setAppendState(AppendState::Invalid);
+
+        // Awake any pending handleNewSample operation in the streaming thread.
+        m_newSampleCondition.notifyOne();
+    }
 
     {
         LockHolder locker(m_padAddRemoveLock);
@@ -269,23 +349,9 @@ void AppendPipeline::handleNeedContextSyncMessage(GstMessage* message)
     const gchar* contextType = nullptr;
     gst_message_parse_context_type(message, &contextType);
     GST_TRACE("context type: %s", contextType);
-
-    LockHolder locker(m_appendStateTransitionLock);
-    if (m_appendState == AppendState::Invalid)
-        return;
-
-    if (!g_strcmp0(contextType, "drm-preferred-decryption-system-id")) {
-        if (WTF::isMainThread())
-            transitionTo(AppendState::KeyNegotiation, true);
-        else {
-            GstStructure* structure = gst_structure_new("transition-main-thread", "transition", G_TYPE_INT, AppendState::KeyNegotiation, nullptr);
-            GstMessage* message = gst_message_new_application(GST_OBJECT(m_demux.get()), structure);
-            if (gst_bus_post(m_bus.get(), message)) {
-                GST_TRACE("transition-main-thread KeyNegotiation sent to the bus");
-                m_appendStateTransitionCondition.wait(m_appendStateTransitionLock);
-            }
-        }
-    }
+    if (!g_strcmp0(contextType, "drm-preferred-decryption-system-id")
+        && m_appendState != AppendPipeline::AppendState::KeyNegotiation)
+        setAppendState(AppendPipeline::AppendState::KeyNegotiation);
 
     // MediaPlayerPrivateGStreamerBase will take care of setting up encryption.
     if (m_playerPrivate)
@@ -316,22 +382,16 @@ void AppendPipeline::handleApplicationMessage(GstMessage* message)
         return;
     }
 
-    if (gst_structure_has_name(structure, "transition-main-thread")) {
-        GST_TRACE("Received transition-main-thread in main thread");
-        AppendState nextState;
-        gst_structure_get(structure, "transition", G_TYPE_INT, &nextState, nullptr);
-        transitionTo(nextState, false);
-        return;
-    }
-
     if (gst_structure_has_name(structure, "appsink-caps-changed")) {
         appsinkCapsChanged();
         return;
     }
 
     if (gst_structure_has_name(structure, "appsink-new-sample")) {
-        m_busAlreadyNotifiedOfAvailablesamples = false;
-        consumeAppSinkAvailableSamples();
+        GRefPtr<GstSample> newSample;
+        gst_structure_get(structure, "new-sample", GST_TYPE_SAMPLE, &newSample.outPtr(), nullptr);
+
+        appsinkNewSample(newSample.get());
         return;
     }
 
@@ -707,6 +767,7 @@ void AppendPipeline::appsinkCapsChanged()
         m_appsinkCaps = WTFMove(caps);
         if (m_playerPrivate)
             m_playerPrivate->trackDetected(this, m_track, previousCapsWereNull);
+        didReceiveInitializationSegment();
         gst_element_set_state(m_pipeline.get(), GST_STATE_PLAYING);
     }
 }
@@ -883,8 +944,12 @@ void AppendPipeline::resetPipeline()
     m_appsrcAtLeastABufferLeft = false;
     setAppsrcDataLeavingProbe();
 
-    gst_element_set_state(m_pipeline.get(), GST_STATE_READY);
-    gst_element_get_state(m_pipeline.get(), nullptr, nullptr, 0);
+    {
+        LockHolder locker(m_newSampleLock);
+        m_newSampleCondition.notifyOne();
+        gst_element_set_state(m_pipeline.get(), GST_STATE_READY);
+        gst_element_get_state(m_pipeline.get(), nullptr, nullptr, 0);
+    }
 
 #if (!(LOG_DISABLED || defined(GST_DISABLE_GST_DEBUG)))
     {
@@ -973,20 +1038,27 @@ GstFlowReturn AppendPipeline::handleNewAppsinkSample(GstElement* appsink)
 {
     ASSERT(!WTF::isMainThread());
 
+    // Even if we're disabled, it's important to pull the sample out anyway to
+    // avoid deadlocks when changing to GST_STATE_NULL having a non empty appsink.
+    GRefPtr<GstSample> sample = adoptGRef(gst_app_sink_pull_sample(GST_APP_SINK(appsink)));
+    LockHolder locker(m_newSampleLock);
+
     if (!m_playerPrivate || m_appendState == AppendState::Invalid) {
         GST_WARNING("AppendPipeline has been disabled, ignoring this sample");
         return GST_FLOW_ERROR;
     }
 
-    if (!m_busAlreadyNotifiedOfAvailablesamples) {
-        m_busAlreadyNotifiedOfAvailablesamples = true;
-        GstStructure* structure = gst_structure_new_empty("appsink-new-sample");
-        GstMessage* message = gst_message_new_application(GST_OBJECT(appsink), structure);
-        gst_bus_post(m_bus.get(), message);
-        GST_TRACE("appsink-new-sample message posted to bus");
-    }
+    GstStructure* structure = gst_structure_new("appsink-new-sample", "new-sample", GST_TYPE_SAMPLE, sample.get(), nullptr);
+    GstMessage* message = gst_message_new_application(GST_OBJECT(appsink), structure);
+    gst_bus_post(m_bus.get(), message);
+    GST_TRACE("appsink-new-sample message posted to bus");
 
-    return GST_FLOW_OK;
+    m_newSampleCondition.wait(m_newSampleLock);
+    // We've been awaken because the sample was processed or because of
+    // an exceptional condition (entered in Invalid state, destructor, etc.).
+    // We can't reliably delete info here, appendPipelineAppsinkNewSampleMainThread will do it.
+
+    return m_flowReturn;
 }
 
 static GRefPtr<GstElement>
@@ -1050,7 +1122,7 @@ void AppendPipeline::connectDemuxerSrcPadToAppsinkFromAnyThread(GstPad* demuxerS
         GstStructure* structure = gst_structure_new("demuxer-connect-to-appsink", "demuxer-src-pad", G_TYPE_OBJECT, demuxerSrcPad, nullptr);
         GstMessage* message = gst_message_new_application(GST_OBJECT(m_demux.get()), structure);
         gst_bus_post(m_bus.get(), message);
-        GST_TRACE("demuxer-connect-to-appsink message posted to bus, waiting...");
+        GST_TRACE("demuxer-connect-to-appsink message posted to bus");
 
         m_padAddRemoveCondition.wait(m_padAddRemoveLock);
 
@@ -1104,6 +1176,20 @@ void AppendPipeline::connectDemuxerSrcPadToAppsinkFromAnyThread(GstPad* demuxerS
         }
 #endif
 
+        gst_pad_add_probe(currentSrcPad.get(), GST_PAD_PROBE_TYPE_BUFFER,
+            [] (GstPad*, GstPadProbeInfo* info, void* userData) -> GstPadProbeReturn {
+                ASSERT(GST_PAD_PROBE_INFO_TYPE(info) & GST_PAD_PROBE_TYPE_BUFFER);
+                BufferMetadataCompleter* completer = static_cast<BufferMetadataCompleter*>(userData);
+                GstBuffer* buffer = GST_PAD_PROBE_INFO_BUFFER(info);
+                completer->completeMissingMetadata(buffer);
+                return GST_PAD_PROBE_OK;
+            },
+            new BufferMetadataCompleter(),
+            [] (gpointer userData) {
+                BufferMetadataCompleter* completer = static_cast<BufferMetadataCompleter*>(userData);
+                delete completer;
+            });
+
         gst_pad_link(currentSrcPad.get(), appsinkSinkPad.get());
 
         gst_element_sync_state_with_parent(m_appsink.get());
@@ -1119,22 +1205,6 @@ void AppendPipeline::connectDemuxerSrcPadToAppsinkFromAnyThread(GstPad* demuxerS
 
         GST_DEBUG_BIN_TO_DOT_FILE_WITH_TS(GST_BIN(m_pipeline.get()), GST_DEBUG_GRAPH_SHOW_ALL, "webkit-after-link");
     }
-}
-
-void AppendPipeline::transitionTo(AppendState nextState, bool isAlreadyLocked)
-{
-    ASSERT(WTF::isMainThread());
-
-    LockHolder locker(isAlreadyLocked ? nullptr : &m_appendStateTransitionLock);
-
-    if (m_appendState == AppendState::Invalid || m_appendState == nextState || !m_playerPrivate) {
-        m_appendStateTransitionCondition.notifyOne();
-        return;
-    }
-
-    setAppendState(nextState);
-
-    m_appendStateTransitionCondition.notifyOne();
 }
 
 void AppendPipeline::connectDemuxerSrcPadToAppsink(GstPad* demuxerSrcPad)
@@ -1162,7 +1232,8 @@ void AppendPipeline::connectDemuxerSrcPadToAppsink(GstPad* demuxerSrcPad)
     }
 #endif
 
-    if (m_mediaSourceClient->duration().isInvalid() && m_initialDuration > MediaTime::zeroTime())
+    if (m_initialDuration > m_mediaSourceClient->duration()
+        || (m_mediaSourceClient->duration().isInvalid() && m_initialDuration > MediaTime::zeroTime()))
         m_mediaSourceClient->durationChanged(m_initialDuration);
 
     parseDemuxerSrcPadCaps(gst_caps_ref(caps.get()));
@@ -1259,17 +1330,7 @@ void AppendPipeline::dispatchPendingDecryptionStructure()
     // gst_event_new_custom() takes over ownership of it.
     gst_element_send_event(m_pipeline.get(), gst_event_new_custom(GST_EVENT_CUSTOM_DOWNSTREAM_OOB, m_pendingDecryptionStructure.release()));
 
-    if (WTF::isMainThread()) {
-        transitionTo(AppendState::Ongoing, true);
-    } else {
-        GstStructure* structure = gst_structure_new("transition-main-thread", "transition", G_TYPE_INT, AppendState::Ongoing, nullptr);
-        GstMessage* message = gst_message_new_application(GST_OBJECT(m_appsrc.get()), structure);
-        if (gst_bus_post(m_bus.get(), message)) {
-            GST_TRACE("transition-main-thread Ongoing sent to the bus");
-            LockHolder locker(m_appendStateTransitionLock);
-            m_appendStateTransitionCondition.wait(m_appendStateTransitionLock);
-        }
-    }
+    setAppendState(AppendState::Ongoing);
 }
 
 void AppendPipeline::dispatchDecryptionStructure(GUniquePtr<GstStructure>&& structure)

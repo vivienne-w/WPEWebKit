@@ -1119,7 +1119,8 @@ void MediaPlayerPrivateGStreamer::handleMessage(GstMessage* message)
         gst_message_parse_request_state(message, &requestedState);
         gst_element_get_state(m_pipeline.get(), &currentState, nullptr, 250 * GST_NSECOND);
         if (requestedState < currentState) {
-            GST_INFO("Element %s requested state change to %s", GST_MESSAGE_SRC_NAME(message),
+            GUniquePtr<gchar> elementName(gst_element_get_name(GST_ELEMENT(message)));
+            GST_INFO("Element %s requested state change to %s", elementName.get(),
                 gst_element_state_get_name(requestedState));
             m_requestedState = requestedState;
             if (!changePipelineState(requestedState))
@@ -2359,6 +2360,7 @@ void MediaPlayerPrivateGStreamer::createGSTPlayBin()
         return GST_BUS_PASS;
     }, this, nullptr);
 
+    // Let also other listeners subscribe to (application) messages in this bus.
     gst_bus_add_signal_watch_full(bus.get(), RunLoopSourcePriority::RunLoopDispatcher);
     g_signal_connect(bus.get(), "message", G_CALLBACK(busMessageCallback), this);
 

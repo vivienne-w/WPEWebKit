@@ -620,8 +620,8 @@ static gboolean webKitWebSrcQueryWithParent(GstPad* pad, GstObject* parent, GstQ
 
             gst_query_set_context(query, context);
             result = TRUE;
-            break;
         }
+        break;
     }
     default: {
         GRefPtr<GstPad> target = adoptGRef(gst_ghost_pad_get_target(GST_GHOST_PAD_CAST(pad)));
@@ -805,20 +805,6 @@ void CachedResourceStreamingClient::responseReceived(PlatformMediaResource&, con
         GST_DEBUG_OBJECT(src, "Seek in progress, ignoring response");
         return;
     }
-
-    // FIXME: priv->uri disappeared.
-#if 0
-    if (response.isRedirected()) {
-        if (!urlHasSupportedProtocol(response.url())) {
-            GST_ELEMENT_ERROR(src, RESOURCE, READ, ("Invalid URI '%s'", response.url().string().utf8().data()), (nullptr));
-            gst_app_src_end_of_stream(priv->appsrc);
-            webKitWebSrcStop(src);
-            return;
-        }
-        g_free(priv->uri);
-        priv->uri = g_strdup(response.url().string().utf8().data());
-    }
-#endif
 
     if (priv->requestedOffset) {
         // Seeking ... we expect a 206 == PARTIAL_CONTENT

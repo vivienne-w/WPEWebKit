@@ -90,8 +90,6 @@ public:
     void connectDemuxerSrcPadToAppsinkFromAnyThread(GstPad*);
     void connectDemuxerSrcPadToAppsink(GstPad*);
 
-    void transitionTo(AppendState, bool isAlreadyLocked);
-
     void reportAppsrcAtLeastABufferLeft();
     void reportAppsrcNeedDataReceived();
 
@@ -138,12 +136,11 @@ private:
     // Used intentionally without locks.
     bool m_busAlreadyNotifiedOfAvailablesamples;
 
-    Lock m_padAddRemoveLock;
-    Condition m_padAddRemoveCondition;
+   
     Lock m_newSampleLock;
     Condition m_newSampleCondition;
-    Lock m_appendStateTransitionLock;
-    Condition m_appendStateTransitionCondition;
+    Lock m_padAddRemoveLock;
+    Condition m_padAddRemoveCondition;
 
     GRefPtr<GstCaps> m_appsinkCaps;
     GRefPtr<GstCaps> m_demuxerSrcPadCaps;
