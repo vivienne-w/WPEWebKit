@@ -1121,6 +1121,22 @@ void AppendPipeline::connectDemuxerSrcPadToAppsinkFromAnyThread(GstPad* demuxerS
     }
 }
 
+void AppendPipeline::transitionTo(AppendState nextState, bool isAlreadyLocked)
+{
+    ASSERT(WTF::isMainThread());
+
+    LockHolder locker(isAlreadyLocked ? nullptr : &m_appendStateTransitionLock);
+
+    if (m_appendState == AppendState::Invalid || m_appendState == nextState || !m_playerPrivate) {
+        m_appendStateTransitionCondition.notifyOne();
+        return;
+    }
+
+    setAppendState(nextState);
+
+    m_appendStateTransitionCondition.notifyOne();
+}
+
 void AppendPipeline::connectDemuxerSrcPadToAppsink(GstPad* demuxerSrcPad)
 {
     ASSERT(WTF::isMainThread());
@@ -1220,6 +1236,16 @@ void AppendPipeline::disconnectDemuxerSrcPadFromAppsinkFromAnyThread(GstPad*)
 
     GST_DEBUG_BIN_TO_DOT_FILE_WITH_TS(GST_BIN(m_pipeline.get()), GST_DEBUG_GRAPH_SHOW_ALL, "pad-removed-after");
 }
+
+void AppendPipeline::appendPipelineDemuxerNoMorePadsFromAnyThread()
+{
+    GST_TRACE("appendPipelineDemuxerNoMorePadsFromAnyThread");
+    GstStructure* structure = gst_structure_new_empty("demuxer-no-more-pads");
+    GstMessage* message = gst_message_new_application(GST_OBJECT(m_appsrc.get()), structure);
+    gst_bus_post(m_bus.get(), message);
+    GST_TRACE("appendPipelineDemuxerNoMorePadsFromAnyThread - posted to bus");
+}
+
 
 #if ENABLE(ENCRYPTED_MEDIA)
 void AppendPipeline::dispatchPendingDecryptionStructure()
