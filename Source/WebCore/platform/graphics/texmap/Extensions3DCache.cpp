@@ -51,13 +51,19 @@ Extensions3DCache::Extensions3DCache()
     if (!previousActiveContext)
         PlatformDisplay::sharedDisplayForCompositing().sharingGLContext()->makeContextCurrent();
 
-    RefPtr<GraphicsContext3D> context3D = GraphicsContext3D::createForCurrentGLContext();
-    m_supportsUnpackSubimage = context3D->getExtensions().supports("GL_EXT_unpack_subimage");
+    // RefPtr<GraphicsContext3D> context3D = GraphicsContext3D::createForCurrentGLContext();
+
+    String extensions(reinterpret_cast<const char*>(::glGetString(GL_EXTENSIONS)));
+    Vector<String> extensionsVector;
+    extensions.split(' ', extensionsVector);
+
+    m_supportsUnpackSubimage = extensionsVector.contains("GL_EXT_unpack_subimage");
 #if 0
     m_GL_OES_packed_depth_stencil = context3D->getExtensions().supports("GL_OES_packed_depth_stencil");
     m_GL_EXT_multisampled_render_to_texture = context3D->getExtensions().supports("GL_EXT_multisampled_render_to_texture");
 #endif
-    context3D = nullptr;
+
+    // context3D = nullptr;
 
     if (previousActiveContext)
         previousActiveContext->makeContextCurrent();

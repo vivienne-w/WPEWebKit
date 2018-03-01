@@ -34,6 +34,7 @@
 #include "HTTPRequest.h"
 #include "WebInspectorProxy.h"
 #include "WebSocketServerConnection.h"
+#include <wtf/NeverDestroyed.h>
 
 using namespace WebCore;
 
@@ -141,7 +142,7 @@ bool WebInspectorServer::didReceiveWebSocketUpgradeHTTPRequest(WebSocketServerCo
     String path = request->url();
 
     // NOTE: Keep this in sync with WebCore/inspector/front-end/inspector.js.
-    DEPRECATED_DEFINE_STATIC_LOCAL(const String, inspectorWebSocketConnectionPathPrefix, (ASCIILiteral("/devtools/page/")));
+    static NeverDestroyed<String> inspectorWebSocketConnectionPathPrefix(ASCIILiteral("/devtools/page/"));
 
     // Unknown path requested.
     if (!path.startsWith(inspectorWebSocketConnectionPathPrefix))

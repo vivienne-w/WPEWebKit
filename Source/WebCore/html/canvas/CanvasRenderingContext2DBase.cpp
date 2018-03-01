@@ -2000,7 +2000,7 @@ void CanvasRenderingContext2DBase::didDraw(const FloatRect& r, unsigned options)
         return;
 
 #if USE(COORDINATED_GRAPHICS_THREADED)
-    canvas().buffer()->markBufferChanged();
+    downcast<HTMLCanvasElement>(canvasBase()).buffer()->markBufferChanged();
 #endif
 
     if (!state().hasInvertibleTransform)

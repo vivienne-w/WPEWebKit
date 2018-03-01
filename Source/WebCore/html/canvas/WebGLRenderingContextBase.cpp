@@ -411,6 +411,7 @@ std::unique_ptr<WebGLRenderingContextBase> WebGLRenderingContextBase::create(Can
     HostWindow* hostWindow = nullptr;
 
     auto* canvasElement = is<HTMLCanvasElement>(canvas) ? &downcast<HTMLCanvasElement>(canvas) : nullptr;
+    GraphicsContext3D::RenderStyle renderStyle = GraphicsContext3D::RenderOffscreen;
 
     if (canvasElement) {
         Document& document = canvasElement->document();
@@ -452,6 +453,9 @@ std::unique_ptr<WebGLRenderingContextBase> WebGLRenderingContextBase::create(Can
             attributes.powerPreference = GraphicsContext3DPowerPreference::LowPower;
         }
 
+        if (frame->settings().nonCompositedWebGLEnabled())
+            renderStyle = GraphicsContext3D::RenderDirectlyToHostWindow;
+
         if (page)
             attributes.devicePixelRatio = page->deviceScaleFactor();
 
@@ -482,7 +486,6 @@ std::unique_ptr<WebGLRenderingContextBase> WebGLRenderingContextBase::create(Can
         return renderingContext;
     }
 
-    GraphicsContext3D::RenderStyle renderStyle = frame->settings().nonCompositedWebGLEnabled() ? GraphicsContext3D::RenderDirectlyToHostWindow : GraphicsContext3D::RenderOffscreen;
     auto context = GraphicsContext3D::create(attributes, hostWindow, renderStyle);
     if (!context || !context->makeContextCurrent()) {
         if (canvasElement)
@@ -716,7 +719,7 @@ void WebGLRenderingContextBase::addActivityStateChangeObserverIfNecessary()
 {
     // We are only interested in visibility changes for contexts
     // that are using the high-performance GPU.
-    if (!isHighPerformanceContext(m_context) && !canvas().document().frame()->settings().nonCompositedWebGLEnabled())
+    if (!isHighPerformanceContext(m_context))
         return;
 
     auto* canvas = htmlCanvas();
@@ -725,6 +728,9 @@ void WebGLRenderingContextBase::addActivityStateChangeObserverIfNecessary()
 
     auto* page = canvas->document().page();
     if (!page)
+        return;
+
+    if (!page->settings().nonCompositedWebGLEnabled())
         return;
 
     page->addActivityStateChangeObserver(*this);
@@ -6163,7 +6169,13 @@ void WebGLRenderingContextBase::activityStateDidChange(ActivityState::Flags oldA
         }
     }
 
-    if (canvas().document().frame()->settings().nonCompositedWebGLEnabled()) {
+    auto* canvas = htmlCanvas();
+    if (!canvas)
+        return;
+    auto* frame = canvas->document().frame();
+    if (!frame)
+        return;
+    if (frame->settings().nonCompositedWebGLEnabled()) {
         if ((changed & ActivityState::IsInWindow) && !(newActivityState & ActivityState::IsInWindow)) {
             if (m_scissorEnabled)
                 m_context->disable(GraphicsContext3D::SCISSOR_TEST);

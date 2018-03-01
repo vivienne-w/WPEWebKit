@@ -48,6 +48,7 @@ class SocketStreamHandleClient;
 class SocketStreamHandleImpl final : public SocketStreamHandle {
 public:
     static Ref<SocketStreamHandleImpl> create(const URL&, SocketStreamHandleClient&, PAL::SessionID, const String&, SourceApplicationAuditToken&&);
+    static Ref<SocketStreamHandle> create(GSocketConnection*, SocketStreamHandleClient&);
     virtual ~SocketStreamHandleImpl();
 
     void platformSend(const char* data, size_t length, Function<void(bool)>&&) final;

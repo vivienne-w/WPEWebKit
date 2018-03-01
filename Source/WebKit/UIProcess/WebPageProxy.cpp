@@ -2384,7 +2384,7 @@ void WebPageProxy::setCustomUserAgent(const String& customUserAgent)
 void WebPageProxy::setProxies(const Vector<WebCore::Proxy>& proxies)
 {
 #if USE(SOUP)
-    m_process->processPool().sendToNetworkingProcessRelaunchingIfNecessary(Messages::NetworkProcess::SetProxies(m_sessionID, proxies));
+    m_process->processPool().sendToNetworkingProcessRelaunchingIfNecessary(Messages::NetworkProcess::SetProxies(sessionID(), proxies));
 #endif
 }
 

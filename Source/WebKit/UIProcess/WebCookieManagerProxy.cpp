@@ -287,7 +287,6 @@ void WebCookieManagerProxy::setCookieStoragePartitioningEnabled(bool enabled)
 #endif
 }
 
-<<<<<<< HEAD
 void WebCookieManagerProxy::setCookies2(PAL::SessionID sessionID, const Vector<WebCore::Cookie>& cookies)
 {
     processPool()->sendToNetworkingProcessRelaunchingIfNecessary(Messages::WebCookieManager::SetCookies2(sessionID, cookies));

@@ -229,28 +229,6 @@ void deleteAllCookiesModifiedSince(const NetworkStorageSession& session, WallTim
         g_warning("Deleting cookies modified since a given time span is not supported yet");
 }
 
-static SoupDate* msToSoupDate(double ms)
-{
-    int year = msToYear(ms);
-    int dayOfYear = dayInYear(ms, year);
-    bool leapYear = isLeapYear(year);
-    return soup_date_new(year, monthFromDayInYear(dayOfYear, leapYear), dayInMonthFromDayInYear(dayOfYear, leapYear), msToHours(ms), msToMinutes(ms), static_cast<int>(ms / 1000) % 60);
-}
-
-static SoupCookie* toSoupCookie(const Cookie& cookie)
-{
-    SoupCookie* soupCookie = soup_cookie_new(cookie.name.utf8().data(), cookie.value.utf8().data(),
-        cookie.domain.utf8().data(), cookie.path.utf8().data(), -1);
-    soup_cookie_set_http_only(soupCookie, cookie.httpOnly);
-    soup_cookie_set_secure(soupCookie, cookie.secure);
-    if (!cookie.session) {
-        SoupDate* date = msToSoupDate(cookie.expires);
-        soup_cookie_set_expires(soupCookie, date);
-        soup_date_free(date);
-    }
-    return soupCookie;
-}
-
 void setCookies(const NetworkStorageSession& session, const Vector<Cookie>& cookies)
 {
     SoupCookieJar* jar = session.cookieStorage();
@@ -268,7 +246,7 @@ void setCookies(const NetworkStorageSession& session, const Vector<Cookie>& cook
     }
     deleteAllCookies(session);
     for (const auto& cookie : cookies)
-        soup_cookie_jar_add_cookie(jar, toSoupCookie(cookie));
+        soup_cookie_jar_add_cookie(jar, cookie.toSoupCookie());
 
     for (guint i = 0; i < blocked_handler_id_array->len; ++i)
     {
@@ -291,7 +269,7 @@ bool getCookies(const NetworkStorageSession& session, Vector<Cookie>& returnCook
     for (GSList* iter = cookies.get(); iter; iter = g_slist_next(iter)) {
         SoupCookie* cookie = static_cast<SoupCookie*>(iter->data);
         returnCookies.append(Cookie(String::fromUTF8(cookie->name), String::fromUTF8(cookie->value), String::fromUTF8(cookie->domain),
-            String::fromUTF8(cookie->path), cookie->expires ? static_cast<double>(soup_date_to_time_t(cookie->expires)) * 1000 : 0,
+            String::fromUTF8(cookie->path), 0, cookie->expires ? static_cast<double>(soup_date_to_time_t(cookie->expires)) * 1000 : 0,
             cookie->http_only, cookie->secure, !cookie->expires, String(), URL(), Vector<uint16_t>{ }));
         soup_cookie_free(cookie);
     }

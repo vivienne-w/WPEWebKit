@@ -120,6 +120,8 @@ inline WKConsoleMessageSource toAPI(JSC::MessageSource source)
         return WKConsoleMessageSourceSecurity;
     case JSC::MessageSource::ContentBlocker:
         return WKConsoleMessageSourceContentBlocker;
+    case JSC::MessageSource::Media:
+    case JSC::MessageSource::WebRTC:
     case JSC::MessageSource::Other:
         return WKConsoleMessageSourceOther;
     }

@@ -121,7 +121,7 @@ void NetworkProcess::platformInitializeNetworkProcess(const NetworkProcessCreati
     m_diskCacheDirectory = parameters.diskCacheDirectory;
 
 #if ENABLE(NETWORK_CACHE)
-    SoupNetworkSession::clearCache(WebCore::directoryName(m_diskCacheDirectory));
+    SoupNetworkSession::clearCache(FileSystem::directoryName(m_diskCacheDirectory));
 
     OptionSet<NetworkCache::Cache::Option> cacheOptions { NetworkCache::Cache::Option::RegisterNotify };
     if (parameters.shouldEnableNetworkCacheEfficacyLogging)
@@ -135,7 +135,7 @@ void NetworkProcess::platformInitializeNetworkProcess(const NetworkProcessCreati
 #else
     // We used to use the given cache directory for the soup cache, but now we use a subdirectory to avoid
     // conflicts with other cache files in the same directory. Remove the old cache files if they still exist.
-    SoupNetworkSession::clearCache(WebCore::directoryName(m_diskCacheDirectory));
+    SoupNetworkSession::clearCache(FileSystem::directoryName(m_diskCacheDirectory));
 
     GRefPtr<SoupCache> soupCache = adoptGRef(soup_cache_new(m_diskCacheDirectory.utf8().data(), SOUP_CACHE_SINGLE_USER));
     NetworkStorageSession::defaultStorageSession().getOrCreateSoupNetworkSession().setCache(soupCache.get());
