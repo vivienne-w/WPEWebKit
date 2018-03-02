@@ -63,7 +63,7 @@ OBJC_CLASS WebAccessibilityObjectWrapper;
 
 typedef WebAccessibilityObjectWrapper AccessibilityObjectWrapper;
 
-#elif PLATFORM(GTK) || (PLATFORM(EFL) && HAVE(ACCESSIBILITY))
+#elif PLATFORM(GTK) || (PLATFORM(EFL) || PLATFORM(WPE) && HAVE(ACCESSIBILITY))
 typedef struct _AtkObject AtkObject;
 typedef struct _AtkObject AccessibilityObjectWrapper;
 #else
@@ -1011,7 +1011,7 @@ public:
     bool isHidden() const { return isARIAHidden() || isDOMHidden(); }
     
 #if HAVE(ACCESSIBILITY)
-#if PLATFORM(GTK) || PLATFORM(EFL)
+#if PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(WPE)
     AccessibilityObjectWrapper* wrapper() const;
     void setWrapper(AccessibilityObjectWrapper*);
 #else
@@ -1090,7 +1090,7 @@ protected:
 
     void ariaElementsFromAttribute(AccessibilityChildrenVector&, const QualifiedName&) const;
 
-#if (PLATFORM(GTK) || PLATFORM(EFL)) && HAVE(ACCESSIBILITY)
+#if (PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(WPE)) && HAVE(ACCESSIBILITY)
     bool allowsTextRanges() const;
     unsigned getLengthForTextRange() const;
 #else
@@ -1102,7 +1102,7 @@ protected:
     RetainPtr<WebAccessibilityObjectWrapper> m_wrapper;
 #elif PLATFORM(WIN)
     COMPtr<AccessibilityObjectWrapper> m_wrapper;
-#elif PLATFORM(GTK) || (PLATFORM(EFL) && HAVE(ACCESSIBILITY))
+#elif PLATFORM(GTK) || (PLATFORM(EFL) || PLATFORM(WPE) && HAVE(ACCESSIBILITY))
     AtkObject* m_wrapper;
 #endif
 };

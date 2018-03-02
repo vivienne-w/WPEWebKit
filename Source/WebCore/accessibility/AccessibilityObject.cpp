@@ -86,7 +86,7 @@ AccessibilityObject::AccessibilityObject()
     , m_haveChildren(false)
     , m_role(UnknownRole)
     , m_lastKnownIsIgnoredValue(DefaultBehavior)
-#if PLATFORM(GTK) || (PLATFORM(EFL) && HAVE(ACCESSIBILITY))
+#if PLATFORM(GTK) || (PLATFORM(EFL) || PLATFORM(WPE) && HAVE(ACCESSIBILITY))
     , m_wrapper(nullptr)
 #endif
 {

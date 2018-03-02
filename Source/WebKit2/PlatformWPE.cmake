@@ -301,6 +301,17 @@ if (ENABLE_BREAKPAD)
     )
 endif ()
 
+if (ENABLE_ACCESSIBILITY)
+   list(APPEND WebKit2_SOURCES
+       WebProcess/WebPage/atk/WebPageAccessibilityObjectAtk.cpp
+   )
+
+   list(APPEND WebKit2_INCLUDE_DIRECTORIES
+       "${WEBKIT2_DIR}/WebProcess/WebPage/atk"
+       ${ATK_INCLUDE_DIRS}
+   )
+endif ()
+
 set(InspectorFiles
     ${CMAKE_SOURCE_DIR}/Source/WebInspectorUI/Localizations/en.lproj/localizedStrings.js
     ${CMAKE_SOURCE_DIR}/Source/WebInspectorUI/UserInterface/*.html
