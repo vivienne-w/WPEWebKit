@@ -384,7 +384,7 @@ Ref<Nicosia::Buffer> CompositingCoordinator::getCoordinatedBuffer(const IntSize&
     if (Extensions3DCache::singleton().supportsUnpackSubimage()) {
         for (auto& atlas : m_updateAtlases) {
             if (atlas->supportsAlpha() == (flags & Nicosia::Buffer::SupportsAlpha)) {
-	        if (auto buffer = atlas->getCoordinatedBuffer(size, atlasID, allocatedRect))
+                if (auto buffer = atlas->getCoordinatedBuffer(size, atlasID, allocatedRect))
                     return *buffer;
             }
         }
