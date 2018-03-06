@@ -63,7 +63,7 @@ OBJC_CLASS WebAccessibilityObjectWrapper;
 
 typedef WebAccessibilityObjectWrapper AccessibilityObjectWrapper;
 
-#elif PLATFORM(GTK) || (PLATFORM(EFL) || PLATFORM(WPE) && HAVE(ACCESSIBILITY))
+#elif PLATFORM(GTK) || ((PLATFORM(EFL) || PLATFORM(WPE)) && HAVE(ACCESSIBILITY))
 typedef struct _AtkObject AtkObject;
 typedef struct _AtkObject AccessibilityObjectWrapper;
 #else
@@ -1102,7 +1102,7 @@ protected:
     RetainPtr<WebAccessibilityObjectWrapper> m_wrapper;
 #elif PLATFORM(WIN)
     COMPtr<AccessibilityObjectWrapper> m_wrapper;
-#elif PLATFORM(GTK) || (PLATFORM(EFL) || PLATFORM(WPE) && HAVE(ACCESSIBILITY))
+#elif PLATFORM(GTK) || ((PLATFORM(EFL) || PLATFORM(WPE)) && HAVE(ACCESSIBILITY))
     AtkObject* m_wrapper;
 #endif
 };
