@@ -1066,6 +1066,7 @@ void MediaPlayerPrivateGStreamerMSE::attemptToDecryptWithInstance(const CDMInsta
                 GST_TRACE("Found session %s", sessionId.utf8().data());
                 GUniquePtr<GstStructure> structure(gst_structure_new("drm-session", "session", G_TYPE_STRING, sessionId.utf8().data(), nullptr));
                 it.value->dispatchDecryptionStructure(GUniquePtr<GstStructure>(gst_structure_copy(structure.get())));
+                gst_structure_free(structure.release());
             } else
                 GST_WARNING("found no session id to dispatch");
         }

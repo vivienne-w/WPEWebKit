@@ -303,6 +303,11 @@ AppendPipeline::~AppendPipeline()
         m_appsink = nullptr;
     }
 
+    if (m_pendingDecryptionStructure) {
+        GST_INFO("Destruction of DecryptionStructure");
+        gst_structure_free(m_pendingDecryptionStructure.release());
+    }
+
     m_appsinkCaps = nullptr;
     m_demuxerSrcPadCaps = nullptr;
 };
@@ -367,6 +372,11 @@ void AppendPipeline::handleNeedContextSyncMessage(GstMessage* message)
         if (tempInit.isEmpty() || tempInit == m_initData) {
             GST_INFO("InitData empty or allready handled, ignoring. Size: %d", tempInit.sizeInBytes());
             return;
+        }
+
+        if (m_pendingDecryptionStructure) {
+	    GST_INFO("Remove DecryptionStructure, we have new initdata");
+            gst_structure_free(m_pendingDecryptionStructure.release());
         }
 
         m_initData = tempInit;
@@ -1360,7 +1370,7 @@ void AppendPipeline::dispatchPendingDecryptionStructure()
 
     // Release the m_pendingDecryptionStructure object since
     // gst_event_new_custom() takes over ownership of it.
-    gst_element_send_event(m_pipeline.get(), gst_event_new_custom(GST_EVENT_CUSTOM_DOWNSTREAM_OOB, m_pendingDecryptionStructure.release()));
+    gst_element_send_event(m_pipeline.get(), gst_event_new_custom(GST_EVENT_CUSTOM_DOWNSTREAM_OOB, gst_structure_copy(m_pendingDecryptionStructure.get())));
 
     if (WTF::isMainThread()) {
         transitionTo(AppendState::Ongoing, true);
@@ -1368,9 +1378,13 @@ void AppendPipeline::dispatchPendingDecryptionStructure()
         GstStructure* structure = gst_structure_new("transition-main-thread", "transition", G_TYPE_INT, AppendState::Ongoing, nullptr);
         GstMessage* message = gst_message_new_application(GST_OBJECT(m_appsrc.get()), structure);
         if (gst_bus_post(m_bus.get(), message)) {
-            GST_TRACE("transition-main-thread Ongoing sent to the bus");
-            LockHolder locker(m_appendStateTransitionLock);
-            m_appendStateTransitionCondition.wait(m_appendStateTransitionLock);
+            if (m_appendState == AppendState::Ongoing) {
+                GST_DEBUG("AppendState is already Ongoing! do nothing");
+            } else {
+                GST_DEBUG("transition-main-thread Ongoing sent to the bus");
+                LockHolder locker(m_appendStateTransitionLock);
+                m_appendStateTransitionCondition.wait(m_appendStateTransitionLock);
+            }
         }
     }
 }
