@@ -761,6 +761,7 @@ set(WebCore_NON_SVG_IDL_FILES
     page/IntersectionObserverCallback.idl
     page/IntersectionObserverEntry.idl
     page/Location.idl
+    page/MemoryInfo.idl
     page/Navigator.idl
     page/NavigatorID.idl
     page/NavigatorLanguage.idl
@@ -3691,7 +3692,6 @@ set(WebCoreTestSupport_IDL_FILES
     testing/InternalSettings.idl
     testing/Internals.idl
     testing/MallocStatistics.idl
-    testing/MemoryInfo.idl
     testing/MockCDMFactory.idl
     testing/MockContentFilterSettings.idl
     testing/MockPageOverlay.idl
