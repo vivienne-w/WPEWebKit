@@ -55,6 +55,7 @@ if (USE_COORDINATED_GRAPHICS)
         platform/graphics/nicosia/NicosiaPaintingEngineBasic.cpp
         platform/graphics/nicosia/NicosiaPaintingEngineThreaded.cpp
         platform/graphics/nicosia/NicosiaPaintingContextCairo.cpp
+        platform/graphics/nicosia/cairo/NicosiaCairoOperationRecorder.cpp
     )
 else ()
     list(APPEND WebCore_SOURCES
