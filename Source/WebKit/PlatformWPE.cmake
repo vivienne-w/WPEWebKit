@@ -562,6 +562,7 @@ if (EXPORT_DEPRECATED_WEBKIT2_C_API)
         ${WEBKIT_DIR}/Shared/API/c/WKUserScriptInjectionTime.h
 
         ${WEBKIT_DIR}/Shared/API/c/wpe/WKBaseWPE.h
+        ${WEBKIT_DIR}/Shared/API/c/wpe/WebKit.h
 
         ${WEBKIT_DIR}/WebProcess/InjectedBundle/API/c/WKBundle.h
         ${WEBKIT_DIR}/WebProcess/InjectedBundle/API/c/WKBundleBackForwardList.h
