@@ -30,7 +30,7 @@ namespace WebCore {
 
 UpdateAtlas::UpdateAtlas(Client& client, const IntSize& size, Nicosia::Buffer::Flags flags)
     : m_client(client)
-    , m_buffer(Nicosia::Buffer::create(size, flags))
+    , m_buffer(Nicosia::Buffer::create({ std::max(size.width(), 32), std::max(size.height(), 32) }, flags))
 {
     static ID s_nextID { 0 };
     m_id = ++s_nextID;
@@ -48,6 +48,7 @@ void UpdateAtlas::buildLayoutIfNeeded()
     if (m_areaAllocator)
         return;
     m_areaAllocator = std::make_unique<GeneralAreaAllocator>(size());
+    m_areaAllocator->setMinimumAllocation(IntSize(32, 32));
 }
 
 void UpdateAtlas::didSwapBuffers()
