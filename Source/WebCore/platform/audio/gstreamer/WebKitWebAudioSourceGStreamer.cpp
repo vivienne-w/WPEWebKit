@@ -71,6 +71,8 @@ struct _WebKitWebAudioSourcePrivate {
     guint64 numberOfSamples;
 
     GRefPtr<GstBufferPool> pool;
+
+    bool enableGapBufferSupport;
 };
 
 enum {
@@ -195,6 +197,11 @@ static void webkit_web_audio_src_init(WebKitWebAudioSrc* src)
 
     g_rec_mutex_init(&priv->mutex);
     priv->task = adoptGRef(gst_task_new(reinterpret_cast<GstTaskFunction>(webKitWebAudioSrcLoop), src, nullptr));
+
+    // GAP buffer support is enabled only for GStreamer 1.12.5 because of a
+    // memory leak that was fixed in that version.
+    // https://bugzilla.gnome.org/show_bug.cgi?id=793067
+    priv->enableGapBufferSupport = webkitGstCheckVersion(1, 12, 5);
 
     gst_task_set_lock(priv->task.get(), &priv->mutex);
 }
@@ -356,12 +363,8 @@ static void webKitWebAudioSrcLoop(WebKitWebAudioSrc* src)
         auto& buffer = channelBufferList[i];
         unmapGstBuffer(buffer.get());
 
-        // This is enabled only for GStreamer 1.12.5 because of a memory leak that was fixed in that version.
-        // https://bugzilla.gnome.org/show_bug.cgi?id=793067
-        if (webkitGstCheckVersion(1, 12, 5)) {
-            if (priv->bus->channel(i)->isSilent())
-                GST_BUFFER_FLAG_SET(buffer.get(), GST_BUFFER_FLAG_GAP);
-        }
+        if (priv->enableGapBufferSupport && priv->bus->channel(i)->isSilent())
+            GST_BUFFER_FLAG_SET(buffer.get(), GST_BUFFER_FLAG_GAP);
 
         if (failed)
             continue;

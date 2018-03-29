@@ -31,7 +31,7 @@
 #pragma once
 
 #include "CommonVM.h"
-#include <runtime/VM.h>
+#include <JavaScriptCore/VM.h>
 #include <wtf/RefCounted.h>
 
 namespace WebCore {

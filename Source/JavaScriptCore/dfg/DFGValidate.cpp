@@ -346,6 +346,11 @@ public:
                     }
                     break;
                 }
+                case GetArgumentCountIncludingThis: {
+                    if (InlineCallFrame* inlineCallFrame = node->argumentsInlineCallFrame())
+                        VALIDATE((node), inlineCallFrame->isVarargs());
+                    break;
+                }
                 default:
                     break;
                 }
@@ -752,6 +757,7 @@ private:
                     break;
 
                 case Check:
+                case CheckVarargs:
                     // FIXME: This is probably not correct.
                     break;
 

@@ -2550,7 +2550,7 @@ void SpeculativeJIT::compile(Node* node)
 #endif
             break;
         case Array::Undecided: {
-            SpeculateStrictInt32Operand index(this, node->child2());
+            SpeculateStrictInt32Operand index(this, m_graph.varArgChild(node, 1));
             GPRTemporary resultTag(this, Reuse, index);
             GPRTemporary resultPayload(this);
 
@@ -2561,7 +2561,7 @@ void SpeculativeJIT::compile(Node* node)
             speculationCheck(OutOfBounds, JSValueRegs(), node,
                 m_jit.branch32(MacroAssembler::LessThan, indexGPR, MacroAssembler::TrustedImm32(0)));
 
-            use(node->child1());
+            use(m_graph.varArgChild(node, 0));
             index.use();
 
             m_jit.move(MacroAssembler::TrustedImm32(JSValue::UndefinedTag), resultTagGPR);
@@ -2570,20 +2570,20 @@ void SpeculativeJIT::compile(Node* node)
             break;
         }
         case Array::Generic: {
-            if (node->child1().useKind() == ObjectUse) {
-                if (node->child2().useKind() == StringUse) {
+            if (m_graph.varArgChild(node, 0).useKind() == ObjectUse) {
+                if (m_graph.varArgChild(node, 1).useKind() == StringUse) {
                     compileGetByValForObjectWithString(node);
                     break;
                 }
 
-                if (node->child2().useKind() == SymbolUse) {
+                if (m_graph.varArgChild(node, 1).useKind() == SymbolUse) {
                     compileGetByValForObjectWithSymbol(node);
                     break;
                 }
             }
 
-            SpeculateCellOperand base(this, node->child1()); // Save a register, speculate cell. We'll probably be right.
-            JSValueOperand property(this, node->child2());
+            SpeculateCellOperand base(this, m_graph.varArgChild(node, 0)); // Save a register, speculate cell. We'll probably be right.
+            JSValueOperand property(this, m_graph.varArgChild(node, 1));
             GPRReg baseGPR = base.gpr();
             JSValueRegs propertyRegs = property.jsValueRegs();
             
@@ -2599,8 +2599,8 @@ void SpeculativeJIT::compile(Node* node)
         case Array::Int32:
         case Array::Contiguous: {
             if (node->arrayMode().isInBounds()) {
-                SpeculateStrictInt32Operand property(this, node->child2());
-                StorageOperand storage(this, node->child3());
+                SpeculateStrictInt32Operand property(this, m_graph.varArgChild(node, 1));
+                StorageOperand storage(this, m_graph.varArgChild(node, 2));
             
                 GPRReg propertyReg = property.gpr();
                 GPRReg storageReg = storage.gpr();
@@ -2656,9 +2656,9 @@ void SpeculativeJIT::compile(Node* node)
                 break;
             }
 
-            SpeculateCellOperand base(this, node->child1());
-            SpeculateStrictInt32Operand property(this, node->child2());
-            StorageOperand storage(this, node->child3());
+            SpeculateCellOperand base(this, m_graph.varArgChild(node, 0));
+            SpeculateStrictInt32Operand property(this, m_graph.varArgChild(node, 1));
+            StorageOperand storage(this, m_graph.varArgChild(node, 2));
             
             GPRReg baseReg = base.gpr();
             GPRReg propertyReg = property.gpr();
@@ -2690,8 +2690,8 @@ void SpeculativeJIT::compile(Node* node)
         }
         case Array::Double: {
             if (node->arrayMode().isInBounds()) {
-                SpeculateStrictInt32Operand property(this, node->child2());
-                StorageOperand storage(this, node->child3());
+                SpeculateStrictInt32Operand property(this, m_graph.varArgChild(node, 1));
+                StorageOperand storage(this, m_graph.varArgChild(node, 2));
             
                 GPRReg propertyReg = property.gpr();
                 GPRReg storageReg = storage.gpr();
@@ -2709,9 +2709,9 @@ void SpeculativeJIT::compile(Node* node)
                 break;
             }
 
-            SpeculateCellOperand base(this, node->child1());
-            SpeculateStrictInt32Operand property(this, node->child2());
-            StorageOperand storage(this, node->child3());
+            SpeculateCellOperand base(this, m_graph.varArgChild(node, 0));
+            SpeculateStrictInt32Operand property(this, m_graph.varArgChild(node, 1));
+            StorageOperand storage(this, m_graph.varArgChild(node, 2));
             
             GPRReg baseReg = base.gpr();
             GPRReg propertyReg = property.gpr();
@@ -2746,8 +2746,8 @@ void SpeculativeJIT::compile(Node* node)
         case Array::ArrayStorage:
         case Array::SlowPutArrayStorage: {
             if (node->arrayMode().isInBounds()) {
-                SpeculateStrictInt32Operand property(this, node->child2());
-                StorageOperand storage(this, node->child3());
+                SpeculateStrictInt32Operand property(this, m_graph.varArgChild(node, 1));
+                StorageOperand storage(this, m_graph.varArgChild(node, 2));
                 GPRReg propertyReg = property.gpr();
                 GPRReg storageReg = storage.gpr();
         
@@ -2767,9 +2767,9 @@ void SpeculativeJIT::compile(Node* node)
                 break;
             }
 
-            SpeculateCellOperand base(this, node->child1());
-            SpeculateStrictInt32Operand property(this, node->child2());
-            StorageOperand storage(this, node->child3());
+            SpeculateCellOperand base(this, m_graph.varArgChild(node, 0));
+            SpeculateStrictInt32Operand property(this, m_graph.varArgChild(node, 1));
+            StorageOperand storage(this, m_graph.varArgChild(node, 2));
             GPRReg propertyReg = property.gpr();
             GPRReg storageReg = storage.gpr();
             GPRReg baseReg = base.gpr();
@@ -3675,7 +3675,7 @@ void SpeculativeJIT::compile(Node* node)
             GPRTemporary scratch(this);
 
             m_jit.move(TrustedImmPtr(scratchBuffer->addressOfActiveLength()), scratch.gpr());
-            m_jit.storePtr(TrustedImmPtr(0), scratch.gpr());
+            m_jit.storePtr(TrustedImmPtr(nullptr), scratch.gpr());
         }
 
         cellResult(result.gpr(), node, UseChildrenCalledExplicitly);
@@ -4405,6 +4405,17 @@ void SpeculativeJIT::compile(Node* node)
         break;
     }
 
+    case NumberIsInteger: {
+        JSValueOperand input(this, node->child1());
+        JSValueRegs inputRegs = input.jsValueRegs();
+        flushRegisters();
+        GPRFlushedCallResult result(this);
+        GPRReg resultGPR = result.gpr();
+        callOperation(operationNumberIsInteger, resultGPR, inputRegs);
+        booleanResult(resultGPR, node);
+        break;
+    }
+
     case IsObject: {
         JSValueOperand value(this, node->child1());
         GPRTemporary result(this, Reuse, value, TagWord);
@@ -5108,6 +5119,7 @@ void SpeculativeJIT::compile(Node* node)
 
     case Phantom:
     case Check:
+    case CheckVarargs:
         DFG_NODE_DO_TO_CHILDREN(m_jit.graph(), node, speculate);
         noResult(node);
         break;
@@ -5230,6 +5242,7 @@ void SpeculativeJIT::compile(Node* node)
     case EntrySwitch:
     case CPUIntrinsic:
     case AssertNotEmpty:
+    case GetArrayMask:
         DFG_CRASH(m_jit.graph(), node, "unexpected node in DFG backend");
         break;
     }
@@ -5289,7 +5302,7 @@ void SpeculativeJIT::compileAllocateNewArrayWithSize(JSGlobalObject* globalObjec
     GPRReg scratchGPR = scratch.gpr();
     GPRReg scratch2GPR = scratch2.gpr();
     
-    m_jit.move(TrustedImmPtr(0), storageGPR);
+    m_jit.move(TrustedImmPtr(nullptr), storageGPR);
             
     MacroAssembler::JumpList slowCases;
     if (shouldConvertLargeSizeToArrayStorage)

@@ -570,6 +570,7 @@ private:
             compilePutStack();
             break;
         case DFG::Check:
+        case CheckVarargs:
             compileNoOp();
             break;
         case ToObject:
@@ -745,6 +746,9 @@ private:
             break;
         case GetArrayLength:
             compileGetArrayLength();
+            break;
+        case GetArrayMask:
+            compileGetArrayMask();
             break;
         case GetVectorLength:
             compileGetVectorLength();
@@ -1057,6 +1061,9 @@ private:
             break;
         case IsNumber:
             compileIsNumber();
+            break;
+        case NumberIsInteger:
+            compileNumberIsInteger();
             break;
         case IsCellWithType:
             compileIsCellWithType();
@@ -2940,7 +2947,10 @@ private:
     {
         LValue cell = lowCell(m_node->child1());
         speculateFunction(m_node->child1(), cell);
-        setJSValue(m_out.loadPtr(cell, m_heaps.JSFunction_executable));
+        setJSValue(
+            m_out.bitXor(
+                m_out.loadPtr(cell, m_heaps.JSFunction_executable),
+                m_out.constIntPtr(JSFunctionPoison::key())));
     }
     
     void compileArrayify()
@@ -3622,6 +3632,11 @@ private:
         }
     }
     
+    void compileGetArrayMask()
+    {
+        setInt32(m_out.load32NonNegative(lowObject(m_node->child1()), m_heaps.JSObject_butterflyMask));
+    }
+
     void compileGetArrayLength()
     {
         switch (m_node->arrayMode().type()) {
@@ -3630,6 +3645,14 @@ private:
         case Array::Double:
         case Array::Contiguous: {
             setInt32(m_out.load32NonNegative(lowStorage(m_node->child2()), m_heaps.Butterfly_publicLength));
+            return;
+        }
+
+        case Array::ArrayStorage:
+        case Array::SlowPutArrayStorage: {
+            LValue length = m_out.load32(lowStorage(m_node->child2()), m_heaps.ArrayStorage_publicLength);
+            speculate(Uncountable, noValue(), nullptr, m_out.lessThan(length, m_out.int32Zero));
+            setInt32(length);
             return;
         }
             
@@ -3674,7 +3697,7 @@ private:
         switch (m_node->arrayMode().type()) {
         case Array::ArrayStorage:
         case Array::SlowPutArrayStorage:
-            setInt32(m_out.load32NonNegative(lowStorage(m_node->child2()), m_heaps.Butterfly_vectorLength));
+            setInt32(m_out.load32NonNegative(lowStorage(m_node->child2()), m_heaps.ArrayStorage_vectorLength));
             return;
         default:
             return;
@@ -3693,16 +3716,17 @@ private:
         switch (m_node->arrayMode().type()) {
         case Array::Int32:
         case Array::Contiguous: {
-            LValue index = lowInt32(m_node->child2());
-            LValue storage = lowStorage(m_node->child3());
+            LValue index = lowInt32(m_graph.varArgChild(m_node, 1));
+            LValue storage = lowStorage(m_graph.varArgChild(m_node, 2));
             
             IndexedAbstractHeap& heap = m_node->arrayMode().type() == Array::Int32 ?
                 m_heaps.indexedInt32Properties : m_heaps.indexedContiguousProperties;
 
-            LValue base = lowCell(m_node->child1());
+            LValue base = lowCell(m_graph.varArgChild(m_node, 0));
+            LValue mask = lowInt32(m_graph.varArgChild(m_node, 3));
 
             if (m_node->arrayMode().isInBounds()) {
-                LValue result = m_out.load64(maskedIndex(heap, storage, index, base, m_node->child2()));
+                LValue result = m_out.load64(maskedIndex(heap, storage, index, mask, m_graph.varArgChild(m_node, 1)));
                 LValue isHole = m_out.isZero64(result);
                 if (m_node->arrayMode().isSaneChain()) {
                     DFG_ASSERT(
@@ -3726,7 +3750,7 @@ private:
             
             LBasicBlock lastNext = m_out.appendTo(fastCase, slowCase);
 
-            LValue fastResultValue = m_out.load64(maskedIndex(heap, storage, index, base, m_node->child2()));
+            LValue fastResultValue = m_out.load64(maskedIndex(heap, storage, index, mask, m_graph.varArgChild(m_node, 1)));
             ValueFromBlock fastResult = m_out.anchor(fastResultValue);
             m_out.branch(
                 m_out.isZero64(fastResultValue), rarely(slowCase), usually(continuation));
@@ -3742,15 +3766,16 @@ private:
         }
             
         case Array::Double: {
-            LValue base = lowCell(m_node->child1());
-            LValue index = lowInt32(m_node->child2());
-            LValue storage = lowStorage(m_node->child3());
+            LValue base = lowCell(m_graph.varArgChild(m_node, 0));
+            LValue index = lowInt32(m_graph.varArgChild(m_node, 1));
+            LValue storage = lowStorage(m_graph.varArgChild(m_node, 2));
+            LValue mask = lowInt32(m_graph.varArgChild(m_node, 3));
             
             IndexedAbstractHeap& heap = m_heaps.indexedDoubleProperties;
             
             if (m_node->arrayMode().isInBounds()) {
                 LValue result = m_out.loadDouble(
-                    maskedIndex(heap, storage, index, base, m_node->child2()));
+                    maskedIndex(heap, storage, index, mask, m_graph.varArgChild(m_node, 1)));
                 
                 if (!m_node->arrayMode().isSaneChain()) {
                     speculate(
@@ -3773,7 +3798,7 @@ private:
             
             LBasicBlock lastNext = m_out.appendTo(inBounds, boxPath);
             LValue doubleValue = m_out.loadDouble(
-                maskedIndex(heap, storage, index, base, m_node->child2()));
+                maskedIndex(heap, storage, index, mask, m_graph.varArgChild(m_node, 1)));
             m_out.branch(
                 m_out.doubleNotEqualOrUnordered(doubleValue, doubleValue),
                 rarely(slowCase), usually(boxPath));
@@ -3793,7 +3818,7 @@ private:
         }
 
         case Array::Undecided: {
-            LValue index = lowInt32(m_node->child2());
+            LValue index = lowInt32(m_graph.varArgChild(m_node, 1));
 
             speculate(OutOfBounds, noValue(), m_node, m_out.lessThan(index, m_out.int32Zero));
             setJSValue(m_out.constInt64(ValueUndefined));
@@ -3801,8 +3826,8 @@ private:
         }
             
         case Array::DirectArguments: {
-            LValue base = lowCell(m_node->child1());
-            LValue index = lowInt32(m_node->child2());
+            LValue base = lowCell(m_graph.varArgChild(m_node, 0));
+            LValue index = lowInt32(m_graph.varArgChild(m_node, 1));
             
             speculate(
                 ExoticObjectMode, noValue(), nullptr,
@@ -3844,8 +3869,8 @@ private:
         }
             
         case Array::ScopedArguments: {
-            LValue base = lowCell(m_node->child1());
-            LValue index = lowInt32(m_node->child2());
+            LValue base = lowCell(m_graph.varArgChild(m_node, 0));
+            LValue index = lowInt32(m_graph.varArgChild(m_node, 1));
             
             speculate(
                 ExoticObjectMode, noValue(), nullptr,
@@ -3897,37 +3922,38 @@ private:
         }
             
         case Array::Generic: {
-            if (m_node->child1().useKind() == ObjectUse) {
-                if (m_node->child2().useKind() == StringUse) {
+            if (m_graph.varArgChild(m_node, 0).useKind() == ObjectUse) {
+                if (m_graph.varArgChild(m_node, 1).useKind() == StringUse) {
                     setJSValue(vmCall(
                         Int64, m_out.operation(operationGetByValObjectString), m_callFrame,
-                        lowObject(m_node->child1()), lowString(m_node->child2())));
+                        lowObject(m_graph.varArgChild(m_node, 0)), lowString(m_graph.varArgChild(m_node, 1))));
                     return;
                 }
 
-                if (m_node->child2().useKind() == SymbolUse) {
+                if (m_graph.varArgChild(m_node, 1).useKind() == SymbolUse) {
                     setJSValue(vmCall(
                         Int64, m_out.operation(operationGetByValObjectSymbol), m_callFrame,
-                        lowObject(m_node->child1()), lowSymbol(m_node->child2())));
+                        lowObject(m_graph.varArgChild(m_node, 0)), lowSymbol(m_graph.varArgChild(m_node, 1))));
                     return;
                 }
             }
             setJSValue(vmCall(
                 Int64, m_out.operation(operationGetByVal), m_callFrame,
-                lowJSValue(m_node->child1()), lowJSValue(m_node->child2())));
+                lowJSValue(m_graph.varArgChild(m_node, 0)), lowJSValue(m_graph.varArgChild(m_node, 1))));
             return;
         }
 
         case Array::ArrayStorage:
         case Array::SlowPutArrayStorage: {
-            LValue base = lowCell(m_node->child1());
-            LValue index = lowInt32(m_node->child2());
-            LValue storage = lowStorage(m_node->child3());
+            LValue base = lowCell(m_graph.varArgChild(m_node, 0));
+            LValue index = lowInt32(m_graph.varArgChild(m_node, 1));
+            LValue storage = lowStorage(m_graph.varArgChild(m_node, 2));
+            LValue mask = lowInt32(m_graph.varArgChild(m_node, 3));
 
             IndexedAbstractHeap& heap = m_heaps.ArrayStorage_vector;
 
             if (m_node->arrayMode().isInBounds()) {
-                LValue result = m_out.load64(maskedIndex(heap, storage, index, base, m_node->child2()));
+                LValue result = m_out.load64(maskedIndex(heap, storage, index, mask, m_graph.varArgChild(m_node, 1)));
                 speculate(LoadFromHole, noValue(), 0, m_out.isZero64(result));
                 setJSValue(result);
                 break;
@@ -3938,11 +3964,11 @@ private:
             LBasicBlock continuation = m_out.newBlock();
 
             m_out.branch(
-                m_out.aboveOrEqual(index, m_out.load32NonNegative(storage, m_heaps.Butterfly_vectorLength)),
+                m_out.aboveOrEqual(index, m_out.load32NonNegative(storage, m_heaps.ArrayStorage_vectorLength)),
                 rarely(slowCase), usually(inBounds));
 
             LBasicBlock lastNext = m_out.appendTo(inBounds, slowCase);
-            LValue result = m_out.load64(maskedIndex(heap, storage, index, base, m_node->child2()));
+            LValue result = m_out.load64(maskedIndex(heap, storage, index, mask, m_graph.varArgChild(m_node, 1)));
             ValueFromBlock fastResult = m_out.anchor(result);
             m_out.branch(
                 m_out.isZero64(result),
@@ -3964,14 +3990,15 @@ private:
         }
             
         default: {
-            LValue base = lowCell(m_node->child1());
-            LValue index = lowInt32(m_node->child2());
-            LValue storage = lowStorage(m_node->child3());
+            LValue base = lowCell(m_graph.varArgChild(m_node, 0));
+            LValue index = lowInt32(m_graph.varArgChild(m_node, 1));
+            LValue storage = lowStorage(m_graph.varArgChild(m_node, 2));
+            LValue mask = lowInt32(m_graph.varArgChild(m_node, 3));
             
             TypedArrayType type = m_node->arrayMode().typedArrayType();
             
             if (isTypedView(type)) {
-                TypedPointer pointer = pointerIntoTypedArray(base, storage, index, type);
+                TypedPointer pointer = pointerIntoTypedArray(base, storage, index, type, mask);
                 
                 if (isInt(type)) {
                     LValue result = loadFromIntTypedArray(pointer, type);
@@ -4168,8 +4195,8 @@ private:
                 
                 contiguousPutByValOutOfBounds(
                     codeBlock()->isStrictMode()
-                    ? operationPutByValBeyondArrayBoundsStrict
-                    : operationPutByValBeyondArrayBoundsNonStrict,
+                        ? (m_node->op() == PutByValDirect ? operationPutByValDirectBeyondArrayBoundsStrict : operationPutByValBeyondArrayBoundsStrict)
+                        : (m_node->op() == PutByValDirect ? operationPutByValDirectBeyondArrayBoundsNonStrict : operationPutByValBeyondArrayBoundsNonStrict),
                     base, storage, index, value, continuation);
                 
                 m_out.store64(value, elementPointer);
@@ -4194,8 +4221,8 @@ private:
                 
                 contiguousPutByValOutOfBounds(
                     codeBlock()->isStrictMode()
-                    ? operationPutDoubleByValBeyondArrayBoundsStrict
-                    : operationPutDoubleByValBeyondArrayBoundsNonStrict,
+                        ? (m_node->op() == PutByValDirect ? operationPutDoubleByValDirectBeyondArrayBoundsStrict : operationPutDoubleByValBeyondArrayBoundsStrict)
+                        : (m_node->op() == PutByValDirect ? operationPutDoubleByValDirectBeyondArrayBoundsNonStrict : operationPutDoubleByValBeyondArrayBoundsNonStrict),
                     base, storage, index, value, continuation);
                 
                 m_out.storeDouble(value, elementPointer);
@@ -4210,8 +4237,85 @@ private:
             m_out.appendTo(continuation, outerLastNext);
             return;
         }
+
+        case Array::ArrayStorage:
+        case Array::SlowPutArrayStorage: {
+            LValue value = lowJSValue(child3);
+
+            TypedPointer elementPointer = m_out.baseIndex(
+                m_heaps.ArrayStorage_vector, storage, m_out.zeroExtPtr(index),
+                provenValue(child2));
+
+            if (m_node->op() == PutByValAlias) {
+                m_out.store64(value, elementPointer);
+                return;
+            }
+
+            if (m_node->arrayMode().isInBounds()) {
+                speculate(StoreToHole, noValue(), 0, m_out.isZero64(m_out.load64(elementPointer)));
+                m_out.store64(value, elementPointer);
+                return;
+            }
+
+            LValue isOutOfBounds = m_out.aboveOrEqual(
+                index, m_out.load32NonNegative(storage, m_heaps.ArrayStorage_vectorLength));
+
+            auto slowPathFunction = codeBlock()->isStrictMode()
+                ? (m_node->op() == PutByValDirect ? operationPutByValDirectBeyondArrayBoundsStrict : operationPutByValBeyondArrayBoundsStrict)
+                : (m_node->op() == PutByValDirect ? operationPutByValDirectBeyondArrayBoundsNonStrict : operationPutByValBeyondArrayBoundsNonStrict);
+            if (!m_node->arrayMode().isOutOfBounds()) {
+                speculate(OutOfBounds, noValue(), 0, isOutOfBounds);
+                isOutOfBounds = m_out.booleanFalse;
+            }
+
+            LBasicBlock inBoundCase = m_out.newBlock();
+            LBasicBlock slowCase = m_out.newBlock();
+            LBasicBlock holeCase = m_out.newBlock();
+            LBasicBlock doStoreCase = m_out.newBlock();
+            LBasicBlock lengthUpdateCase = m_out.newBlock();
+            LBasicBlock continuation = m_out.newBlock();
+
+            m_out.branch(isOutOfBounds, rarely(slowCase), usually(inBoundCase));
+
+            LBasicBlock lastNext = m_out.appendTo(slowCase, inBoundCase);
+            vmCall(
+                Void, m_out.operation(slowPathFunction),
+                m_callFrame, base, index, value);
+            m_out.jump(continuation);
+
+
+            if (m_node->arrayMode().isSlowPut()) {
+                m_out.appendTo(inBoundCase, doStoreCase);
+                m_out.branch(m_out.isZero64(m_out.load64(elementPointer)), rarely(slowCase), usually(doStoreCase));
+            } else {
+                m_out.appendTo(inBoundCase, holeCase);
+                m_out.branch(m_out.isZero64(m_out.load64(elementPointer)), rarely(holeCase), usually(doStoreCase));
+
+                m_out.appendTo(holeCase, lengthUpdateCase);
+                m_out.store32(
+                    m_out.add(m_out.load32(storage, m_heaps.ArrayStorage_numValuesInVector), m_out.int32One),
+                    storage, m_heaps.ArrayStorage_numValuesInVector);
+                m_out.branch(
+                    m_out.below(
+                        index, m_out.load32NonNegative(storage, m_heaps.ArrayStorage_publicLength)),
+                    unsure(doStoreCase), unsure(lengthUpdateCase));
+
+                m_out.appendTo(lengthUpdateCase, doStoreCase);
+                m_out.store32(
+                    m_out.add(index, m_out.int32One),
+                    storage, m_heaps.ArrayStorage_publicLength);
+                m_out.jump(doStoreCase);
+            }
+
+            m_out.appendTo(doStoreCase, continuation);
+            m_out.store64(value, elementPointer);
+            m_out.jump(continuation);
+
+            m_out.appendTo(continuation, lastNext);
+            return;
+        }
             
-        default:
+        default: {
             TypedArrayType type = m_node->arrayMode().typedArrayType();
             
             if (isTypedView(type)) {
@@ -4270,6 +4374,7 @@ private:
 
             DFG_CRASH(m_graph, m_node, "Bad array type");
             break;
+        }
         }
     }
 
@@ -4443,6 +4548,100 @@ private:
             else
                 operation = m_out.operation(operationArrayPushDoubleMultiple);
             ValueFromBlock slowResult = m_out.anchor(vmCall(Int64, operation, m_callFrame, base, buffer, m_out.constInt32(elementCount)));
+            m_out.storePtr(m_out.constIntPtr(0), m_out.absolute(scratchBuffer->addressOfActiveLength()));
+            m_out.jump(continuation);
+
+            m_out.appendTo(continuation, lastNext);
+            setJSValue(m_out.phi(Int64, fastResult, slowResult));
+            return;
+        }
+
+        case Array::ArrayStorage: {
+            // This ensures that the result of ArrayPush is Int32 in AI.
+            int32_t largestPositiveInt32Length = 0x7fffffff - elementCount;
+
+            LValue prevLength = m_out.load32(storage, m_heaps.ArrayStorage_publicLength);
+            // Refuse to handle bizarre lengths.
+            speculate(Uncountable, noValue(), nullptr, m_out.above(prevLength, m_out.constInt32(largestPositiveInt32Length)));
+
+            if (elementCount == 1) {
+                Edge& element = m_graph.varArgChild(m_node, elementOffset);
+
+                LValue value = lowJSValue(element);
+
+                LBasicBlock fastPath = m_out.newBlock();
+                LBasicBlock slowPath = m_out.newBlock();
+                LBasicBlock continuation = m_out.newBlock();
+
+                m_out.branch(
+                    m_out.aboveOrEqual(
+                        prevLength, m_out.load32(storage, m_heaps.ArrayStorage_vectorLength)),
+                    rarely(slowPath), usually(fastPath));
+
+                LBasicBlock lastNext = m_out.appendTo(fastPath, slowPath);
+                m_out.store64(
+                    value, m_out.baseIndex(m_heaps.ArrayStorage_vector, storage, m_out.zeroExtPtr(prevLength)));
+                LValue newLength = m_out.add(prevLength, m_out.int32One);
+                m_out.store32(newLength, storage, m_heaps.ArrayStorage_publicLength);
+                m_out.store32(
+                    m_out.add(m_out.load32(storage, m_heaps.ArrayStorage_numValuesInVector), m_out.int32One),
+                    storage, m_heaps.ArrayStorage_numValuesInVector);
+
+                ValueFromBlock fastResult = m_out.anchor(boxInt32(newLength));
+                m_out.jump(continuation);
+
+                m_out.appendTo(slowPath, continuation);
+                ValueFromBlock slowResult = m_out.anchor(
+                    vmCall(Int64, m_out.operation(operationArrayPush), m_callFrame, value, base));
+                m_out.jump(continuation);
+
+                m_out.appendTo(continuation, lastNext);
+                setJSValue(m_out.phi(Int64, fastResult, slowResult));
+                return;
+            }
+
+            LValue newLength = m_out.add(prevLength, m_out.constInt32(elementCount));
+
+            LBasicBlock fastPath = m_out.newBlock();
+            LBasicBlock slowPath = m_out.newBlock();
+            LBasicBlock setup = m_out.newBlock();
+            LBasicBlock slowCallPath = m_out.newBlock();
+            LBasicBlock continuation = m_out.newBlock();
+
+            LValue beyondVectorLength = m_out.above(newLength, m_out.load32(storage, m_heaps.ArrayStorage_vectorLength));
+
+            m_out.branch(beyondVectorLength, rarely(slowPath), usually(fastPath));
+
+            LBasicBlock lastNext = m_out.appendTo(fastPath, slowPath);
+            m_out.store32(newLength, storage, m_heaps.ArrayStorage_publicLength);
+            m_out.store32(
+                m_out.add(m_out.load32(storage, m_heaps.ArrayStorage_numValuesInVector), m_out.constInt32(elementCount)),
+                storage, m_heaps.ArrayStorage_numValuesInVector);
+            ValueFromBlock fastBufferResult = m_out.anchor(m_out.baseIndex(storage, m_out.zeroExtPtr(prevLength), ScaleEight, ArrayStorage::vectorOffset()));
+            m_out.jump(setup);
+
+            m_out.appendTo(slowPath, setup);
+            size_t scratchSize = sizeof(EncodedJSValue) * elementCount;
+            ASSERT(scratchSize);
+            ScratchBuffer* scratchBuffer = vm().scratchBufferForSize(scratchSize);
+            m_out.storePtr(m_out.constIntPtr(scratchSize), m_out.absolute(scratchBuffer->addressOfActiveLength()));
+            ValueFromBlock slowBufferResult = m_out.anchor(m_out.constIntPtr(static_cast<EncodedJSValue*>(scratchBuffer->dataBuffer())));
+            m_out.jump(setup);
+
+            m_out.appendTo(setup, slowCallPath);
+            LValue buffer = m_out.phi(pointerType(), fastBufferResult, slowBufferResult);
+            for (unsigned elementIndex = 0; elementIndex < elementCount; ++elementIndex) {
+                Edge& element = m_graph.varArgChild(m_node, elementIndex + elementOffset);
+
+                LValue value = lowJSValue(element);
+                m_out.store64(value, m_out.baseIndex(m_heaps.variables, buffer, m_out.constInt32(elementIndex), jsNumber(elementIndex)));
+            }
+            ValueFromBlock fastResult = m_out.anchor(boxInt32(newLength));
+
+            m_out.branch(beyondVectorLength, rarely(slowCallPath), usually(continuation));
+
+            m_out.appendTo(slowCallPath, continuation);
+            ValueFromBlock slowResult = m_out.anchor(vmCall(Int64, m_out.operation(operationArrayPushMultiple), m_callFrame, base, buffer, m_out.constInt32(elementCount)));
             m_out.storePtr(m_out.constIntPtr(0), m_out.absolute(scratchBuffer->addressOfActiveLength()));
             m_out.jump(continuation);
 
@@ -4724,6 +4923,49 @@ private:
             return;
         }
 
+        case Array::ArrayStorage: {
+            LBasicBlock vectorLengthCheckCase = m_out.newBlock();
+            LBasicBlock popCheckCase = m_out.newBlock();
+            LBasicBlock fastCase = m_out.newBlock();
+            LBasicBlock slowCase = m_out.newBlock();
+            LBasicBlock continuation = m_out.newBlock();
+
+            LValue prevLength = m_out.load32(storage, m_heaps.ArrayStorage_publicLength);
+
+            Vector<ValueFromBlock, 3> results;
+            results.append(m_out.anchor(m_out.constInt64(JSValue::encode(jsUndefined()))));
+            m_out.branch(
+                m_out.isZero32(prevLength), rarely(continuation), usually(vectorLengthCheckCase));
+
+            LBasicBlock lastNext = m_out.appendTo(vectorLengthCheckCase, popCheckCase);
+            LValue newLength = m_out.sub(prevLength, m_out.int32One);
+            m_out.branch(
+                m_out.aboveOrEqual(newLength, m_out.load32(storage, m_heaps.ArrayStorage_vectorLength)), rarely(slowCase), usually(popCheckCase));
+
+            m_out.appendTo(popCheckCase, fastCase);
+            TypedPointer pointer = m_out.baseIndex(m_heaps.ArrayStorage_vector, storage, m_out.zeroExtPtr(newLength));
+            LValue result = m_out.load64(pointer);
+            m_out.branch(m_out.notZero64(result), usually(fastCase), rarely(slowCase));
+
+            m_out.appendTo(fastCase, slowCase);
+            m_out.store32(newLength, storage, m_heaps.ArrayStorage_publicLength);
+            m_out.store64(m_out.int64Zero, pointer);
+            m_out.store32(
+                m_out.sub(m_out.load32(storage, m_heaps.ArrayStorage_numValuesInVector), m_out.int32One),
+                storage, m_heaps.ArrayStorage_numValuesInVector);
+            results.append(m_out.anchor(result));
+            m_out.jump(continuation);
+
+            m_out.appendTo(slowCase, continuation);
+            results.append(m_out.anchor(vmCall(
+                Int64, m_out.operation(operationArrayPop), m_callFrame, base)));
+            m_out.jump(continuation);
+
+            m_out.appendTo(continuation, lastNext);
+            setJSValue(m_out.phi(Int64, results));
+            return;
+        }
+
         default:
             DFG_CRASH(m_graph, m_node, "Bad array type");
             return;
@@ -4856,7 +5098,7 @@ private:
         // We don't need memory barriers since we just fast-created the function, so it
         // must be young.
         m_out.storePtr(scope, fastObject, m_heaps.JSFunction_scope);
-        m_out.storePtr(weakPointer(executable), fastObject, m_heaps.JSFunction_executable);
+        m_out.storePtr(weakPoisonedPointer<JSFunctionPoison>(executable), fastObject, m_heaps.JSFunction_executable);
         m_out.storePtr(m_out.intPtrZero, fastObject, m_heaps.JSFunction_rareData);
         
         mutatorFence();
@@ -5966,9 +6208,9 @@ private:
     
     void compileStringCharAt()
     {
-        LValue base = lowCell(m_node->child1());
-        LValue index = lowInt32(m_node->child2());
-        LValue storage = lowStorage(m_node->child3());
+        LValue base = lowCell(m_graph.child(m_node, 0));
+        LValue index = lowInt32(m_graph.child(m_node, 1));
+        LValue storage = lowStorage(m_graph.child(m_node, 2));
             
         LBasicBlock fastPath = m_out.newBlock();
         LBasicBlock slowPath = m_out.newBlock();
@@ -6002,7 +6244,7 @@ private:
         ValueFromBlock char8Bit = m_out.anchor(
             m_out.load8ZeroExt32(m_out.baseIndex(
                 m_heaps.characters8, storage, m_out.zeroExtPtr(indexForAccess),
-                provenValue(m_node->child2()))));
+                provenValue(m_graph.child(m_node, 1)))));
         m_out.jump(bitsContinuation);
             
         m_out.appendTo(is16Bit, bigCharacter);
@@ -6010,7 +6252,7 @@ private:
         LValue char16BitValue = m_out.load16ZeroExt32(
             m_out.baseIndex(
                 m_heaps.characters16, storage, m_out.zeroExtPtr(indexForAccess),
-                provenValue(m_node->child2())));
+                provenValue(m_graph.child(m_node, 1))));
         ValueFromBlock char16Bit = m_out.anchor(char16BitValue);
         m_out.branch(
             m_out.aboveOrEqual(char16BitValue, m_out.constInt32(0x100)),
@@ -6389,7 +6631,12 @@ private:
     
     void compileGetArgumentCountIncludingThis()
     {
-        setInt32(m_out.load32(payloadFor(CallFrameSlot::argumentCount)));
+        VirtualRegister argumentCountRegister;
+        if (InlineCallFrame* inlineCallFrame = m_node->argumentsInlineCallFrame())
+            argumentCountRegister = inlineCallFrame->argumentCountRegister;
+        else
+            argumentCountRegister = VirtualRegister(CallFrameSlot::argumentCount);
+        setInt32(m_out.load32(payloadFor(argumentCountRegister)));
     }
 
     void compileSetArgumentCountIncludingThis()
@@ -6871,7 +7118,7 @@ private:
                 CCallHelpers::DataLabelPtr targetToCheck;
                 CCallHelpers::Jump slowPath = jit.branchPtrWithPatch(
                     CCallHelpers::NotEqual, GPRInfo::regT0, targetToCheck,
-                    CCallHelpers::TrustedImmPtr(0));
+                    CCallHelpers::TrustedImmPtr(nullptr));
 
                 CCallHelpers::Call fastCall = jit.nearCall();
                 CCallHelpers::Jump done = jit.jump();
@@ -7191,7 +7438,7 @@ private:
                 CCallHelpers::DataLabelPtr targetToCheck;
                 CCallHelpers::Jump slowPath = jit.branchPtrWithPatch(
                     CCallHelpers::NotEqual, GPRInfo::regT0, targetToCheck,
-                    CCallHelpers::TrustedImmPtr(0));
+                    CCallHelpers::TrustedImmPtr(nullptr));
 
                 callLinkInfo->setFrameShuffleData(shuffleData);
                 CallFrameShuffler(jit, shuffleData).prepareForTailCall();
@@ -7761,7 +8008,7 @@ private:
                 CCallHelpers::DataLabelPtr targetToCheck;
                 CCallHelpers::Jump slowPath = jit.branchPtrWithPatch(
                     CCallHelpers::NotEqual, GPRInfo::regT0, targetToCheck,
-                    CCallHelpers::TrustedImmPtr(0));
+                    CCallHelpers::TrustedImmPtr(nullptr));
                 
                 CCallHelpers::Call fastCall;
                 CCallHelpers::Jump done;
@@ -8611,6 +8858,51 @@ private:
     void compileIsNumber()
     {
         setBoolean(isNumber(lowJSValue(m_node->child1()), provenType(m_node->child1())));
+    }
+
+    void compileNumberIsInteger()
+    {
+        LBasicBlock notInt32 = m_out.newBlock();
+        LBasicBlock doubleCase = m_out.newBlock();
+        LBasicBlock doubleNotNanOrInf = m_out.newBlock();
+        LBasicBlock continuation = m_out.newBlock();
+
+        LValue input = lowJSValue(m_node->child1());
+
+        ValueFromBlock trueResult = m_out.anchor(m_out.booleanTrue);
+        m_out.branch(
+            isInt32(input, provenType(m_node->child1())), unsure(continuation), unsure(notInt32));
+
+        LBasicBlock lastNext = m_out.appendTo(notInt32, doubleCase);
+        ValueFromBlock falseResult = m_out.anchor(m_out.booleanFalse);
+        m_out.branch(
+            isNotNumber(input, provenType(m_node->child1())), unsure(continuation), unsure(doubleCase));
+
+        m_out.appendTo(doubleCase, doubleNotNanOrInf);
+        LValue doubleAsInt;
+        LValue asDouble = unboxDouble(input, &doubleAsInt);
+        LValue expBits = m_out.bitAnd(m_out.lShr(doubleAsInt, m_out.constInt32(52)), m_out.constInt64(0x7ff));
+        m_out.branch(
+            m_out.equal(expBits, m_out.constInt64(0x7ff)),
+            unsure(continuation), unsure(doubleNotNanOrInf));
+
+        m_out.appendTo(doubleNotNanOrInf, continuation);
+        B3::PatchpointValue* patchpoint = m_out.patchpoint(Int32);
+        patchpoint->appendSomeRegister(asDouble);
+        patchpoint->numFPScratchRegisters = 1;
+        patchpoint->effects = Effects::none();
+        patchpoint->setGenerator([=] (CCallHelpers& jit, const StackmapGenerationParams& params) {
+            GPRReg result = params[0].gpr();
+            FPRReg input = params[1].fpr();
+            FPRReg temp = params.fpScratch(0);
+            jit.roundTowardZeroDouble(input, temp);
+            jit.compareDouble(MacroAssembler::DoubleEqual, input, temp, result);
+        });
+        ValueFromBlock patchpointResult = m_out.anchor(patchpoint);
+        m_out.jump(continuation);
+
+        m_out.appendTo(continuation, lastNext);
+        setBoolean(m_out.phi(Int32, trueResult, falseResult, patchpointResult));
     }
     
     void compileIsCellWithType()
@@ -9673,19 +9965,20 @@ private:
             IndexedAbstractHeap& heap = m_node->arrayMode().type() == Array::Int32 ?
                 m_heaps.indexedInt32Properties : m_heaps.indexedContiguousProperties;
 
-            LBasicBlock checkHole = m_out.newBlock();
             LBasicBlock slowCase = m_out.newBlock();
             LBasicBlock continuation = m_out.newBlock();
+            LBasicBlock lastNext = nullptr;
 
             if (!m_node->arrayMode().isInBounds()) {
+                LBasicBlock checkHole = m_out.newBlock();
                 m_out.branch(
                     m_out.aboveOrEqual(
                         index, m_out.load32NonNegative(storage, m_heaps.Butterfly_publicLength)),
                     rarely(slowCase), usually(checkHole));
+                lastNext = m_out.appendTo(checkHole, slowCase);
             } else
-                m_out.jump(checkHole);
+                lastNext = m_out.insertNewBlocksBefore(slowCase);
 
-            LBasicBlock lastNext = m_out.appendTo(checkHole, slowCase);
             LValue checkHoleResultValue =
                 m_out.notZero64(m_out.load64(baseIndex(heap, storage, index, m_node->child2())));
             ValueFromBlock checkHoleResult = m_out.anchor(checkHoleResultValue);
@@ -9709,19 +10002,20 @@ private:
             
             IndexedAbstractHeap& heap = m_heaps.indexedDoubleProperties;
             
-            LBasicBlock checkHole = m_out.newBlock();
             LBasicBlock slowCase = m_out.newBlock();
             LBasicBlock continuation = m_out.newBlock();
+            LBasicBlock lastNext = nullptr;
             
             if (!m_node->arrayMode().isInBounds()) {
+                LBasicBlock checkHole = m_out.newBlock();
                 m_out.branch(
                     m_out.aboveOrEqual(
                         index, m_out.load32NonNegative(storage, m_heaps.Butterfly_publicLength)),
                     rarely(slowCase), usually(checkHole));
+                lastNext = m_out.appendTo(checkHole, slowCase);
             } else
-                m_out.jump(checkHole);
+                lastNext = m_out.insertNewBlocksBefore(slowCase);
 
-            LBasicBlock lastNext = m_out.appendTo(checkHole, slowCase);
             LValue doubleValue = m_out.loadDouble(baseIndex(heap, storage, index, m_node->child2()));
             LValue checkHoleResultValue = m_out.doubleEqual(doubleValue, doubleValue);
             ValueFromBlock checkHoleResult = m_out.anchor(checkHoleResultValue);
@@ -9737,10 +10031,52 @@ private:
             setBoolean(m_out.phi(Int32, checkHoleResult, slowResult));
             return;
         }
-            
-        default:
-            RELEASE_ASSERT_NOT_REACHED();
-            return;
+
+        case Array::ArrayStorage: {
+            LValue base = lowCell(m_node->child1());
+            LValue index = lowInt32(m_node->child2());
+            LValue storage = lowStorage(m_node->child3());
+            LValue internalMethodType = m_out.constInt32(static_cast<int32_t>(m_node->internalMethodType()));
+
+            LBasicBlock slowCase = m_out.newBlock();
+            LBasicBlock continuation = m_out.newBlock();
+            LBasicBlock lastNext = nullptr;
+
+            if (!m_node->arrayMode().isInBounds()) {
+                LBasicBlock checkHole = m_out.newBlock();
+                m_out.branch(
+                    m_out.aboveOrEqual(
+                        index, m_out.load32NonNegative(storage, m_heaps.ArrayStorage_vectorLength)),
+                    rarely(slowCase), usually(checkHole));
+                lastNext = m_out.appendTo(checkHole, slowCase);
+            } else
+                lastNext = m_out.insertNewBlocksBefore(slowCase);
+
+            LValue checkHoleResultValue =
+                m_out.notZero64(m_out.load64(baseIndex(m_heaps.ArrayStorage_vector, storage, index, m_node->child2())));
+            ValueFromBlock checkHoleResult = m_out.anchor(checkHoleResultValue);
+            m_out.branch(checkHoleResultValue, usually(continuation), rarely(slowCase));
+
+            m_out.appendTo(slowCase, continuation);
+            ValueFromBlock slowResult = m_out.anchor(m_out.equal(
+                m_out.constInt64(JSValue::encode(jsBoolean(true))),
+                vmCall(Int64, m_out.operation(operationHasIndexedPropertyByInt), m_callFrame, base, index, internalMethodType)));
+            m_out.jump(continuation);
+
+            m_out.appendTo(continuation, lastNext);
+            setBoolean(m_out.phi(Int32, checkHoleResult, slowResult));
+            break;
+        }
+
+        default: {
+            LValue base = lowCell(m_node->child1());
+            LValue index = lowInt32(m_node->child2());
+            LValue internalMethodType = m_out.constInt32(static_cast<int32_t>(m_node->internalMethodType()));
+            setBoolean(m_out.equal(
+                m_out.constInt64(JSValue::encode(jsBoolean(true))),
+                vmCall(Int64, m_out.operation(operationHasIndexedPropertyByInt), m_callFrame, base, index, internalMethodType)));
+            break;
+        }
         }
     }
 
@@ -11194,14 +11530,13 @@ private:
             heap, storage, m_out.zeroExtPtr(index), provenValue(edge), offset);
     }
 
-    TypedPointer maskedIndex(IndexedAbstractHeap& heap, LValue storage, LValue index, LValue baseObject, Edge edge, ptrdiff_t offset = 0)
+    TypedPointer maskedIndex(IndexedAbstractHeap& heap, LValue storage, LValue index, LValue mask, Edge edge, ptrdiff_t offset = 0)
     {
         if (m_indexMaskingMode == IndexMaskingDisabled)
             return baseIndex(heap, storage, index, edge, offset);
 
-        LValue mask = m_out.zeroExtPtr(m_out.load32(baseObject, m_heaps.JSObject_butterflyMask));
         return m_out.baseIndex(
-            heap, storage, m_out.zeroExtPtr(index), provenValue(edge), offset, mask);
+            heap, storage, m_out.zeroExtPtr(index), provenValue(edge), offset, m_out.zeroExtPtr(mask));
     }
 
     template<typename IntFunctor, typename DoubleFunctor>
@@ -12743,14 +13078,14 @@ private:
         FunctionType slowPathFunction, LValue base, LValue storage, LValue index, LValue value,
         LBasicBlock continuation)
     {
-        LValue isNotInBounds = m_out.aboveOrEqual(
-            index, m_out.load32NonNegative(storage, m_heaps.Butterfly_publicLength));
         if (!m_node->arrayMode().isInBounds()) {
             LBasicBlock notInBoundsCase =
                 m_out.newBlock();
             LBasicBlock performStore =
                 m_out.newBlock();
                 
+            LValue isNotInBounds = m_out.aboveOrEqual(
+                index, m_out.load32NonNegative(storage, m_heaps.Butterfly_publicLength));
             m_out.branch(isNotInBounds, unsure(notInBoundsCase), unsure(performStore));
                 
             LBasicBlock lastNext = m_out.appendTo(notInBoundsCase, performStore);
@@ -13278,10 +13613,13 @@ private:
         functor(TypeofType::Undefined);
     }
     
-    TypedPointer pointerIntoTypedArray(LValue base, LValue storage, LValue index, TypedArrayType type)
+    TypedPointer pointerIntoTypedArray(LValue base, LValue storage, LValue index, TypedArrayType type, LValue mask = nullptr)
     {
-        if (m_indexMaskingMode == IndexMaskingEnabled)
-            index = m_out.bitAnd(index, m_out.load32(base, m_heaps.JSObject_butterflyMask));
+        if (m_indexMaskingMode == IndexMaskingEnabled) {
+            if (!mask)
+                mask = m_out.load32(base, m_heaps.JSObject_butterflyMask);
+            index = m_out.bitAnd(index, mask);
+        }
         LValue offset = m_out.shl(m_out.zeroExtPtr(index), m_out.constIntPtr(logElementSize(type)));
 
         return TypedPointer(
@@ -14106,9 +14444,12 @@ private:
         return m_out.testNonZero64(jsValue, m_tagTypeNumber);
     }
 
-    LValue unboxDouble(LValue jsValue)
+    LValue unboxDouble(LValue jsValue, LValue* unboxedAsInt = nullptr)
     {
-        return m_out.bitCast(m_out.add(jsValue, m_tagTypeNumber), Double);
+        LValue asInt = m_out.add(jsValue, m_tagTypeNumber);
+        if (unboxedAsInt)
+            *unboxedAsInt = asInt;
+        return m_out.bitCast(asInt, Double);
     }
     LValue boxDouble(LValue doubleValue)
     {
@@ -14522,14 +14863,16 @@ private:
         switch (arrayMode.type()) {
         case Array::Int32:
         case Array::Double:
-        case Array::Contiguous: {
+        case Array::Contiguous:
+        case Array::Undecided:
+        case Array::ArrayStorage: {
             IndexingType shape = arrayMode.shapeMask();
             LValue indexingType = m_out.load8ZeroExt32(cell, m_heaps.JSCell_indexingTypeAndMisc);
 
             switch (arrayMode.arrayClass()) {
             case Array::OriginalArray:
                 DFG_CRASH(m_graph, m_node, "Unexpected original array");
-                return 0;
+                return nullptr;
 
             case Array::Array:
                 return m_out.equal(
@@ -14550,6 +14893,54 @@ private:
             break;
         }
 
+        case Array::SlowPutArrayStorage: {
+            ASSERT(!arrayMode.isJSArrayWithOriginalStructure());
+            LValue indexingType = m_out.load8ZeroExt32(cell, m_heaps.JSCell_indexingTypeAndMisc);
+
+            LBasicBlock trueCase = m_out.newBlock();
+            LBasicBlock checkCase = m_out.newBlock();
+            LBasicBlock continuation = m_out.newBlock();
+
+            ValueFromBlock falseValue = m_out.anchor(m_out.booleanFalse);
+            LValue isAnArrayStorageShape = m_out.belowOrEqual(
+                m_out.sub(
+                    m_out.bitAnd(indexingType, m_out.constInt32(IndexingShapeMask)),
+                    m_out.constInt32(ArrayStorageShape)),
+                m_out.constInt32(SlowPutArrayStorageShape - ArrayStorageShape));
+            m_out.branch(isAnArrayStorageShape, unsure(checkCase), unsure(continuation));
+
+            LBasicBlock lastNext = m_out.appendTo(checkCase, trueCase);
+            switch (arrayMode.arrayClass()) {
+            case Array::OriginalArray:
+                DFG_CRASH(m_graph, m_node, "Unexpected original array");
+                return nullptr;
+
+            case Array::Array:
+                m_out.branch(
+                    m_out.testNonZero32(indexingType, m_out.constInt32(IsArray)),
+                    unsure(trueCase), unsure(continuation));
+                break;
+
+            case Array::NonArray:
+            case Array::OriginalNonArray:
+                m_out.branch(
+                    m_out.testIsZero32(indexingType, m_out.constInt32(IsArray)),
+                    unsure(trueCase), unsure(continuation));
+                break;
+
+            case Array::PossiblyArray:
+                m_out.jump(trueCase);
+                break;
+            }
+
+            m_out.appendTo(trueCase, continuation);
+            ValueFromBlock trueValue = m_out.anchor(m_out.booleanTrue);
+            m_out.jump(continuation);
+
+            m_out.appendTo(continuation, lastNext);
+            return m_out.phi(Int32, falseValue, trueValue);
+        }
+
         default:
             break;
         }
@@ -14562,6 +14953,9 @@ private:
         case Array::Int32:
         case Array::Double:
         case Array::Contiguous:
+        case Array::Undecided:
+        case Array::ArrayStorage:
+        case Array::SlowPutArrayStorage:
             return isArrayTypeForArrayify(cell, arrayMode);
             
         case Array::DirectArguments:
@@ -15710,14 +16104,15 @@ private:
 
     LValue weakPointer(JSCell* pointer)
     {
-        // There are weird relationships in how optimized CodeBlocks
-        // point to other CodeBlocks. We don't want to have them be
-        // part of the weak pointer set. For example, an optimized CodeBlock
-        // having a weak pointer to itself will cause it to get collected.
-        RELEASE_ASSERT(!jsDynamicCast<CodeBlock*>(vm(), pointer));
-
         addWeakReference(pointer);
         return m_out.weakPointer(m_graph, pointer);
+    }
+    
+    template<typename Key>
+    LValue weakPoisonedPointer(JSCell* pointer)
+    {
+        addWeakReference(pointer);
+        return m_out.weakPoisonedPointer<Key>(m_graph, pointer);
     }
 
     LValue frozenPointer(FrozenValue* value)

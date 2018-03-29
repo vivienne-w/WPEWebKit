@@ -308,7 +308,7 @@ void MemoryPressureHandler::pollMemoryPressure()
             break;
         }
 
-        sleep(s_pollTimeSec);
+        sleep(Seconds(s_pollTimeSec));
     } while (true);
 
     if (ReliefLogger::loggingEnabled())

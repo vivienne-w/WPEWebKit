@@ -176,7 +176,6 @@ interface TestRunner {
     // Cookies testing
     void setAlwaysAcceptCookies(boolean accept);
     void setCookieStoragePartitioningEnabled(boolean enabled);
-    void setStorageAccessAPIEnabled(boolean enabled);
 
     void overridePreference(DOMString preference, DOMString value);
 
@@ -279,6 +278,9 @@ interface TestRunner {
     void setStatisticsSubframeUnderTopFrameOrigin(DOMString hostName, DOMString topFrameHostName);
     void setStatisticsSubresourceUnderTopFrameOrigin(DOMString hostName, DOMString topFrameHostName);
     void setStatisticsSubresourceUniqueRedirectTo(DOMString hostName, DOMString hostNameRedirectedTo);
+    void setStatisticsSubresourceUniqueRedirectFrom(DOMString hostName, DOMString hostNameRedirectedTo);
+    void setStatisticsTopFrameUniqueRedirectTo(DOMString hostName, DOMString hostNameRedirectedTo);
+    void setStatisticsTopFrameUniqueRedirectFrom(DOMString hostName, DOMString hostNameRedirectedTo);
     void setStatisticsTimeToLiveUserInteraction(double seconds);
     void setStatisticsTimeToLiveCookiePartitionFree(double seconds);
     void statisticsNotifyObserver();
@@ -297,6 +299,10 @@ interface TestRunner {
     void statisticsClearInMemoryAndPersistentStoreModifiedSinceHours(unsigned long hours, object callback);
     void statisticsClearThroughWebsiteDataRemoval(object callback);
     void statisticsResetToConsistentState();
+
+    // Storage Access API
+    void setStorageAccessAPIEnabled(boolean enabled);
+    void getAllStorageAccessEntries(object callback);
 
     // Open panel
     void setOpenPanelFiles(object filesArray);

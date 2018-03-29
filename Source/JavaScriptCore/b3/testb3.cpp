@@ -7963,7 +7963,7 @@ void testBranch8WithLoad8ZIndex()
 
 void testComplex(unsigned numVars, unsigned numConstructs)
 {
-    double before = monotonicallyIncreasingTimeMS();
+    MonotonicTime before = MonotonicTime::now();
     
     Procedure proc;
     BasicBlock* current = proc.addBlock();
@@ -8092,8 +8092,8 @@ void testComplex(unsigned numVars, unsigned numConstructs)
 
     compileProc(proc);
 
-    double after = monotonicallyIncreasingTimeMS();
-    dataLog(toCString("    That took ", after - before, " ms.\n"));
+    MonotonicTime after = MonotonicTime::now();
+    dataLog(toCString("    That took ", (after - before).milliseconds(), " ms.\n"));
 }
 
 void testSimplePatchpoint()
@@ -13294,7 +13294,7 @@ void testEntrySwitchSimple()
     CodeLocationLabel labelTwo = linkBuffer.locationOf(proc.entrypointLabel(1));
     CodeLocationLabel labelThree = linkBuffer.locationOf(proc.entrypointLabel(2));
     
-    MacroAssemblerCodeRef codeRef = FINALIZE_CODE(linkBuffer, ("testb3 compilation"));
+    MacroAssemblerCodeRef codeRef = FINALIZE_CODE(linkBuffer, "testb3 compilation");
     
     CHECK(invoke<int>(labelOne, 1, 2) == 3);
     CHECK(invoke<int>(labelTwo, 1, 2) == -1);
@@ -13327,7 +13327,7 @@ void testEntrySwitchNoEntrySwitch()
     CodeLocationLabel labelTwo = linkBuffer.locationOf(proc.entrypointLabel(1));
     CodeLocationLabel labelThree = linkBuffer.locationOf(proc.entrypointLabel(2));
     
-    MacroAssemblerCodeRef codeRef = FINALIZE_CODE(linkBuffer, ("testb3 compilation"));
+    MacroAssemblerCodeRef codeRef = FINALIZE_CODE(linkBuffer, "testb3 compilation");
     
     CHECK_EQ(invoke<int>(labelOne, 1, 2), 3);
     CHECK_EQ(invoke<int>(labelTwo, 1, 2), 3);
@@ -13414,7 +13414,7 @@ void testEntrySwitchWithCommonPaths()
     CodeLocationLabel labelTwo = linkBuffer.locationOf(proc.entrypointLabel(1));
     CodeLocationLabel labelThree = linkBuffer.locationOf(proc.entrypointLabel(2));
     
-    MacroAssemblerCodeRef codeRef = FINALIZE_CODE(linkBuffer, ("testb3 compilation"));
+    MacroAssemblerCodeRef codeRef = FINALIZE_CODE(linkBuffer, "testb3 compilation");
     
     CHECK_EQ(invoke<int>(labelOne, 1, 2, 10), 3);
     CHECK_EQ(invoke<int>(labelTwo, 1, 2, 10), -1);
@@ -13531,7 +13531,7 @@ void testEntrySwitchWithCommonPathsAndNonTrivialEntrypoint()
     CodeLocationLabel labelTwo = linkBuffer.locationOf(proc.entrypointLabel(1));
     CodeLocationLabel labelThree = linkBuffer.locationOf(proc.entrypointLabel(2));
     
-    MacroAssemblerCodeRef codeRef = FINALIZE_CODE(linkBuffer, ("testb3 compilation"));
+    MacroAssemblerCodeRef codeRef = FINALIZE_CODE(linkBuffer, "testb3 compilation");
     
     CHECK_EQ(invoke<int>(labelOne, 1, 2, 10, false), 3);
     CHECK_EQ(invoke<int>(labelTwo, 1, 2, 10, false), -1);
@@ -13608,7 +13608,7 @@ void testEntrySwitchLoop()
     CodeLocationLabel labelOne = linkBuffer.locationOf(proc.entrypointLabel(0));
     CodeLocationLabel labelTwo = linkBuffer.locationOf(proc.entrypointLabel(1));
     
-    MacroAssemblerCodeRef codeRef = FINALIZE_CODE(linkBuffer, ("testb3 compilation"));
+    MacroAssemblerCodeRef codeRef = FINALIZE_CODE(linkBuffer, "testb3 compilation");
 
     CHECK(invoke<int>(labelOne, 0) == 1);
     CHECK(invoke<int>(labelOne, 42) == 43);

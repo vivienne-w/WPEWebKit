@@ -36,6 +36,7 @@
 #include "HashMapImpl.h"
 #include "JITOperations.h"
 #include "MathCommon.h"
+#include "NumberConstructor.h"
 #include "Operations.h"
 #include "PutByIdStatus.h"
 #include "StringObject.h"
@@ -1176,6 +1177,7 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
     case IsUndefined:
     case IsBoolean:
     case IsNumber:
+    case NumberIsInteger:
     case IsObject:
     case IsObjectOrNull:
     case IsFunction:
@@ -1199,6 +1201,9 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
                 break;
             case IsNumber:
                 setConstant(node, jsBoolean(child.value().isNumber()));
+                break;
+            case NumberIsInteger:
+                setConstant(node, jsBoolean(NumberConstructor::isIntegerImpl(child.value())));
                 break;
             case IsObject:
                 setConstant(node, jsBoolean(child.value().isObject()));
@@ -1307,6 +1312,22 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
             }
             
             break;
+
+        case NumberIsInteger:
+            if (!(child.m_type & ~SpecInt32Only)) {
+                setConstant(node, jsBoolean(true));
+                constantWasSet = true;
+                break;
+            }
+            
+            if (!(child.m_type & SpecFullNumber)) {
+                setConstant(node, jsBoolean(false));
+                constantWasSet = true;
+                break;
+            }
+            
+            break;
+
         case IsObject:
             if (!(child.m_type & ~SpecObject)) {
                 setConstant(node, jsBoolean(true));
@@ -1731,7 +1752,7 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
             m_state.setIsValid(false);
             break;
         case Array::Undecided: {
-            JSValue index = forNode(node->child2()).value();
+            JSValue index = forNode(m_graph.child(node, 1)).value();
             if (index && index.isInt32() && index.asInt32() >= 0) {
                 setConstant(node, jsUndefined());
                 break;
@@ -2520,6 +2541,16 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
             forNode(node->child1()).m_value, node->arrayMode());
         if (view) {
             setConstant(node, jsNumber(view->length()));
+            break;
+        }
+        forNode(node).setType(SpecInt32Only);
+        break;
+    }
+
+    case GetArrayMask: {
+        JSArrayBufferView* view = m_graph.tryGetFoldableView(forNode(node->child1()).m_value);
+        if (view) {
+            setConstant(node, jsNumber(view->butterflyIndexingMask()));
             break;
         }
         forNode(node).setType(SpecInt32Only);
@@ -3344,17 +3375,15 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
             m_graph.globalObjectFor(node->origin.semantic)->restParameterStructure());
         break;
             
+    case CheckVarargs:
     case Check: {
         // Simplify out checks that don't actually do checking.
-        for (unsigned i = 0; i < AdjacencyList::Size; ++i) {
-            Edge edge = node->children.child(i);
+        m_graph.doToChildren(node, [&] (Edge edge) {
             if (!edge)
-                break;
-            if (edge.isProved() || edge.willNotHaveCheck()) {
+                return;
+            if (edge.isProved() || edge.willNotHaveCheck())
                 m_state.setFoundConstants(true);
-                break;
-            }
-        }
+        });
         break;
     }
 

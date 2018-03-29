@@ -2540,13 +2540,18 @@ void ArgumentCoder<ResourceLoadStatistics>::encode(Encoder& encoder, const WebCo
     // Storage access
     encoder << statistics.storageAccessUnderTopFrameOrigins;
 
+    // Top frame stats
+    encoder << statistics.topFrameUniqueRedirectsTo;
+    encoder << statistics.topFrameUniqueRedirectsFrom;
+
     // Subframe stats
     encoder << statistics.subframeUnderTopFrameOrigins;
     
     // Subresource stats
     encoder << statistics.subresourceUnderTopFrameOrigins;
     encoder << statistics.subresourceUniqueRedirectsTo;
-    
+    encoder << statistics.subresourceUniqueRedirectsFrom;
+
     // Prevalent Resource
     encoder << statistics.isPrevalentResource;
     encoder << statistics.dataRecordsRemoved;
@@ -2579,6 +2584,13 @@ std::optional<ResourceLoadStatistics> ArgumentCoder<ResourceLoadStatistics>::dec
     if (!decoder.decode(statistics.storageAccessUnderTopFrameOrigins))
         return std::nullopt;
 
+    // Top frame stats
+    if (!decoder.decode(statistics.topFrameUniqueRedirectsTo))
+        return std::nullopt;    
+
+    if (!decoder.decode(statistics.topFrameUniqueRedirectsFrom))
+        return std::nullopt;
+
     // Subframe stats
     if (!decoder.decode(statistics.subframeUnderTopFrameOrigins))
         return std::nullopt;
@@ -2588,6 +2600,9 @@ std::optional<ResourceLoadStatistics> ArgumentCoder<ResourceLoadStatistics>::dec
         return std::nullopt;
 
     if (!decoder.decode(statistics.subresourceUniqueRedirectsTo))
+        return std::nullopt;
+    
+    if (!decoder.decode(statistics.subresourceUniqueRedirectsFrom))
         return std::nullopt;
     
     // Prevalent Resource

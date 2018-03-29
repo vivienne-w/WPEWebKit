@@ -255,12 +255,6 @@ void RenderObject::setParent(RenderElement* parent)
     m_parent = parent;
 }
 
-void RenderObject::removeFromParentAndDestroy()
-{
-    ASSERT(m_parent);
-    m_parent->removeAndDestroyChild(*RenderTreeBuilder::current(), *this);
-}
-
 RenderObject* RenderObject::nextInPreOrder() const
 {
     if (RenderObject* o = firstChildSlow())
@@ -1455,12 +1449,8 @@ void RenderObject::willBeDestroyed()
 void RenderObject::insertedIntoTree()
 {
     // FIXME: We should ASSERT(isRooted()) here but generated content makes some out-of-order insertion.
-
     if (!isFloating() && parent()->childrenInline())
         parent()->dirtyLinesFromChangedChild(*this);
-
-    if (RenderFragmentedFlow* fragmentedFlow = enclosingFragmentedFlow())
-        fragmentedFlow->fragmentedFlowDescendantInserted(*this);
 }
 
 void RenderObject::willBeRemovedFromTree()
@@ -1476,9 +1466,6 @@ void RenderObject::destroy()
     RELEASE_ASSERT(!m_next);
     RELEASE_ASSERT(!m_previous);
     RELEASE_ASSERT(!m_bitfields.beingDestroyed());
-
-    if (is<RenderElement>(*this))
-        downcast<RenderElement>(*this).destroyLeftoverChildren();
 
     m_bitfields.setBeingDestroyed(true);
 

@@ -1,3 +1,521 @@
+2018-03-09  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Do not use WebKitDOMHTMLFormElement as argument of signal WebKitWebPage::will-submit-form
+        https://bugs.webkit.org/show_bug.cgi?id=183510
+
+        Reviewed by Michael Catanzaro.
+
+        Update the test to use WebKitDOMElement instead and fix a memory leak.
+
+        * TestWebKitAPI/Tests/WebKitGLib/WebExtensionTest.cpp:
+        (handleFormSubmissionCallback):
+        (willSubmitFormCallback):
+
+2018-02-27  Daniel Bates  <dabates@apple.com>
+
+        Standardize terminology for marked text
+        https://bugs.webkit.org/show_bug.cgi?id=180999
+
+        Reviewed by Zalan Bujtas.
+
+        The name MarkerSubrange is a misnomer for a data structure that associates a text subrange with a type
+        and optional document marker. In particular, a MarkerSubrange may not always correspond to a document
+        marker. For instance, selected text is represented using a MarkerSubrange that does not have a
+        corresponding document marker. Let's standardize on the phrase "marked text" as the canonical way to
+        describe these tagged text subranges.
+
+        * TestWebKitAPI/TestWebKitAPI.xcodeproj/project.pbxproj:
+        * TestWebKitAPI/Tests/WebCore/MarkedText.cpp: Added.
+        (WebCore::operator<<):
+        (TestWebKitAPI::TEST):
+        * TestWebKitAPI/Tests/WebCore/MarkerSubrange.cpp: Removed.
+
+2018-02-27  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        Unreviewed, skip FTL tests if FTL is disabled
+        https://bugs.webkit.org/show_bug.cgi?id=183071
+
+        * Scripts/run-jsc-stress-tests:
+
+2018-02-25  Fujii Hironori  <Hironori.Fujii@sony.com>
+
+        [WK2] http/tests/navigation/new-window-redirect-history.html crashes
+        https://bugs.webkit.org/show_bug.cgi?id=127683
+
+        Reviewed by Dan Bernstein.
+
+        m_previousTestBackForwardListItem was null for the new window.
+        m_previousTestBackForwardListItem is initialized only for the main
+        window in InjectedBundlePage::prepare.
+
+        * WebKitTestRunner/InjectedBundle/InjectedBundlePage.cpp:
+        (WTR::InjectedBundlePage::dumpBackForwardList):
+        Do null-check of m_previousTestBackForwardListItem.
+
+2018-02-25  Alexey Proskuryakov  <ap@apple.com>
+
+        Various crashes in WebKitTestRunner, especially when system is under heavy load
+        https://bugs.webkit.org/show_bug.cgi?id=183109
+
+        Reviewed by Tim Horton.
+
+        WebKitTestRunner had many places where it sent messages to WebContent with a timeout,
+        but it didn't handle the timeout when it did occur. Nearly all of those would result
+        in logic errors and failing tests, and most would even result in stack corruption,
+        as the response handler modified local variables.
+
+        There is only one timeout scenario that we actually mean to handle in WKTR. That's
+        when a test freezes after it is done (e.g. an infinite loop in beforeunload) - we don't
+        want to blame the next test for freezing, so we silently relaunch WebContent.
+        Everything else is cargo cult code that never worked.
+
+        This patch addresses the crashes, and actually makes tests pass a lot more on an
+        overloaded system.
+
+        * WebKitTestRunner/TestController.cpp:
+        (WTR::TestController::resetStateToConsistentValues): Moved m_doneResetting assignment
+        to where it's actually needed, for clarity.
+        (WTR::TestController::reattachPageToWebProcess): This function used to always hit
+        and ignore message timeout, as m_doneResetting is only updated by navigation callback
+        when the state is Resetting. This change makes it faster.
+        (WTR::TestController::platformResetStateToConsistentValues): Style fix.
+        (WTR::TestController::clearServiceWorkerRegistrations): Timing out here wasn't
+        handled in a meaningful manner, and would even corrupt the stack.
+        (WTR::TestController::clearDOMCache): Ditto.
+        (WTR::TestController::clearDOMCaches): Ditto.
+        (WTR::TestController::hasDOMCache): Ditto.
+        (WTR::TestController::domCacheSize): Ditto.
+        (WTR::TestController::isStatisticsPrevalentResource): Ditto.
+        (WTR::TestController::isStatisticsRegisteredAsSubFrameUnder): Ditto.
+        (WTR::TestController::isStatisticsRegisteredAsRedirectingTo): Ditto.
+        (WTR::TestController::isStatisticsHasHadUserInteraction): Ditto.
+        (WTR::TestController::isStatisticsGrandfathered): Ditto.
+        (WTR::TestController::statisticsUpdateCookiePartitioning): Ditto.
+        (WTR::TestController::statisticsSetShouldPartitionCookiesForHost): Ditto.
+        (WTR::TestController::statisticsClearInMemoryAndPersistentStore): Ditto.
+        (WTR::TestController::statisticsClearInMemoryAndPersistentStoreModifiedSinceHours): Ditto.
+        (WTR::TestController::statisticsClearThroughWebsiteDataRemoval): Ditto.
+
+        * WebKitTestRunner/TestInvocation.cpp:
+        (WTR::TestInvocation::shortTimeout const): Made shortTimeout shorter (on a hunch).
+        (WTR::TestInvocation::invoke): Removed a timeout waiting for initial response. There
+        is never a logical reason for such a timeout, as we always have a new or responsive
+        WebContent process here.
+        (WTR::TestInvocation::dumpResults): Removed another timeout that we don't know how to
+        properly handle.
+        (WTR::TestInvocation::didReceiveMessageFromInjectedBundle): Removed assignment to
+        m_errorMessage, which had no effect in this context.
+
+        * WebKitTestRunner/TestInvocation.h: Removed no longer used code.
+
+        * WebKitTestRunner/cocoa/TestControllerCocoa.mm:
+        (WTR::TestController::cocoaResetStateToConsistentValues): Use a named constant for
+        no timeout.
+        
+        * WebKitTestRunner/ios/TestControllerIOS.mm:
+        (WTR::TestController::platformConfigureViewForTest): Removed a useless timeout.
+        Not sure if timing out here would corrupt the stack or not, but there is no reason
+        to impose arbitrary limits on individual steps of a test.
+
+        * WebKitTestRunner/mac/TestControllerMac.mm:
+        (WTR::TestController::platformConfigureViewForTest): Use a named constant for
+        no timeout.
+
+2018-02-22  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        Remove currentTime() / currentTimeMS()
+        https://bugs.webkit.org/show_bug.cgi?id=183052
+
+        Reviewed by Mark Lam.
+
+        * DumpRenderTree/TestRunner.cpp:
+        (preciseTimeCallback):
+        * DumpRenderTree/mac/TestRunnerMac.mm:
+        (TestRunner::setMockGeolocationPosition):
+        * TestWebKitAPI/Tests/WTF/Condition.cpp:
+        * TestWebKitAPI/Tests/WTF/ThreadGroup.cpp:
+        * TestWebKitAPI/Tests/WTF/WorkQueue.cpp:
+        * WebKitTestRunner/GeolocationProviderMock.cpp:
+        (WTR::GeolocationProviderMock::setPosition):
+        * WebKitTestRunner/InjectedBundle/TestRunner.cpp:
+        (WTR::TestRunner::preciseTime):
+
+2018-02-22  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        Remove sleep(double) and sleepMS(double) interfaces
+        https://bugs.webkit.org/show_bug.cgi?id=183038
+
+        Reviewed by Mark Lam.
+
+        * DumpRenderTree/TestNetscapePlugIn/PluginTest.cpp:
+        (PluginTest::indicateTestFailure):
+        * DumpRenderTree/TestNetscapePlugIn/Tests/EvaluateJSWithinNPP_New.cpp:
+        (EvaluteJSWithinNPP_New::NPP_New):
+        * DumpRenderTree/TestNetscapePlugIn/Tests/InvokeDestroysPluginWithinNPP_New.cpp:
+        (InvokeDestroysPluginWithinNPP_New::NPP_New):
+        * DumpRenderTree/TestNetscapePlugIn/Tests/SlowNPPNew.cpp:
+        * TestWebKitAPI/Tests/WTF/Signals.cpp:
+        (TEST):
+        * TestWebKitAPI/Tests/WTF/ThreadGroup.cpp:
+        (TestWebKitAPI::testThreadGroup):
+        * TestWebKitAPI/Tests/WTF/WorkQueue.cpp:
+        (TestWebKitAPI::TEST):
+        * TestWebKitAPI/Tests/WebKitCocoa/PictureInPictureDelegate.mm:
+        (TestWebKitAPI::TEST):
+        * TestWebKitAPI/Tests/ios/DataInteractionTests.mm:
+        (TestWebKitAPI::TEST):
+        * TestWebKitAPI/jsconly/PlatformUtilitiesJSCOnly.cpp:
+        (TestWebKitAPI::Util::sleep):
+
+2018-02-21  Michael Catanzaro  <mcatanzaro@igalia.com>
+
+        [GTK] Unsafe g_setenv use in MiniBrowser main
+        https://bugs.webkit.org/show_bug.cgi?id=182978
+
+        Reviewed by Carlos Garcia Campos.
+
+        setenv (and g_setenv) will randomly crash if called too late.
+
+        * MiniBrowser/gtk/main.c:
+        (main):
+
+2018-02-21  Ms2ger  <Ms2ger@igalia.com>
+
+        [WTR][WPE] Correct the process names in TestController.
+        https://bugs.webkit.org/show_bug.cgi?id=178700
+
+        Reviewed by Michael Catanzaro.
+
+        Similar to r228731 for GTK.
+
+        * Scripts/webkitpy/port/wpe.py:
+        (WPEPort._get_crash_log): removed the code to convert WebProcess name.
+        * WebKitTestRunner/TestController.cpp: return the correct process names for WPE.
+        (WTR::TestController::webProcessName):
+        (WTR::TestController::networkProcessName):
+        (WTR::TestController::databaseProcessName):
+
+2018-02-21  Ms2ger  <Ms2ger@igalia.com>
+
+        [ATK] Remove attributeSet variable from AccessibilityUIElement::attributedStringForRange().
+        https://bugs.webkit.org/show_bug.cgi?id=183000
+
+        Reviewed by Joanmarie Diggs.
+
+        It is never initialized, but is passed to atk_attribute_set_free.
+        This caused a crash in accessibility/content-editable-as-textarea.html on the debug bots.
+
+        * WebKitTestRunner/InjectedBundle/atk/AccessibilityUIElementAtk.cpp:
+        (WTR::AccessibilityUIElement::attributedStringForRange):
+
+2018-02-19  Fujii Hironori  <Hironori.Fujii@sony.com>
+
+        [WTR][GTK] crash log backtrace doesn't show symbol names for DatabaseProcess and NetworkProcess
+        https://bugs.webkit.org/show_bug.cgi?id=182953
+
+        Reviewed by Carlos Garcia Campos.
+
+        * Scripts/webkitpy/port/gtk.py:
+        (GtkPort._get_crash_log): Removed the code to convert WebProcess name.
+        * WebKitTestRunner/TestController.cpp:
+        (WTR::TestController::webProcessName): Return the correct program name for GTK+ port.
+        (WTR::TestController::networkProcessName): Ditto.
+        (WTR::TestController::databaseProcessName): Ditto.
+
+2018-02-15  Don Olmstead  <don.olmstead@sony.com>
+
+        WebCore headers should not be included relatively within dependent projects
+        https://bugs.webkit.org/show_bug.cgi?id=182805
+
+        Reviewed by Chris Dumez.
+
+        * TestWebKitAPI/win/TestWebCoreStubs.cpp:
+        * WebKitTestRunner/InjectedBundle/atk/AccessibilityUIElementAtk.cpp:
+        * WebKitTestRunner/InjectedBundle/wpe/AccessibilityControllerWPE.cpp:
+        * WebKitTestRunner/InjectedBundle/wpe/AccessibilityUIElementWPE.cpp:
+        * WebKitTestRunner/gtk/EventSenderProxyGtk.cpp:
+        * WebKitTestRunner/wpe/EventSenderProxyWPE.cpp:
+
+2018-02-12  John Wilander  <wilander@apple.com>
+
+        Resource Load Statistics: Classify resources as prevalent based on redirects to other prevalent resources
+        https://bugs.webkit.org/show_bug.cgi?id=182664
+        <rdar://problem/37372572>
+
+        Reviewed by Brent Fulgham.
+
+        * WebKitTestRunner/InjectedBundle/Bindings/TestRunner.idl:
+        * WebKitTestRunner/InjectedBundle/TestRunner.cpp:
+        (WTR::TestRunner::setStatisticsSubresourceUniqueRedirectFrom):
+        (WTR::TestRunner::setStatisticsTopFrameUniqueRedirectTo):
+        (WTR::TestRunner::setStatisticsTopFrameUniqueRedirectFrom):
+        * WebKitTestRunner/InjectedBundle/TestRunner.h:
+        * WebKitTestRunner/TestController.cpp:
+        (WTR::TestController::setStatisticsSubresourceUniqueRedirectFrom):
+        (WTR::TestController::setStatisticsTopFrameUniqueRedirectTo):
+        (WTR::TestController::setStatisticsTopFrameUniqueRedirectFrom):
+        * WebKitTestRunner/TestController.h:
+        * WebKitTestRunner/TestInvocation.cpp:
+        (WTR::TestInvocation::didReceiveSynchronousMessageFromInjectedBundle):
+
+2018-02-09  Philippe Normand  <pnormand@igalia.com>
+
+        [GStreamer] Layout test fast/replaced/border-radius-clip.html crashes with GStreamer-CRITICAL **: gst_segment_to_stream_time: assertion 'segment->format == format' failed in gst_segment_to_stream_time()
+        https://bugs.webkit.org/show_bug.cgi?id=176802
+
+        Reviewed by Xabier Rodriguez-Calvar.
+
+        * gstreamer/jhbuild.modules:
+        * gstreamer/patches/gst-plugins-good-0001-gstgdkpixbufdec-stop-pretending-to-decode-gifs.patch: Added.
+
+2018-02-08  Michael Catanzaro  <mcatanzaro@igalia.com>
+
+        TestController should not exercise cocoa-specific resource load statistics APIs
+        https://bugs.webkit.org/show_bug.cgi?id=182355
+
+        Reviewed by Alex Christensen.
+
+        Remove unnecessary use of platform-specific APIs in the TestController, since there are
+        cross-platform APIs to do the same thing.
+
+        Also, ensure callbacks execute before returning from TestController's functions, since
+        otherwise the tests are guaranteed to be flaky at best, and also since there's nothing to
+        prevent the TestController from being destroyed before the callbacks execute.
+
+        * WebKitTestRunner/TestController.cpp:
+        (WTR::resourceStatisticsVoidResultCallback):
+        (WTR::resourceStatisticsBooleanResultCallback):
+        (WTR::TestController::isStatisticsPrevalentResource):
+        (WTR::TestController::isStatisticsRegisteredAsSubFrameUnder):
+        (WTR::TestController::isStatisticsRegisteredAsRedirectingTo):
+        (WTR::TestController::isStatisticsHasHadUserInteraction):
+        (WTR::TestController::isStatisticsGrandfathered):
+        (WTR::TestController::statisticsUpdateCookiePartitioning):
+        (WTR::TestController::statisticsSetShouldPartitionCookiesForHost):
+        (WTR::TestController::statisticsClearInMemoryAndPersistentStore):
+        (WTR::TestController::statisticsClearInMemoryAndPersistentStoreModifiedSinceHours):
+        (WTR::TestController::statisticsClearThroughWebsiteDataRemoval):
+        (WTR::resourceStatisticsCallback): Deleted.
+        (WTR::TestController::statisticsClearThroughWebsiteDataRemovalCallback): Deleted.
+        * WebKitTestRunner/TestController.h:
+        * WebKitTestRunner/cocoa/TestControllerCocoa.mm:
+        (WTR::toNSString): Deleted.
+        (WTR::TestController::setStatisticsLastSeen): Deleted.
+        (WTR::TestController::setStatisticsPrevalentResource): Deleted.
+        (WTR::TestController::isStatisticsPrevalentResource): Deleted.
+        (WTR::TestController::isStatisticsRegisteredAsSubFrameUnder): Deleted.
+        (WTR::TestController::isStatisticsRegisteredAsRedirectingTo): Deleted.
+        (WTR::TestController::setStatisticsHasHadUserInteraction): Deleted.
+        (WTR::TestController::setStatisticsHasHadNonRecentUserInteraction): Deleted.
+        (WTR::TestController::isStatisticsHasHadUserInteraction): Deleted.
+        (WTR::TestController::setStatisticsGrandfathered): Deleted.
+        (WTR::TestController::isStatisticsGrandfathered): Deleted.
+        (WTR::TestController::setStatisticsSubframeUnderTopFrameOrigin): Deleted.
+        (WTR::TestController::setStatisticsSubresourceUnderTopFrameOrigin): Deleted.
+        (WTR::TestController::setStatisticsSubresourceUniqueRedirectTo): Deleted.
+        (WTR::TestController::setStatisticsTimeToLiveUserInteraction): Deleted.
+        (WTR::TestController::setStatisticsTimeToLiveCookiePartitionFree): Deleted.
+        (WTR::TestController::statisticsProcessStatisticsAndDataRecords): Deleted.
+        (WTR::TestController::statisticsUpdateCookiePartitioning): Deleted.
+        (WTR::TestController::statisticsSetShouldPartitionCookiesForHost): Deleted.
+        (WTR::TestController::statisticsSubmitTelemetry): Deleted.
+        (WTR::TestController::setStatisticsNotifyPagesWhenDataRecordsWereScanned): Deleted.
+        (WTR::TestController::setStatisticsShouldClassifyResourcesBeforeDataRecordsRemoval): Deleted.
+        (WTR::TestController::setStatisticsNotifyPagesWhenTelemetryWasCaptured): Deleted.
+        (WTR::TestController::setStatisticsMinimumTimeBetweenDataRecordsRemoval): Deleted.
+        (WTR::TestController::setStatisticsGrandfatheringTime): Deleted.
+        (WTR::TestController::setStatisticsMaxStatisticsEntries): Deleted.
+        (WTR::TestController::setStatisticsPruneEntriesDownTo): Deleted.
+        (WTR::TestController::statisticsClearInMemoryAndPersistentStore): Deleted.
+        (WTR::TestController::statisticsClearInMemoryAndPersistentStoreModifiedSinceHours): Deleted.
+        (WTR::TestController::statisticsClearThroughWebsiteDataRemoval): Deleted.
+        (WTR::TestController::statisticsResetToConsistentState): Deleted.
+
+2018-02-13  Chris Dumez  <cdumez@apple.com>
+
+        REGRESSION (r228299): Broke reader mode in Safari
+        https://bugs.webkit.org/show_bug.cgi?id=182697
+        <rdar://problem/37399012>
+
+        Reviewed by Ryosuke Niwa.
+
+        Add API test coverage for responding asynchronously to the decidePolicyForNavigationResponse
+        delegate.
+
+        * TestWebKitAPI/TestWebKitAPI.xcodeproj/project.pbxproj:
+        * TestWebKitAPI/Tests/WebKitCocoa/AsyncPolicyForNavigationResponse.mm: Added.
+        (-[TestAsyncNavigationDelegate webView:didFinishNavigation:]):
+        (-[TestAsyncNavigationDelegate webView:didFailNavigation:withError:]):
+        (-[TestAsyncNavigationDelegate webView:didFailProvisionalNavigation:withError:]):
+
+        (-[TestAsyncNavigationDelegate webView:decidePolicyForNavigationAction:decisionHandler:]):
+        (-[TestAsyncNavigationDelegate webView:decidePolicyForNavigationResponse:decisionHandler:]):
+        (TestWebKitAPI::TEST):
+
+2018-02-07  Ms2ger  <Ms2ger@igalia.com>
+
+        [GTK] Enable WebKit.GeolocationTransitionTo{High,Low}Accuracy tests
+        https://bugs.webkit.org/show_bug.cgi?id=125068
+
+        Unreviewed test gardening.
+
+        They do not appear to have failed since we started running them again in r226944.
+
+        * TestWebKitAPI/glib/TestExpectations.json:
+
+2018-02-07  Ms2ger  <Ms2ger@igalia.com>
+
+        [GTK] Enable WebKit.InjectedBundleFrameHitTest test
+        https://bugs.webkit.org/show_bug.cgi?id=120303
+
+        Unreviewed test gardening.
+
+        It does not appear to have failed since we started running it again in r226944.
+
+        * TestWebKitAPI/glib/TestExpectations.json:
+
+2018-02-07  Ms2ger  <Ms2ger@igalia.com>
+
+        [GTK] Enable WebKit.ForceRepaint test
+        https://bugs.webkit.org/show_bug.cgi?id=105532
+
+        Unreviewed test gardening.
+
+        It does not appear to have failed since we started running it again in r226944.
+
+        * TestWebKitAPI/glib/TestExpectations.json:
+
+2018-02-07  Ms2ger  <Ms2ger@igalia.com>
+
+        [GTK] Enable WebKit.NewFirstVisuallyNonEmptyLayoutFrames test
+        https://bugs.webkit.org/show_bug.cgi?id=85037
+
+        Unreviewed test gardening.
+
+        It does not appear to have failed since we started running it again in r226944.
+
+        * TestWebKitAPI/glib/TestExpectations.json:
+
+2018-02-06  Don Olmstead  <don.olmstead@sony.com>
+
+        Remove WebCore/ForwardingHeaders directory
+        https://bugs.webkit.org/show_bug.cgi?id=182347
+
+        Reviewed by Keith Miller.
+
+        * WebKitTestRunner/TestController.cpp:
+
+2018-02-05  Daniel Bates  <dabates@apple.com>
+
+        REGRESSION (r217572): run-webkit-tests exits without emitting newline character
+        https://bugs.webkit.org/show_bug.cgi?id=182360
+
+        Rubber-stamped by Aakash Jain.
+
+        Fixes an annoyance where run-webkit-tests always exits without printing a newline character.
+        In the terminal this looks like:
+
+            $ Tools/Scripts/run-webkit-tests
+            Expected to fail, but passed: (7)
+            ...
+            Stopping WebSocket server ...$
+
+        This bug was caused by code added in r217572 to stop all run-webkit-tests started servers (e.g. an HTTP
+        server) from an at-exit handler. When run-webkit-tests runs successfully (i.e. without error or
+        control-C interruption) we would stop all such servers twice: once as part of ending the test
+        run and once from the at-exit handler. The latter never prints a trailing newline character hence
+        the state of the terminal (as depicted above). Instead LayoutTestRunner.stop_servers() should only
+        stop servers that it started in LayoutTestRunner.start_servers().
+
+        * Scripts/webkitpy/layout_tests/controllers/layout_test_runner.py:
+        (LayoutTestRunner.__init__):
+        (LayoutTestRunner.start_servers):
+        (LayoutTestRunner.stop_servers):
+        Only start servers that run-webkit-tests has not already started and only stop servers that
+        run-webkit-tests started.
+
+        * Scripts/webkitpy/layout_tests/controllers/layout_test_runner_unittest.py:
+        (LayoutTestRunnerTests.test_servers_started.is_websocket_server_running):
+        (LayoutTestRunnerTests.test_servers_started):
+        (LayoutTestRunnerTests.test_servers_started.is_websocket_servers_running): Deleted.
+        Update due to rename below.
+
+        * Scripts/webkitpy/layout_tests/servers/websocket_server.py:
+        (is_web_socket_server_running): Added.
+        (PyWebSocket.is_running): Deleted.
+
+        * Scripts/webkitpy/port/base.py:
+        (Port.is_http_server_running): Check if we already started the server ourself.
+        (Port.is_websocket_server_running): Formerly named is_websocket_servers_running. Modified
+        to check if we already started the server ourself. Take a similar approach as the other
+        Port.is_*_running methods and only check if an existing WebSocket server is running on the
+        non-secure server port. This is a simple heuristic and should be sufficient in practice.
+        (Port.is_wpt_server_running): Check if we already started the server ourself.
+        (Port.is_websocket_servers_running): Deleted; renamed to is_websocket_server_running().
+
+2018-02-05  Daniel Bates  <dabates@apple.com>
+
+        prepare-ChangeLog gets confused about Python docstrings that contain the word "class" or "def"
+        https://bugs.webkit.org/show_bug.cgi?id=182405
+
+        Reviewed by David Kilzer.
+
+        String literal statements, including docstrings, do not demarcate a new scope in Python.
+        So, do not treat them like they do when building up the list of modified functions.
+
+        * Scripts/prepare-ChangeLog:
+        (get_function_line_ranges_for_python):
+        * Scripts/webkitperl/prepare-ChangeLog_unittest/resources/python_unittests-expected.txt:
+        The expected ending line number for the last "pass" statement inside the scope of Class5 changed
+        from 97 to 98 because empty lines do not effect scope. This is consistent with the parsing
+        of the second "pass" statement in the scope of class Class5. A "pass" is a null operation that
+        is used as a syntactic placeholder when a statement is required. Ideally we would make
+        the parsing code smarter so as to avoid emitting ranges for "pass" statements that serve
+        not syntactic purpose.
+        * Scripts/webkitperl/prepare-ChangeLog_unittest/resources/python_unittests.py:
+        (Class5):
+        (Class6):
+        (Class6.__init__):
+        (Class7):
+        (Class7.__init__):
+        (Class8):
+        (Class8.__init__):
+        Add some more tests.
+
+2018-02-05  John Wilander  <wilander@apple.com>
+
+        Storage Access API: Add testRunner.getAllStorageAccessEntries() to make testing easier and more explicit
+        https://bugs.webkit.org/show_bug.cgi?id=181601
+        <rdar://problem/36475837>
+
+        Reviewed by Alex Christensen.
+
+        http/tests/storageAccess/request-and-grant-access-then-detach-should-not-have-access.html
+        was found to be flaky. With the testRunner.hasStorageAccessEntry() getter
+        it's possible to check access even if a frame doesn't respond timely to
+        postMessage after detach and attach.
+
+        * WebKitTestRunner/InjectedBundle/Bindings/TestRunner.idl:
+        * WebKitTestRunner/InjectedBundle/InjectedBundle.cpp:
+        (WTR::InjectedBundle::didReceiveMessageToPage):
+        * WebKitTestRunner/InjectedBundle/TestRunner.cpp:
+        (WTR::TestRunner::setStorageAccessAPIEnabled):
+            Just moved for source file grouping.
+        (WTR::TestRunner::getAllStorageAccessEntries):
+        (WTR::TestRunner::callDidReceiveAllStorageAccessEntriesCallback):
+        * WebKitTestRunner/InjectedBundle/TestRunner.h:
+        * WebKitTestRunner/TestController.cpp:
+        (WTR::TestController::getAllStorageAccessEntries):
+            Note that this is just stubbed out, i.e. not implemented.
+        * WebKitTestRunner/TestController.h:
+        * WebKitTestRunner/TestInvocation.cpp:
+        (WTR::TestInvocation::didReceiveSynchronousMessageFromInjectedBundle):
+        (WTR::TestInvocation::didReceiveAllStorageAccessEntries):
+        * WebKitTestRunner/TestInvocation.h:
+        * WebKitTestRunner/cocoa/TestControllerCocoa.mm:
+        (WTR::TestController::getAllStorageAccessEntries):
+            This is the Cocoa-specific version of this test infrastructure.
+
 2018-02-05  Alicia Boya García  <aboya@igalia.com>
 
         Fix bug in MediaTime comparison for negative values with different scale.

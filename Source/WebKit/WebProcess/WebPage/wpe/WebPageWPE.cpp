@@ -31,6 +31,7 @@
 #include "WebPreferencesKeys.h"
 #include "WebPreferencesStore.h"
 #include "WindowsKeyboardCodes.h"
+#include <WebCore/NotImplemented.h>
 #include <WebCore/Settings.h>
 #include <WebCore/SharedBuffer.h>
 

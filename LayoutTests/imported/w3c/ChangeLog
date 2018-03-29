@@ -1,3 +1,146 @@
+2018-02-26  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed, rolling out r226745.
+        https://bugs.webkit.org/show_bug.cgi?id=183132
+
+        This is breaking some websites (Requested by youenn on
+        #webkit).
+
+        Reverted changeset:
+
+        "Use no-cache fetch mode when loading main documents with
+        location.reload()"
+        https://bugs.webkit.org/show_bug.cgi?id=181285
+        https://trac.webkit.org/changeset/226745
+
+2018-02-16  Daniel Bates  <dabates@apple.com>
+
+        Remove UTF-32 BOM parsing code
+        https://bugs.webkit.org/show_bug.cgi?id=182900
+        <rdar://problem/37238717>
+
+        Reviewed by Alexey Proskuryakov.
+
+        Update expected results now that all sub-tests pass.
+
+        * web-platform-tests/encoding/unsupported-encodings-expected.txt:
+        * web-platform-tests/encoding/utf-32-expected.txt:
+
+2018-02-19  Manuel Rego Casasnovas  <rego@igalia.com>
+
+        [css-grid] Apply automatic minimum size clamping to spanning items too
+        https://bugs.webkit.org/show_bug.cgi?id=182684
+
+        Reviewed by Javier Fernandez.
+
+        Update WPT tests related to this change.
+
+        * web-platform-tests/css/css-grid/grid-items/grid-minimum-size-grid-items-022-expected.txt:
+        * web-platform-tests/css/css-grid/grid-items/grid-minimum-size-grid-items-022.html:
+        * web-platform-tests/css/css-grid/grid-items/grid-minimum-size-grid-items-023-expected.txt:
+        * web-platform-tests/css/css-grid/grid-items/grid-minimum-size-grid-items-023.html:
+        * web-platform-tests/css/css-grid/grid-items/grid-minimum-size-grid-items-024-expected.txt: Added.
+        * web-platform-tests/css/css-grid/grid-items/grid-minimum-size-grid-items-024.html: Added.
+        * web-platform-tests/css/css-grid/grid-items/grid-minimum-size-grid-items-025-expected.txt: Added.
+        * web-platform-tests/css/css-grid/grid-items/grid-minimum-size-grid-items-025.html: Added.
+        * web-platform-tests/css/css-grid/grid-items/w3c-import.log:
+
+2018-02-09  Javier Fernandez  <jfernandez@igalia.com>
+
+        [css-align] Implement the new behavior of 'legacy' for justify-items
+        https://bugs.webkit.org/show_bug.cgi?id=172712
+
+        Reviewed by Antti Koivisto.
+
+        Rebaselined Default Alignment related tests because of the new 'legacy' value.
+
+        * web-platform-tests/css/css-align/content-distribution/place-content-shorthand-004-expected.txt:
+        * web-platform-tests/css/css-align/content-distribution/place-content-shorthand-004.html:
+        * web-platform-tests/css/css-align/default-alignment/parse-justify-items-002-expected.txt:
+        * web-platform-tests/css/css-align/default-alignment/parse-justify-items-002.html:
+        * web-platform-tests/css/css-align/default-alignment/parse-justify-items-004-expected.txt:
+        * web-platform-tests/css/css-align/default-alignment/place-items-shorthand-004-expected.txt:
+        * web-platform-tests/css/css-align/default-alignment/place-items-shorthand-004.html:
+
+2018-02-08  Antoine Quint  <graouts@apple.com>
+
+        [Web Animations] Always expose "composite" in output of getKeyframes()
+        https://bugs.webkit.org/show_bug.cgi?id=182600
+
+        Reviewed by Dean Jackson.
+
+        Update expected results to account for a number of progressions.
+
+        * web-platform-tests/web-animations/interfaces/Animatable/animate-expected.txt:
+        * web-platform-tests/web-animations/interfaces/KeyframeEffect/composite-expected.txt:
+        * web-platform-tests/web-animations/interfaces/KeyframeEffect/setKeyframes-expected.txt:
+
+2018-02-07  Chris Dumez  <cdumez@apple.com>
+
+        IndexedDB in service workers is using a memory backed store
+        https://bugs.webkit.org/show_bug.cgi?id=182574
+        <rdar://problem/37316205>
+
+        Reviewed by Youenn Fablet.
+
+        Rebaseline WPT test that is now passing.
+
+        * web-platform-tests/service-workers/service-worker/indexeddb.https-expected.txt:
+
+2018-02-05  Manuel Rego Casasnovas  <rego@igalia.com>
+
+        [css-grid] Rename gutter properties to remove "grid-" prefix
+        https://bugs.webkit.org/show_bug.cgi?id=180290
+
+        Reviewed by Javier Fernandez.
+
+        Imported WPT tests from css/css-align/gaps/.
+        And also update the tests on css/css-grid/alignment/ gutter tests.
+
+        * web-platform-tests/css/css-align/gaps/column-gap-animation-001-expected.txt: Added.
+        * web-platform-tests/css/css-align/gaps/column-gap-animation-001.html: Added.
+        * web-platform-tests/css/css-align/gaps/column-gap-animation-002-expected.txt: Added.
+        * web-platform-tests/css/css-align/gaps/column-gap-animation-002.html: Added.
+        * web-platform-tests/css/css-align/gaps/column-gap-animation-003-expected.txt: Added.
+        * web-platform-tests/css/css-align/gaps/column-gap-animation-003.html: Added.
+        * web-platform-tests/css/css-align/gaps/column-gap-parsing-001-expected.txt: Added.
+        * web-platform-tests/css/css-align/gaps/column-gap-parsing-001.html: Added.
+        * web-platform-tests/css/css-align/gaps/gap-animation-001-expected.txt: Added.
+        * web-platform-tests/css/css-align/gaps/gap-animation-001.html: Added.
+        * web-platform-tests/css/css-align/gaps/gap-animation-002-expected.txt: Added.
+        * web-platform-tests/css/css-align/gaps/gap-animation-002.html: Added.
+        * web-platform-tests/css/css-align/gaps/gap-animation-003-expected.txt: Added.
+        * web-platform-tests/css/css-align/gaps/gap-animation-003.html: Added.
+        * web-platform-tests/css/css-align/gaps/gap-animation-004-expected.txt: Added.
+        * web-platform-tests/css/css-align/gaps/gap-animation-004.html: Added.
+        * web-platform-tests/css/css-align/gaps/gap-parsing-001-expected.txt: Added.
+        * web-platform-tests/css/css-align/gaps/gap-parsing-001.html: Added.
+        * web-platform-tests/css/css-align/gaps/grid-column-gap-parsing-001-expected.txt: Added.
+        * web-platform-tests/css/css-align/gaps/grid-column-gap-parsing-001.html: Added.
+        * web-platform-tests/css/css-align/gaps/grid-gap-parsing-001-expected.txt: Added.
+        * web-platform-tests/css/css-align/gaps/grid-gap-parsing-001.html: Added.
+        * web-platform-tests/css/css-align/gaps/grid-row-gap-parsing-001-expected.txt: Added.
+        * web-platform-tests/css/css-align/gaps/grid-row-gap-parsing-001.html: Added.
+        * web-platform-tests/css/css-align/gaps/row-gap-animation-001-expected.txt: Added.
+        * web-platform-tests/css/css-align/gaps/row-gap-animation-001.html: Added.
+        * web-platform-tests/css/css-align/gaps/row-gap-animation-002-expected.txt: Added.
+        * web-platform-tests/css/css-align/gaps/row-gap-animation-002.html: Added.
+        * web-platform-tests/css/css-align/gaps/row-gap-animation-003-expected.txt: Added.
+        * web-platform-tests/css/css-align/gaps/row-gap-animation-003.html: Added.
+        * web-platform-tests/css/css-align/gaps/row-gap-parsing-001-expected.txt: Added.
+        * web-platform-tests/css/css-align/gaps/row-gap-parsing-001.html: Added.
+        * web-platform-tests/css/css-align/gaps/w3c-import.log: Added.
+        * web-platform-tests/css/css-grid/alignment/grid-gutters-001-expected.html:
+        * web-platform-tests/css/css-grid/alignment/grid-gutters-002-expected.html:
+        * web-platform-tests/css/css-grid/alignment/grid-gutters-003-expected.html:
+        * web-platform-tests/css/css-grid/alignment/grid-gutters-004-expected.html:
+        * web-platform-tests/css/css-grid/alignment/grid-gutters-005-expected.html:
+        * web-platform-tests/css/css-grid/alignment/grid-gutters-006-expected.html:
+        * web-platform-tests/css/css-grid/alignment/grid-gutters-007-expected.html:
+        * web-platform-tests/css/css-grid/alignment/grid-gutters-008-expected.html:
+        * web-platform-tests/css/css-grid/alignment/grid-gutters-009-expected.html:
+        * web-platform-tests/css/css-grid/alignment/grid-gutters-010-expected.html:
+
 2018-02-02  Chris Dumez  <cdumez@apple.com>
 
         Clearing a registration should null out its workers before setting their state to "redundant"

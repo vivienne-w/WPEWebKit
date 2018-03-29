@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2017 Apple Inc. All rights reserved.
+ * Copyright (C) 2009-2018 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -156,7 +156,7 @@ class YarrGenerator : private MacroAssembler {
 #define JIT_UNICODE_EXPRESSIONS
 #endif
 
-#ifdef JIT_ALL_PARENS_EXPRESSIONS
+#if ENABLE(YARR_JIT_ALL_PARENS_EXPRESSIONS)
     struct ParenContextSizes {
         size_t m_numSubpatterns;
         size_t m_frameSlots;
@@ -246,7 +246,7 @@ class YarrGenerator : private MacroAssembler {
         jump(loopTop);
 
         initDone.link(this);
-        storePtr(TrustedImmPtr(0), Address(parenContextPointer, ParenContext::nextOffset()));
+        storePtr(TrustedImmPtr(nullptr), Address(parenContextPointer, ParenContext::nextOffset()));
         emptyFreeList.link(this);
     }
 
@@ -594,7 +594,7 @@ class YarrGenerator : private MacroAssembler {
 
     DataLabelPtr storeToFrameWithPatch(unsigned frameLocation)
     {
-        return storePtrWithPatch(TrustedImmPtr(0), Address(stackPointerRegister, frameLocation * sizeof(void*)));
+        return storePtrWithPatch(TrustedImmPtr(nullptr), Address(stackPointerRegister, frameLocation * sizeof(void*)));
     }
 
     void loadFromFrame(unsigned frameLocation, RegisterID reg)
@@ -2173,7 +2173,7 @@ class YarrGenerator : private MacroAssembler {
             //
             // These nodes support generic subpatterns.
             case OpParenthesesSubpatternBegin: {
-#ifdef JIT_ALL_PARENS_EXPRESSIONS
+#if ENABLE(YARR_JIT_ALL_PARENS_EXPRESSIONS)
                 PatternTerm* term = op.m_term;
                 unsigned parenthesesFrameLocation = term->frameLocation;
 
@@ -2193,7 +2193,7 @@ class YarrGenerator : private MacroAssembler {
                 // FIXME: for capturing parens, could use the index in the capture array?
                 if (term->quantityType == QuantifierGreedy || term->quantityType == QuantifierNonGreedy) {
                     storeToFrame(TrustedImm32(0), parenthesesFrameLocation + BackTrackInfoParentheses::matchAmountIndex());
-                    storeToFrame(TrustedImmPtr(0), parenthesesFrameLocation + BackTrackInfoParentheses::parenContextHeadIndex());
+                    storeToFrame(TrustedImmPtr(nullptr), parenthesesFrameLocation + BackTrackInfoParentheses::parenContextHeadIndex());
 
                     if (term->quantityType == QuantifierNonGreedy) {
                         storeToFrame(TrustedImm32(-1), parenthesesFrameLocation + BackTrackInfoParentheses::beginIndex());
@@ -2230,13 +2230,13 @@ class YarrGenerator : private MacroAssembler {
                     } else
                         setSubpatternStart(index, term->parentheses.subpatternId);
                 }
-#else // !JIT_ALL_PARENS_EXPRESSIONS
+#else // !YARR_JIT_ALL_PARENS_EXPRESSIONS
                 RELEASE_ASSERT_NOT_REACHED();
 #endif
                 break;
             }
             case OpParenthesesSubpatternEnd: {
-#ifdef JIT_ALL_PARENS_EXPRESSIONS
+#if ENABLE(YARR_JIT_ALL_PARENS_EXPRESSIONS)
                 PatternTerm* term = op.m_term;
                 unsigned parenthesesFrameLocation = term->frameLocation;
 
@@ -2288,7 +2288,7 @@ class YarrGenerator : private MacroAssembler {
                     YarrOp& beginOp = m_ops[op.m_previousOp];
                     beginOp.m_jumps.link(this);
                 }
-#else // !JIT_ALL_PARENS_EXPRESSIONS
+#else // !YARR_JIT_ALL_PARENS_EXPRESSIONS
                 RELEASE_ASSERT_NOT_REACHED();
 #endif
                 break;
@@ -2837,7 +2837,7 @@ class YarrGenerator : private MacroAssembler {
             // out of the start of the parentheses, or jump back to the forwards
             // matching start, depending of whether the match is Greedy or NonGreedy.
             case OpParenthesesSubpatternBegin: {
-#ifdef JIT_ALL_PARENS_EXPRESSIONS
+#if ENABLE(YARR_JIT_ALL_PARENS_EXPRESSIONS)
                 PatternTerm* term = op.m_term;
                 unsigned parenthesesFrameLocation = term->frameLocation;
 
@@ -2880,13 +2880,13 @@ class YarrGenerator : private MacroAssembler {
 
                     m_backtrackingState.fallthrough();
                 }
-#else // !JIT_ALL_PARENS_EXPRESSIONS
+#else // !YARR_JIT_ALL_PARENS_EXPRESSIONS
                 RELEASE_ASSERT_NOT_REACHED();
 #endif
                 break;
             }
             case OpParenthesesSubpatternEnd: {
-#ifdef JIT_ALL_PARENS_EXPRESSIONS
+#if ENABLE(YARR_JIT_ALL_PARENS_EXPRESSIONS)
                 PatternTerm* term = op.m_term;
 
                 if (term->quantityType != QuantifierFixedCount) {
@@ -2917,7 +2917,7 @@ class YarrGenerator : private MacroAssembler {
                 }
 
                 m_backtrackingState.append(op.m_jumps);
-#else // !JIT_ALL_PARENS_EXPRESSIONS
+#else // !YARR_JIT_ALL_PARENS_EXPRESSIONS
                 RELEASE_ASSERT_NOT_REACHED();
 #endif
                 break;
@@ -3022,7 +3022,7 @@ class YarrGenerator : private MacroAssembler {
             parenthesesBeginOpCode = OpParenthesesSubpatternTerminalBegin;
             parenthesesEndOpCode = OpParenthesesSubpatternTerminalEnd;
         } else {
-#ifdef JIT_ALL_PARENS_EXPRESSIONS
+#if ENABLE(YARR_JIT_ALL_PARENS_EXPRESSIONS)
             // We only handle generic parenthesis with greedy counts.
             if (term->quantityType != QuantifierGreedy) {
                 // This subpattern is not supported by the JIT.
@@ -3273,7 +3273,7 @@ class YarrGenerator : private MacroAssembler {
         if (m_pattern.m_saveInitialStartValue)
             push(X86Registers::ebx);
 
-#ifdef JIT_ALL_PARENS_EXPRESSIONS
+#if ENABLE(YARR_JIT_ALL_PARENS_EXPRESSIONS)
         if (m_containsNestedSubpatterns) {
 #if OS(WINDOWS)
             push(X86Registers::edi);
@@ -3334,6 +3334,7 @@ class YarrGenerator : private MacroAssembler {
         push(ARMRegisters::r4);
         push(ARMRegisters::r5);
         push(ARMRegisters::r6);
+        push(ARMRegisters::r8);
 #elif CPU(MIPS)
         // Do nothing.
 #endif
@@ -3359,7 +3360,7 @@ class YarrGenerator : private MacroAssembler {
             pop(X86Registers::r13);
         }
 
-#ifdef JIT_ALL_PARENS_EXPRESSIONS
+#if ENABLE(YARR_JIT_ALL_PARENS_EXPRESSIONS)
         if (m_containsNestedSubpatterns) {
             pop(X86Registers::r12);
 #if OS(WINDOWS)
@@ -3381,6 +3382,7 @@ class YarrGenerator : private MacroAssembler {
         if (m_decodeSurrogatePairs)
             popPair(framePointerRegister, linkRegister);
 #elif CPU(ARM)
+        pop(ARMRegisters::r8);
         pop(ARMRegisters::r6);
         pop(ARMRegisters::r5);
         pop(ARMRegisters::r4);
@@ -3398,7 +3400,7 @@ public:
         , m_decodeSurrogatePairs(m_charSize == Char16 && m_pattern.unicode())
         , m_unicodeIgnoreCase(m_pattern.unicode() && m_pattern.ignoreCase())
         , m_canonicalMode(m_pattern.unicode() ? CanonicalMode::Unicode : CanonicalMode::UCS2)
-#ifdef JIT_ALL_PARENS_EXPRESSIONS
+#if ENABLE(YARR_JIT_ALL_PARENS_EXPRESSIONS)
         , m_containsNestedSubpatterns(false)
         , m_parenContextSizes(compileMode == IncludeSubpatterns ? m_pattern.m_numSubpatterns : 0, m_pattern.m_body->m_callFrameSize)
 #endif
@@ -3412,6 +3414,11 @@ public:
             jitObject.setFallBackWithFailureReason(JITFailureReason::DecodeSurrogatePair);
             return;
         }
+#endif
+
+#if ENABLE(YARR_JIT_ALL_PARENS_EXPRESSIONS)
+        if (m_containsNestedSubpatterns)
+            jitObject.setUsesPaternContextBuffer();
 #endif
 
         // We need to compile before generating code since we set flags based on compilation that
@@ -3429,7 +3436,7 @@ public:
         generateFailReturn();
         hasInput.link(this);
 
-#ifdef JIT_ALL_PARENS_EXPRESSIONS
+#if ENABLE(YARR_JIT_ALL_PARENS_EXPRESSIONS)
         if (m_containsNestedSubpatterns)
             move(TrustedImm32(matchLimit), remainingMatchCount);
 #endif
@@ -3444,7 +3451,7 @@ public:
 
         initCallFrame();
 
-#ifdef JIT_ALL_PARENS_EXPRESSIONS
+#if ENABLE(YARR_JIT_ALL_PARENS_EXPRESSIONS)
         if (m_containsNestedSubpatterns)
             initParenContextFreeList();
 #endif
@@ -3481,14 +3488,14 @@ public:
 
         if (compileMode == MatchOnly) {
             if (m_charSize == Char8)
-                jitObject.set8BitCodeMatchOnly(FINALIZE_CODE(linkBuffer, ("Match-only 8-bit regular expression")));
+                jitObject.set8BitCodeMatchOnly(FINALIZE_CODE(linkBuffer, "Match-only 8-bit regular expression"));
             else
-                jitObject.set16BitCodeMatchOnly(FINALIZE_CODE(linkBuffer, ("Match-only 16-bit regular expression")));
+                jitObject.set16BitCodeMatchOnly(FINALIZE_CODE(linkBuffer, "Match-only 16-bit regular expression"));
         } else {
             if (m_charSize == Char8)
-                jitObject.set8BitCode(FINALIZE_CODE(linkBuffer, ("8-bit regular expression")));
+                jitObject.set8BitCode(FINALIZE_CODE(linkBuffer, "8-bit regular expression"));
             else
-                jitObject.set16BitCode(FINALIZE_CODE(linkBuffer, ("16-bit regular expression")));
+                jitObject.set16BitCode(FINALIZE_CODE(linkBuffer, "16-bit regular expression"));
         }
         if (m_failureReason)
             jitObject.setFallBackWithFailureReason(*m_failureReason);
@@ -3508,7 +3515,7 @@ private:
     bool m_decodeSurrogatePairs;
     bool m_unicodeIgnoreCase;
     CanonicalMode m_canonicalMode;
-#ifdef JIT_ALL_PARENS_EXPRESSIONS
+#if ENABLE(YARR_JIT_ALL_PARENS_EXPRESSIONS)
     bool m_containsNestedSubpatterns;
     ParenContextSizes m_parenContextSizes;
 #endif

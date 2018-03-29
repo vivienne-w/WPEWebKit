@@ -1,3 +1,70 @@
+2018-02-09  Matt Baker  <mattbaker@apple.com>
+
+        Web Inspector: Object.shallowEqual always fails when comparing array property values
+        https://bugs.webkit.org/show_bug.cgi?id=182634
+        <rdar://problem/37374639>
+
+        Reviewed by Devin Rousso.
+
+        Object.shallowEqual should use Array.shallowEqual when comparing property
+        values, since strictly comparing objects/arrays is only true if both
+        operands reference the same Object.
+
+        * UserInterface/Base/Utilities.js:
+        (value):
+
+2018-02-07  Nikita Vasilyev  <nvasilyev@apple.com>
+
+        Web Inspector: Styles: completion popover doesn't hide when switching panels
+        https://bugs.webkit.org/show_bug.cgi?id=182464
+        <rdar://problem/37202763>
+
+        Reviewed by Timothy Hatcher.
+
+        Hide completion popover by triggering blur event on the focused text field.
+        Removing text fields from the DOM tree would hide the completion popovers as well,
+        but switching sidebar panels doesn't remove them from the DOM.
+
+        * UserInterface/Views/SpreadsheetCSSStyleDeclarationEditor.js:
+        (WI.SpreadsheetCSSStyleDeclarationEditor.prototype.hidden):
+        * UserInterface/Views/SpreadsheetCSSStyleDeclarationSection.js:
+        (WI.SpreadsheetCSSStyleDeclarationSection.prototype.hidden):
+        * UserInterface/Views/SpreadsheetRulesStyleDetailsPanel.js:
+        (WI.SpreadsheetRulesStyleDetailsPanel.prototype.hidden):
+        * UserInterface/Views/SpreadsheetStyleProperty.js:
+        (WI.SpreadsheetStyleProperty.prototype.hidden):
+
+2018-02-06  Nikita Vasilyev  <nvasilyev@apple.com>
+
+        Web Inspector: Rename String.prototype.trimEnd to avoid conflicts with native trimEnd
+        https://bugs.webkit.org/show_bug.cgi?id=182545
+
+        Reviewed by Brian Burg.
+
+        Rename:
+        - trimEnd to truncateEnd
+        - trimMiddle to truncateMiddle
+
+        * UserInterface/Base/Utilities.js:
+        (String.prototype.trimMiddle): Deleted.
+        (String.prototype.trimEnd): Deleted.
+        (String.prototype.truncateMiddle): Added.
+        (String.prototype.truncateEnd): Added.
+        Use strict mode. Scrict mode allows `this` to be a primitive (a string, in our case).
+        In non-strict mode, `this` is always an object. Without the strict mode,
+        "a".truncateEnd(42) !== "a", because truncateEnd returns a string object.
+
+        * UserInterface/Views/DOMTreeElement.js:
+        (WI.DOMTreeElement.prototype._buildAttributeDOM):
+        * UserInterface/Views/DOMTreeElementPathComponent.js:
+        (WI.DOMTreeElementPathComponent):
+        * UserInterface/Views/SearchResultTreeElement.js:
+        Remove an obvious comment.
+
+        (WI.SearchResultTreeElement.truncateAndHighlightTitle):
+        * UserInterface/Views/SpreadsheetStyleProperty.js:
+        (WI.SpreadsheetStyleProperty.prototype._renderValue):
+
 2018-02-02  Devin Rousso  <webkit@devinrousso.com>
 
         Web Inspector: Styles Redesign: Pasting multiple properties should create properties instead of a bad property

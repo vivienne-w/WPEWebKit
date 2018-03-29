@@ -1,3 +1,126 @@
+2018-02-23  Fujii Hironori  <Hironori.Fujii@sony.com>
+
+        warning: unused variable 'InitialBufferSize' in Assertions.cpp
+        https://bugs.webkit.org/show_bug.cgi?id=183076
+
+        Reviewed by Yusuke Suzuki.
+
+        * wtf/Assertions.cpp: Moved the definition of InitialBufferSize to inside #if.
+
+2018-02-22  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        Remove currentTime() / currentTimeMS()
+        https://bugs.webkit.org/show_bug.cgi?id=183052
+
+        Reviewed by Mark Lam.
+
+        This patch removes WTF::currentTime() and WTF::currentTimeMS().
+        We have fancy WallTime APIs. It has strong types like WallTime and Seconds,
+        and this reduces the chance of bugs mixing doubles which represent milliseconds
+        and seconds.
+
+        * wtf/Condition.h:
+        * wtf/CurrentTime.cpp:
+        (WTF::currentTime):
+        (WTF::WallTime::now):
+        * wtf/CurrentTime.h:
+        (WTF::currentTimeMS): Deleted.
+        * wtf/DateMath.h:
+        (WTF::jsCurrentTime):
+        * wtf/ParkingLot.cpp:
+        (WTF::ParkingLot::parkConditionallyImpl):
+        * wtf/ThreadingPrimitives.h:
+        * wtf/ThreadingPthreads.cpp:
+        (WTF::ThreadCondition::timedWait):
+        * wtf/ThreadingWin.cpp:
+        (WTF::ThreadCondition::timedWait):
+        (WTF::absoluteTimeToWaitTimeoutInterval):
+        * wtf/WallTime.cpp:
+        (WTF::WallTime::now): Deleted.
+        * wtf/WallTime.h:
+
+2018-02-22  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        Remove sleep(double) and sleepMS(double) interfaces
+        https://bugs.webkit.org/show_bug.cgi?id=183038
+
+        Reviewed by Mark Lam.
+
+        This patch removes sleep(double) and sleepMS(double) interfaces.
+        We can just use sleep(Seconds) instead.
+
+        * benchmarks/LockFairnessTest.cpp:
+        * benchmarks/LockSpeedTest.cpp:
+        * wtf/CurrentTime.cpp:
+        (WTF::sleep):
+        * wtf/CurrentTime.h:
+        (WTF::sleepMS): Deleted.
+        * wtf/DebugUtilities.h:
+        * wtf/Seconds.cpp:
+        (WTF::sleep): Deleted.
+        * wtf/Seconds.h:
+        * wtf/StackShotProfiler.h:
+
+2018-02-14  Brian Burg  <bburg@apple.com>
+
+        Web Automation: combine session commands to resize and move top-level browsing contexts
+        https://bugs.webkit.org/show_bug.cgi?id=182749
+        <rdar://problem/37515170>
+
+        Reviewed by Andy Estes.
+
+        * wtf/JSONValues.h: add a getDouble() implementation that returns a std::optional<T>
+        rather than using an out-parameter. I'd like to move more code to this style.
+
+2018-02-14  Michael Saboff  <msaboff@apple.com>
+
+        REGRESSION(225695) : com.apple.WebKit.WebContent at com.apple.JavaScriptCore: JSC::RegExp::match + 630 :: stack overflow
+        https://bugs.webkit.org/show_bug.cgi?id=182705
+
+        Reviewed by Mark Lam.
+
+        Moved the setting of ENABLE_YARR_JIT_ALL_PARENS_EXPRESSIONS to Platform.h since more than just the YARR
+        code needs to know if that feature is enabled.
+
+        * wtf/Platform.h:
+
+2018-02-12  Mark Lam  <mark.lam@apple.com>
+
+        Add more support for pointer preparations.
+        https://bugs.webkit.org/show_bug.cgi?id=182703
+        <rdar://problem/37469451>
+
+        Reviewed by Saam Barati.
+
+        * wtf/PointerPreparations.h:
+
+2018-02-06  Fujii Hironori  <Hironori.Fujii@sony.com>
+
+        [GTK] fast/events/message-channel-gc-4.html is flaky
+        https://bugs.webkit.org/show_bug.cgi?id=182104
+
+        Reviewed by Carlos Garcia Campos.
+
+        Revert r228001 because RunLoop::current isn't called in GC thread
+        anymore since r228152.
+
+        * wtf/RunLoop.cpp:
+        (WTF::RunLoop::current): Removed a template argument
+        CanBeGCThread::True of ThreadSpecific.
+
+2018-02-05  Konstantin Tokarev  <annulen@yandex.ru>
+
+        [cmake] Fix build with ICU configured without collation support
+        https://bugs.webkit.org/show_bug.cgi?id=182498
+
+        Reviewed by Alex Christensen.
+
+        WebKit has CollatorDefault.cpp providing necessary stubs when
+        UCONFIG_NO_COLLATION is defined, however it is not included in cmake
+        file list.
+
+        * wtf/CMakeLists.txt:
+
 2018-02-05  Alicia Boya García  <aboya@igalia.com>
 
         Fix bug in MediaTime comparison for negative values with different scale.

@@ -430,7 +430,7 @@ public:
         m_flags = defaultFlags(op);
     }
 
-    void remove();
+    void remove(Graph&);
 
     void convertToCheckStructure(RegisteredStructureSet* set)
     {
@@ -451,9 +451,9 @@ public:
         children.setChild1(Edge(structure, CellUse));
     }
     
-    void replaceWith(Node* other)
+    void replaceWith(Graph& graph, Node* other)
     {
-        remove();
+        remove(graph);
         setReplacement(other);
     }
 
@@ -1263,6 +1263,12 @@ public:
     {
         ASSERT(hasLoadVarargsData());
         return m_opInfo.as<LoadVarargsData*>();
+    }
+
+    InlineCallFrame* argumentsInlineCallFrame()
+    {
+        ASSERT(op() == GetArgumentCountIncludingThis);
+        return m_opInfo.as<InlineCallFrame*>();
     }
 
     bool hasQueriedType()

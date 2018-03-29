@@ -1,3 +1,93 @@
+2018-03-12  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Update OptionsGTK.cmake and NEWS for 2.20.0 release.
+
+        * Source/cmake/OptionsGTK.cmake: Bump version numbers.
+
+2018-03-06  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Update OptionsGTK.cmake and NEWS for 2.19.92 release.
+
+        * Source/cmake/OptionsGTK.cmake: Bump version numbers.
+
+2018-03-01  Michael Catanzaro  <mcatanzaro@igalia.com>
+
+        [CMake] configure failure for aarch64
+        https://bugs.webkit.org/show_bug.cgi?id=183268
+
+        Unreviewed build fix. This failure is caused by a simple typo.
+
+        * Source/cmake/OptionsCommon.cmake:
+
+2018-02-21  Michael Catanzaro  <mcatanzaro@igalia.com>
+
+        [GTK] USE_UPOWER causes crashes inside a chroot or on systems with broken dbus/upower
+        https://bugs.webkit.org/show_bug.cgi?id=181825
+
+        Reviewed by Carlos Garcia Campos.
+
+        Get rid of the upower-glib dependency. We will use upower's D-Bus API instead.
+
+        * Source/cmake/FindUPowerGLib.cmake: Removed.
+        * Source/cmake/OptionsGTK.cmake:
+
+2018-02-20  Adrian Perez de Castro  <aperez@igalia.com>
+
+        [GTK][CMake] Support building with Enchant 2.x
+        https://bugs.webkit.org/show_bug.cgi?id=182933
+
+        Reviewed by Michael Catanzaro.
+
+        * Source/cmake/FindEnchant.cmake: Check for both the "enchant" and "enchant-2"
+        pkg-config components, picking the first available for which the headers and
+        library are usable.
+
+2018-02-21  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Update OptionsGTK.cmake and NEWS for 2.19.91 release.
+
+        * Source/cmake/OptionsGTK.cmake: Bump version numbers.
+
+2018-02-18  Philippe Normand  <pnormand@igalia.com>
+
+        [GTK][WPE] Fullscreen video is broken
+        https://bugs.webkit.org/show_bug.cgi?id=182740
+
+        Reviewed by Michael Catanzaro.
+
+        * Source/cmake/WebKitFeatures.cmake: Enable the
+        VIDEO_USES_ELEMENT_FULLSCREEN feature on CMake ports.
+
+2018-02-08  Michael Catanzaro  <mcatanzaro@igalia.com>
+
+        Unreviewed, switch -pthread to -lpthread per recommendation from Adrian
+        https://bugs.webkit.org/show_bug.cgi?id=182400
+        <rdar://problem/37252242>
+
+        This is tested and works fine.
+
+        * Source/cmake/WebKitCompilerFlags.cmake:
+
+2018-02-05  Michael Catanzaro  <mcatanzaro@igalia.com>
+
+        Unreviewed, fix build using the new ENABLE_ADDRESS_SANITIZER option
+        https://bugs.webkit.org/show_bug.cgi?id=182400
+        <rdar://problem/37252242>
+
+        I failed to properly test a last-minute change.
+
+        * Source/cmake/WebKitCompilerFlags.cmake:
+
+2018-02-05  Michael Catanzaro  <mcatanzaro@igalia.com>
+
+        [CMake] Add ENABLE_ADDRESS_SANITIZER to make it easier to build with asan support
+        https://bugs.webkit.org/show_bug.cgi?id=182400
+
+        Reviewed by Konstantin Tokarev.
+
+        * Source/cmake/OptionsGTK.cmake:
+        * Source/cmake/WebKitCompilerFlags.cmake:
+
 2018-02-05  Carlos Garcia Campos  <cgarcia@igalia.com>
 
         Unreviewed. Update OptionsGTK.cmake and NEWS for 2.19.90 release.

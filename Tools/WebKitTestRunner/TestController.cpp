@@ -32,6 +32,7 @@
 #include "StringFunctions.h"
 #include "TestInvocation.h"
 #include "WebCoreTestSupport.h"
+#include <JavaScriptCore/InitializeThreading.h>
 #include <WebKit/WKArray.h>
 #include <WebKit/WKAuthenticationChallenge.h>
 #include <WebKit/WKAuthenticationDecisionListener.h>
@@ -63,7 +64,6 @@
 #include <cstdio>
 #include <ctype.h>
 #include <fstream>
-#include <runtime/InitializeThreading.h>
 #include <stdlib.h>
 #include <string>
 #include <unistd.h>
@@ -853,9 +853,6 @@ bool TestController::resetStateToConsistentValues(const TestOptions& options)
 
     platformResetStateToConsistentValues();
 
-    // Reset main page back to about:blank
-    m_doneResetting = false;
-
     m_shouldDecideNavigationPolicyAfterDelay = false;
 
     setNavigationGesturesEnabled(false);
@@ -866,6 +863,8 @@ bool TestController::resetStateToConsistentValues(const TestOptions& options)
     
     statisticsResetToConsistentState();
 
+    // Reset main page back to about:blank
+    m_doneResetting = false;
     WKPageLoadURL(m_mainWebView->page(), blankURL());
     runUntil(m_doneResetting, m_currentInvocation->shortTimeout());
     return m_doneResetting;
@@ -879,9 +878,10 @@ void TestController::terminateWebContentProcess()
 void TestController::reattachPageToWebProcess()
 {
     // Loading a web page is the only way to reattach an existing page to a process.
+    SetForScope<State> changeState(m_state, Resetting);
     m_doneResetting = false;
     WKPageLoadURL(m_mainWebView->page(), blankURL());
-    runUntil(m_doneResetting, m_currentInvocation->shortTimeout());
+    runUntil(m_doneResetting, noTimeout);
 }
 
 const char* TestController::webProcessName()
@@ -891,6 +891,10 @@ const char* TestController::webProcessName()
     return "com.apple.WebKit.WebContent";
 #elif PLATFORM(COCOA)
     return "com.apple.WebKit.WebContent.Development";
+#elif PLATFORM(GTK)
+    return "WebKitWebProcess";
+#elif PLATFORM(WPE)
+    return "WPEWebProcess";
 #else
     return "WebProcess";
 #endif
@@ -903,6 +907,10 @@ const char* TestController::networkProcessName()
     return "com.apple.WebKit.Networking";
 #elif PLATFORM(COCOA)
     return "com.apple.WebKit.Networking.Development";
+#elif PLATFORM(GTK)
+    return "WebKitNetworkProcess";
+#elif PLATFORM(WPE)
+    return "WPENetworkProcess";
 #else
     return "NetworkProcess";
 #endif
@@ -919,6 +927,10 @@ const char* TestController::databaseProcessName()
 #endif
 #elif PLATFORM(COCOA)
     return "com.apple.WebKit.Storage.Development";
+#elif PLATFORM(GTK)
+    return "WebKitStorageProcess";
+#elif PLATFORM(WPE)
+    return "WPEStorageProcess";
 #else
     return "DatabaseProcess";
 #endif
@@ -2315,7 +2327,6 @@ WKContextRef TestController::platformAdjustContext(WKContextRef context, WKConte
 
 void TestController::platformResetStateToConsistentValues()
 {
-
 }
 
 unsigned TestController::imageCountInGeneralPasteboard() const
@@ -2355,9 +2366,7 @@ void TestController::clearServiceWorkerRegistrations()
     ClearServiceWorkerRegistrationsCallbackContext context(*this);
 
     WKWebsiteDataStoreRemoveAllServiceWorkerRegistrations(websiteDataStore, &context, clearServiceWorkerRegistrationsCallback);
-
-    if (!context.done)
-        runUntil(context.done, m_currentInvocation->shortTimeout());
+    runUntil(context.done, noTimeout);
 #endif
 }
 
@@ -2388,9 +2397,7 @@ void TestController::clearDOMCache(WKStringRef origin)
 
     auto cacheOrigin = adoptWK(WKSecurityOriginCreateFromString(origin));
     WKWebsiteDataStoreRemoveFetchCacheForOrigin(websiteDataStore, cacheOrigin.get(), &context, clearDOMCacheCallback);
-
-    if (!context.done)
-        runUntil(context.done, m_currentInvocation->shortTimeout());
+    runUntil(context.done, noTimeout);
 #endif
 }
 
@@ -2401,8 +2408,7 @@ void TestController::clearDOMCaches()
     ClearDOMCacheCallbackContext context(*this);
 
     WKWebsiteDataStoreRemoveAllFetchCaches(websiteDataStore, &context, clearDOMCacheCallback);
-    if (!context.done)
-        runUntil(context.done, m_currentInvocation->shortTimeout());
+    runUntil(context.done, noTimeout);
 #endif
 }
 
@@ -2439,8 +2445,7 @@ bool TestController::hasDOMCache(WKStringRef origin)
     auto* dataStore = WKContextGetWebsiteDataStore(platformContext());
     FetchCacheOriginsCallbackContext context(*this, origin);
     WKWebsiteDataStoreGetFetchCacheOrigins(dataStore, &context, fetchCacheOriginsCallback);
-    if (!context.done)
-        runUntil(context.done, m_currentInvocation->shortTimeout());
+    runUntil(context.done, noTimeout);
     return context.result;
 }
 
@@ -2469,12 +2474,9 @@ uint64_t TestController::domCacheSize(WKStringRef origin)
     auto* dataStore = WKContextGetWebsiteDataStore(platformContext());
     FetchCacheSizeForOriginCallbackContext context(*this);
     WKWebsiteDataStoreGetFetchCacheSizeForOrigin(dataStore, origin, &context, fetchCacheSizeForOriginCallback);
-    if (!context.done)
-        runUntil(context.done, m_currentInvocation->shortTimeout());
+    runUntil(context.done, noTimeout);
     return context.result;
 }
-
-#if !PLATFORM(COCOA) || !WK_API_ENABLED
 
 void TestController::setStatisticsLastSeen(WKStringRef host, double seconds)
 {
@@ -2499,7 +2501,14 @@ struct ResourceStatisticsCallbackContext {
     bool result { false };
 };
 
-static void resourceStatisticsCallback(bool result, void* userData)
+static void resourceStatisticsVoidResultCallback(void* userData)
+{
+    auto* context = static_cast<ResourceStatisticsCallbackContext*>(userData);
+    context->done = true;
+    context->testController.notifyDone();
+}
+
+static void resourceStatisticsBooleanResultCallback(bool result, void* userData)
 {
     auto* context = static_cast<ResourceStatisticsCallbackContext*>(userData);
     context->result = result;
@@ -2511,9 +2520,8 @@ bool TestController::isStatisticsPrevalentResource(WKStringRef host)
 {
     auto* dataStore = WKContextGetWebsiteDataStore(platformContext());
     ResourceStatisticsCallbackContext context(*this);
-    WKWebsiteDataStoreIsStatisticsPrevalentResource(dataStore, host, &context, resourceStatisticsCallback);
-    if (!context.done)
-        runUntil(context.done, m_currentInvocation->shortTimeout());
+    WKWebsiteDataStoreIsStatisticsPrevalentResource(dataStore, host, &context, resourceStatisticsBooleanResultCallback);
+    runUntil(context.done, noTimeout);
     return context.result;
 }
 
@@ -2521,9 +2529,8 @@ bool TestController::isStatisticsRegisteredAsSubFrameUnder(WKStringRef subFrameH
 {
     auto* dataStore = WKContextGetWebsiteDataStore(platformContext());
     ResourceStatisticsCallbackContext context(*this);
-    WKWebsiteDataStoreIsStatisticsRegisteredAsSubFrameUnder(dataStore, subFrameHost, topFrameHost, &context, resourceStatisticsCallback);
-    if (!context.done)
-        runUntil(context.done, m_currentInvocation->shortTimeout());
+    WKWebsiteDataStoreIsStatisticsRegisteredAsSubFrameUnder(dataStore, subFrameHost, topFrameHost, &context, resourceStatisticsBooleanResultCallback);
+    runUntil(context.done, noTimeout);
     return context.result;
 }
 
@@ -2531,9 +2538,8 @@ bool TestController::isStatisticsRegisteredAsRedirectingTo(WKStringRef hostRedir
 {
     auto* dataStore = WKContextGetWebsiteDataStore(platformContext());
     ResourceStatisticsCallbackContext context(*this);
-    WKWebsiteDataStoreIsStatisticsRegisteredAsRedirectingTo(dataStore, hostRedirectedFrom, hostRedirectedTo, &context, resourceStatisticsCallback);
-    if (!context.done)
-        runUntil(context.done, m_currentInvocation->shortTimeout());
+    WKWebsiteDataStoreIsStatisticsRegisteredAsRedirectingTo(dataStore, hostRedirectedFrom, hostRedirectedTo, &context, resourceStatisticsBooleanResultCallback);
+    runUntil(context.done, noTimeout);
     return context.result;
 }
 
@@ -2553,9 +2559,8 @@ bool TestController::isStatisticsHasHadUserInteraction(WKStringRef host)
 {
     auto* dataStore = WKContextGetWebsiteDataStore(platformContext());
     ResourceStatisticsCallbackContext context(*this);
-    WKWebsiteDataStoreIsStatisticsHasHadUserInteraction(dataStore, host, &context, resourceStatisticsCallback);
-    if (!context.done)
-        runUntil(context.done, m_currentInvocation->shortTimeout());
+    WKWebsiteDataStoreIsStatisticsHasHadUserInteraction(dataStore, host, &context, resourceStatisticsBooleanResultCallback);
+    runUntil(context.done, noTimeout);
     return context.result;
 }
 
@@ -2569,9 +2574,8 @@ bool TestController::isStatisticsGrandfathered(WKStringRef host)
 {
     auto* dataStore = WKContextGetWebsiteDataStore(platformContext());
     ResourceStatisticsCallbackContext context(*this);
-    WKWebsiteDataStoreIsStatisticsGrandfathered(dataStore, host, &context, resourceStatisticsCallback);
-    if (!context.done)
-        runUntil(context.done, m_currentInvocation->shortTimeout());
+    WKWebsiteDataStoreIsStatisticsGrandfathered(dataStore, host, &context, resourceStatisticsBooleanResultCallback);
+    runUntil(context.done, noTimeout);
     return context.result;
 }
 
@@ -2591,6 +2595,24 @@ void TestController::setStatisticsSubresourceUniqueRedirectTo(WKStringRef host, 
 {
     auto* dataStore = WKContextGetWebsiteDataStore(platformContext());
     WKWebsiteDataStoreSetStatisticsSubresourceUniqueRedirectTo(dataStore, host, hostRedirectedTo);
+}
+
+void TestController::setStatisticsSubresourceUniqueRedirectFrom(WKStringRef host, WKStringRef hostRedirectedFrom)
+{
+    auto* dataStore = WKContextGetWebsiteDataStore(platformContext());
+    WKWebsiteDataStoreSetStatisticsSubresourceUniqueRedirectFrom(dataStore, host, hostRedirectedFrom);
+}
+
+void TestController::setStatisticsTopFrameUniqueRedirectTo(WKStringRef host, WKStringRef hostRedirectedTo)
+{
+    auto* dataStore = WKContextGetWebsiteDataStore(platformContext());
+    WKWebsiteDataStoreSetStatisticsTopFrameUniqueRedirectTo(dataStore, host, hostRedirectedTo);
+}
+
+void TestController::setStatisticsTopFrameUniqueRedirectFrom(WKStringRef host, WKStringRef hostRedirectedFrom)
+{
+    auto* dataStore = WKContextGetWebsiteDataStore(platformContext());
+    WKWebsiteDataStoreSetStatisticsTopFrameUniqueRedirectFrom(dataStore, host, hostRedirectedFrom);
 }
 
 void TestController::setStatisticsTimeToLiveUserInteraction(double seconds)
@@ -2614,13 +2636,19 @@ void TestController::statisticsProcessStatisticsAndDataRecords()
 void TestController::statisticsUpdateCookiePartitioning()
 {
     auto* dataStore = WKContextGetWebsiteDataStore(platformContext());
-    WKWebsiteDataStoreStatisticsUpdateCookiePartitioning(dataStore);
+    ResourceStatisticsCallbackContext context(*this);
+    WKWebsiteDataStoreStatisticsUpdateCookiePartitioning(dataStore, &context, resourceStatisticsVoidResultCallback);
+    runUntil(context.done, noTimeout);
+    m_currentInvocation->didSetPartitionOrBlockCookiesForHost();
 }
 
 void TestController::statisticsSetShouldPartitionCookiesForHost(WKStringRef host, bool value)
 {
     auto* dataStore = WKContextGetWebsiteDataStore(platformContext());
-    WKWebsiteDataStoreSetStatisticsShouldPartitionCookiesForHost(dataStore, host, value);
+    ResourceStatisticsCallbackContext context(*this);
+    WKWebsiteDataStoreSetStatisticsShouldPartitionCookiesForHost(dataStore, host, value, &context, resourceStatisticsVoidResultCallback);
+    runUntil(context.done, noTimeout);
+    m_currentInvocation->didSetPartitionOrBlockCookiesForHost();
 }
 
 void TestController::statisticsSubmitTelemetry()
@@ -2671,27 +2699,31 @@ void TestController::setStatisticsPruneEntriesDownTo(unsigned entries)
     WKWebsiteDataStoreSetStatisticsPruneEntriesDownTo(dataStore, entries);
 }
 
-void TestController::statisticsClearThroughWebsiteDataRemovalCallback(void* userData)
-{
-    static_cast<TestController*>(userData)->m_currentInvocation->didClearStatisticsThroughWebsiteDataRemoval();
-}
-
 void TestController::statisticsClearInMemoryAndPersistentStore()
 {
     auto* dataStore = WKContextGetWebsiteDataStore(platformContext());
-    WKWebsiteDataStoreStatisticsClearInMemoryAndPersistentStore(dataStore, this, statisticsClearThroughWebsiteDataRemovalCallback);
+    ResourceStatisticsCallbackContext context(*this);
+    WKWebsiteDataStoreStatisticsClearInMemoryAndPersistentStore(dataStore, &context, resourceStatisticsVoidResultCallback);
+    runUntil(context.done, noTimeout);
+    m_currentInvocation->didClearStatisticsThroughWebsiteDataRemoval();
 }
 
 void TestController::statisticsClearInMemoryAndPersistentStoreModifiedSinceHours(unsigned hours)
 {
     auto* dataStore = WKContextGetWebsiteDataStore(platformContext());
-    WKWebsiteDataStoreStatisticsClearInMemoryAndPersistentStoreModifiedSinceHours(dataStore, hours, this, statisticsClearThroughWebsiteDataRemovalCallback);
+    ResourceStatisticsCallbackContext context(*this);
+    WKWebsiteDataStoreStatisticsClearInMemoryAndPersistentStoreModifiedSinceHours(dataStore, hours, &context, resourceStatisticsVoidResultCallback);
+    runUntil(context.done, noTimeout);
+    m_currentInvocation->didClearStatisticsThroughWebsiteDataRemoval();
 }
 
 void TestController::statisticsClearThroughWebsiteDataRemoval()
 {
     auto* dataStore = WKContextGetWebsiteDataStore(platformContext());
-    WKWebsiteDataStoreStatisticsClearThroughWebsiteDataRemoval(dataStore, this, statisticsClearThroughWebsiteDataRemovalCallback);
+    ResourceStatisticsCallbackContext context(*this);
+    WKWebsiteDataStoreStatisticsClearThroughWebsiteDataRemoval(dataStore, &context, resourceStatisticsVoidResultCallback);
+    runUntil(context.done, noTimeout);
+    m_currentInvocation->didClearStatisticsThroughWebsiteDataRemoval();
 }
 
 void TestController::statisticsResetToConsistentState()
@@ -2700,6 +2732,11 @@ void TestController::statisticsResetToConsistentState()
     WKWebsiteDataStoreStatisticsResetToConsistentState(dataStore);
 }
 
+#if !PLATFORM(COCOA)
+void TestController::getAllStorageAccessEntries()
+{
+    // FIXME: Implement C API version of this test.
+}
 #endif
 
 } // namespace WTR

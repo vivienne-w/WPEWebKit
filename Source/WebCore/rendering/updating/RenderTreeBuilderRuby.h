@@ -38,14 +38,19 @@ class RenderRubyRun;
 class RenderTreeBuilder;
 
 class RenderTreeBuilder::Ruby {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     Ruby(RenderTreeBuilder&);
 
-    void insertChild(RenderRubyRun& parent, RenderPtr<RenderObject> child, RenderObject* beforeChild);
-    RenderElement& findOrCreateParentForChild(RenderRubyAsBlock& parent, const RenderObject& child, RenderObject*& beforeChild);
-    RenderElement& findOrCreateParentForChild(RenderRubyAsInline& parent, const RenderObject& child, RenderObject*& beforeChild);
+    void attach(RenderRubyRun& parent, RenderPtr<RenderObject> child, RenderObject* beforeChild);
+    RenderPtr<RenderObject> detach(RenderRubyAsInline& parent, RenderObject& child) WARN_UNUSED_RETURN;
+    RenderPtr<RenderObject> detach(RenderRubyAsBlock& parent, RenderObject& child) WARN_UNUSED_RETURN;
+    RenderPtr<RenderObject> detach(RenderRubyRun& parent, RenderObject& child) WARN_UNUSED_RETURN;
 
     void moveChildren(RenderRubyBase& from, RenderRubyBase& to);
+
+    RenderElement& findOrCreateParentForChild(RenderRubyAsBlock& parent, const RenderObject& child, RenderObject*& beforeChild);
+    RenderElement& findOrCreateParentForChild(RenderRubyAsInline& parent, const RenderObject& child, RenderObject*& beforeChild);
 
 private:
     void moveInlineChildren(RenderRubyBase& from, RenderRubyBase& to, RenderObject* beforeChild);

@@ -121,23 +121,15 @@ public:
         explicit TrustedImmPtr(T* value)
             : m_value(value)
         {
-            static_assert(!std::is_base_of<HeapCell, T>::value, "To use a GC pointer, the graph must be aware of it. Use SpeculativeJIT::TrustedImmPtr::weakPointer instead.");
+            static_assert(!std::is_base_of<JSCell, T>::value, "To use a GC pointer, the graph must be aware of it. Use SpeculativeJIT::TrustedImmPtr::weakPointer instead.");
         }
 
         explicit TrustedImmPtr(RegisteredStructure structure)
             : m_value(structure.get())
         { }
         
-        // This is only here so that TrustedImmPtr(0) does not confuse the C++
-        // overload handling rules.
-        explicit TrustedImmPtr(int value)
-            : m_value(value)
-        {
-            ASSERT(!value);
-        }
-
         explicit TrustedImmPtr(std::nullptr_t)
-            : m_value(0)
+            : m_value(nullptr)
         { }
 
         explicit TrustedImmPtr(FrozenValue* value)
@@ -153,14 +145,15 @@ public:
 
         static TrustedImmPtr weakPointer(Graph& graph, JSCell* cell)
         {     
-            // There are weird relationships in how optimized CodeBlocks
-            // point to other CodeBlocks. We don't want to have them be
-            // part of the weak pointer set. For example, an optimized CodeBlock
-            // having a weak pointer to itself will cause it to get collected.
-            ASSERT(!jsDynamicCast<CodeBlock*>(graph.m_vm, cell));
-
             graph.m_plan.weakReferences.addLazily(cell);
             return TrustedImmPtr(bitwise_cast<size_t>(cell));
+        }
+
+        template<typename Key>
+        static TrustedImmPtr weakPoisonedPointer(Graph& graph, JSCell* cell)
+        {     
+            graph.m_plan.weakReferences.addLazily(cell);
+            return TrustedImmPtr(bitwise_cast<size_t>(cell) ^ Key::key());
         }
 
         operator MacroAssembler::TrustedImmPtr() const { return m_value; }
@@ -3081,7 +3074,7 @@ public:
         Edge valueUse, JITCompiler::JumpList& slowPathCases, bool isClamped = false);
     void loadFromIntTypedArray(GPRReg baseReg, GPRReg storageReg, GPRReg propertyReg, GPRReg resultReg, TypedArrayType);
     void setIntTypedArrayLoadResult(Node*, GPRReg resultReg, TypedArrayType, bool canSpeculate = false);
-    template <typename ClassType> void compileNewFunctionCommon(GPRReg, RegisteredStructure, GPRReg, GPRReg, GPRReg, MacroAssembler::JumpList&, size_t, FunctionExecutable*, ptrdiff_t, ptrdiff_t, ptrdiff_t);
+    template <typename ClassType> void compileNewFunctionCommon(GPRReg, RegisteredStructure, GPRReg, GPRReg, GPRReg, MacroAssembler::JumpList&, size_t, FunctionExecutable*);
     void compileNewFunction(Node*);
     void compileSetFunctionName(Node*);
     void compileNewRegexp(Node*);
@@ -3305,7 +3298,6 @@ public:
     void speculateMisc(Edge);
     void speculate(Node*, Edge);
     
-    JITCompiler::Jump jumpSlowForUnwantedArrayMode(GPRReg tempWithIndexingTypeReg, ArrayMode, IndexingType);
     JITCompiler::JumpList jumpSlowForUnwantedArrayMode(GPRReg tempWithIndexingTypeReg, ArrayMode);
     void checkArray(Node*);
     void arrayify(Node*, GPRReg baseReg, GPRReg propertyReg);
@@ -3351,6 +3343,7 @@ public:
 
     // The JIT, while also provides MacroAssembler functionality.
     JITCompiler& m_jit;
+    Graph& m_graph;
 
     // The current node being generated.
     BasicBlock* m_block;

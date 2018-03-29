@@ -34,7 +34,6 @@
 #include "ResourceError.h"
 #include "ResourceRequest.h"
 #include "ResourceResponse.h"
-#include "SharedBuffer.h"
 #include <cstdint>
 #include <gst/app/gstappsrc.h>
 #include <gst/pbutils/missing-plugins.h>
@@ -638,7 +637,7 @@ static GstURIType webKitWebSrcUriGetType(GType)
 
 const gchar* const* webKitWebSrcGetProtocols(GType)
 {
-    static const char* protocols[] = {"webkit+http", "webkit+https", "blob", nullptr };
+    static const char* protocols[] = {"webkit+http", "webkit+https", "webkit+blob", nullptr };
     return protocols;
 }
 
@@ -953,7 +952,7 @@ void CachedResourceStreamingClient::dataReceived(PlatformMediaResource&, const c
         GST_TRACE_OBJECT(src, "Pushing buffer of size %" G_GSIZE_FORMAT " bytes", gst_buffer_get_size(subBuffer));
         GstFlowReturn ret = gst_app_src_push_buffer(priv->appsrc, subBuffer);
 
-       if (UNLIKELY(ret != GST_FLOW_OK && ret != GST_FLOW_EOS && ret != GST_FLOW_FLUSHING)) {
+        if (UNLIKELY(ret != GST_FLOW_OK && ret != GST_FLOW_EOS && ret != GST_FLOW_FLUSHING)) {
             GST_ELEMENT_ERROR(src, CORE, FAILED, (nullptr), (nullptr));
             break;
         }

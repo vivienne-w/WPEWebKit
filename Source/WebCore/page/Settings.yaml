@@ -715,6 +715,10 @@ mediaCapabilitiesEnabled:
 resourceLoadStatisticsDebugMode:
   initial: false
 
+clientCoordinatesRelativeToLayoutViewport:
+  initial: false
+  onChange: setNeedsRecalcStyleInAllFrames
+
 consoleLogWithPrivateBrowsingEnabled:
   initial: false
 
