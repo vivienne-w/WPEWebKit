@@ -43,7 +43,7 @@ struct PadProbeInformation {
 
 class AppendPipeline : public ThreadSafeRefCounted<AppendPipeline> {
 public:
-    enum class AppendState { Invalid, NotStarted, Ongoing, KeyNegotiation, DataStarve, Sampling, LastSample, Aborting };
+    enum class AppendState { Invalid, NotStarted, Ongoing, DataStarve, Sampling, LastSample, Aborting };
 
     AppendPipeline(Ref<MediaSourceClientGStreamerMSE>, Ref<SourceBufferPrivateGStreamer>, MediaPlayerPrivateGStreamerMSE&);
     virtual ~AppendPipeline();
@@ -62,7 +62,7 @@ public:
     GstFlowReturn handleNewAppsinkSample(GstElement*);
     GstFlowReturn pushNewBuffer(GstBuffer*);
 #if ENABLE(ENCRYPTED_MEDIA)
-    void dispatchDecryptionStructure(GUniquePtr<GstStructure>&&);
+    bool dispatchDecryptionStructure(GUniquePtr<GstStructure>&&);
 #endif
 
     // Takes ownership of caps.
@@ -103,7 +103,7 @@ private:
     void demuxerNoMorePads();
     void consumeAppSinkAvailableSamples();
 #if ENABLE(ENCRYPTED_MEDIA)
-    void dispatchPendingDecryptionStructure();
+    bool dispatchPendingDecryptionStructure();
 #endif
 
     Ref<MediaSourceClientGStreamerMSE> m_mediaSourceClient;

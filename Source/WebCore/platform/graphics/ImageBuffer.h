@@ -136,6 +136,8 @@ public:
     void markBufferChanged();
 #endif
 
+    void blur(const IntSize& size, const FloatSize& blurRadius);
+
 private:
 #if USE(CG)
     // The returned image might be larger than the internalSize(). If you want the smaller

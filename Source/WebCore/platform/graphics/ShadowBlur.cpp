@@ -854,13 +854,7 @@ void ShadowBlur::blurShadowBuffer(const IntSize& templateSize)
     if (m_type != BlurShadow)
         return;
 
-    IntRect blurRect(IntPoint(), templateSize);
-    auto layerData = m_layerImage->getUnmultipliedImageData(blurRect);
-    if (!layerData)
-        return;
-
-    blurLayerImage(layerData->data(), blurRect.size(), blurRect.width() * 4);
-    m_layerImage->putByteArray(*layerData, AlphaPremultiplication::Unpremultiplied, blurRect.size(), blurRect, { });
+    m_layerImage->blur(templateSize, m_blurRadius);
 }
 
 void ShadowBlur::blurAndColorShadowBuffer(const IntSize& templateSize)

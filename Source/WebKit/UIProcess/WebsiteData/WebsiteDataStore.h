@@ -82,6 +82,7 @@ public:
         String serviceWorkerRegistrationDirectory;
         String webSQLDatabaseDirectory;
         String localStorageDirectory;
+        uint32_t localStorageQuota;
         String mediaKeysStorageDirectory;
         String resourceLoadStatisticsDirectory;
         String javaScriptConfigurationDirectory;
@@ -154,6 +155,8 @@ public:
     void removePendingCookie(const WebCore::Cookie&);
 
     void enableResourceLoadStatisticsAndSetTestingCallback(Function<void (const String&)>&& callback);
+
+    uint32_t localStorageQuota() { return m_configuration.localStorageQuota; }
 
     void setBoundInterfaceIdentifier(String&& identifier) { m_boundInterfaceIdentifier = WTFMove(identifier); }
     const String& boundInterfaceIdentifier() { return m_boundInterfaceIdentifier; }

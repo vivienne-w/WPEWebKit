@@ -5873,6 +5873,7 @@ WebPageCreationParameters WebPageProxy::creationParameters()
     parameters.enumeratingAllNetworkInterfacesEnabled = m_preferences->enumeratingAllNetworkInterfacesEnabled();
 #endif
 #endif
+    parameters.localStorageQuota = m_websiteDataStore->localStorageQuota();
 
 #if ENABLE(APPLICATION_MANIFEST)
     parameters.applicationManifest = m_configuration->applicationManifest() ? std::optional<WebCore::ApplicationManifest>(m_configuration->applicationManifest()->applicationManifest()) : std::nullopt;

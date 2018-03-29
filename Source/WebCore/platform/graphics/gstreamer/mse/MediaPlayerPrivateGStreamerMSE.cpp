@@ -30,7 +30,7 @@
 
 #include "AppendPipeline.h"
 #include "AudioTrackPrivateGStreamer.h"
-#include "GStreamerUtilities.h"
+#include "GStreamerEMEUtilities.h"
 #include "InbandTextTrackPrivateGStreamer.h"
 #include "MIMETypeRegistry.h"
 #include "MediaDescription.h"
@@ -1048,24 +1048,24 @@ void MediaPlayerPrivateGStreamerMSE::attemptToDecryptWithInstance(CDMInstance& i
             it.value->dispatchDecryptionStructure(GUniquePtr<GstStructure>(gst_structure_copy(structure.get())));
     }
 #if USE(OPENCDM)
-    else if (is<CDMInstanceOpenCDM>(instance)) {
-        // REVIEW: The class design seems a bit wrong here. This function seems like it should be polymorphic on
-        //  the CDM instance. If you do that though, you'd need the CDM instance to have a handle back to the
-        //  player private, which opens up other issues.
-        //  Also, it's unpleasant that we have duplicated the structure creation code here and in
-        //  MediaPlayerPrivateGStreamerBase::attemptToDecryptWithLocalInstance, which incidently doesn't support
-        //  ClearKey for some reason.
-        auto& cdmInstanceOpenCDM = downcast<CDMInstanceOpenCDM>(instance);
-        GST_TRACE("instance is OpenCDM, continuing with %s", cdmInstanceOpenCDM.keySystem().utf8().data());
-        //FIXME: Correct initData should be passed to cdmInstanceOpenCDM to retrieve proper session
-        String sessionId = cdmInstanceOpenCDM.sessionIdByInitData(String());
-        ASSERT(!sessionId.isEmpty());
-        GUniquePtr<GstStructure> structure(gst_structure_new("drm-session", "session", G_TYPE_STRING, sessionId.utf8().data(), nullptr));
-        for (const auto& it : m_appendPipelinesMap)
-            it.value->dispatchDecryptionStructure(GUniquePtr<GstStructure>(gst_structure_copy(structure.get())));
-    }
+    else if (is<CDMInstanceOpenCDM>(instance))
+        MediaPlayerPrivateGStreamer::attemptToDecryptWithInstance(instance);
 #endif // USE(OPENCDM)
 }
+
+#if USE(OPENCDM)
+bool MediaPlayerPrivateGStreamerMSE::dispatchDecryptionSessionToPipeline(const String& sessionId, GstEventSeqNum eventId)
+{
+    if (!m_appendPipelinesMap.isEmpty()) {
+        GUniquePtr<GstStructure> structure(gst_structure_new("drm-session", "session", G_TYPE_STRING, sessionId.utf8().data(), "protection-event", G_TYPE_UINT, eventId, nullptr));
+        for (const auto& it : m_appendPipelinesMap)
+            if (it.value->dispatchDecryptionStructure(GUniquePtr<GstStructure>(gst_structure_copy(structure.get()))))
+                return true;
+    }
+    return false;
+}
+#endif
+
 #endif
 
 } // namespace WebCore.

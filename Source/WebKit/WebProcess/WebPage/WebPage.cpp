@@ -590,6 +590,8 @@ WebPage::WebPage(uint64_t pageID, WebPageCreationParameters&& parameters)
     setViewportConfigurationMinimumLayoutSize(parameters.viewportConfigurationMinimumLayoutSize);
     setMaximumUnobscuredSize(parameters.maximumUnobscuredSize);
 #endif
+
+    m_page->settings().setLocalStorageQuota(parameters.localStorageQuota);
 }
 
 #if ENABLE(WEB_RTC)

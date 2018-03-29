@@ -91,6 +91,10 @@ public:
 
 #if ENABLE(ENCRYPTED_MEDIA)
     void attemptToDecryptWithInstance(CDMInstance&) final;
+
+#if USE(OPENCDM)
+    bool dispatchDecryptionSessionToPipeline(const String& sessionId, GstEventSeqNum eventId) final;
+#endif
 #endif
 
 private:

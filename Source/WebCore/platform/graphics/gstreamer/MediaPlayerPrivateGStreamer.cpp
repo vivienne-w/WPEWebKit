@@ -1760,11 +1760,8 @@ void MediaPlayerPrivateGStreamer::updateStates()
             }
         } else if (m_currentState == GST_STATE_PLAYING) {
             m_paused = false;
-
-            if ((m_buffering && !isLiveStream()) || !m_playbackRate) {
-                GST_DEBUG("[Buffering] Pausing stream for buffering.");
-                changePipelineState(GST_STATE_PAUSED);
-            }
+	    //FIXME Here we should analyse the current state of the buffers and network.
+	    //If network is bad/gone or buffers are not sufficient we should go to PAUSED state.
         } else
             m_paused = true;
 

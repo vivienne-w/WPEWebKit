@@ -120,8 +120,7 @@ void NetworkProcess::platformInitializeNetworkProcess(const NetworkProcessCreati
     ASSERT(!parameters.diskCacheDirectory.isEmpty());
     m_diskCacheDirectory = parameters.diskCacheDirectory;
 
-#if ENABLE(NETWORK_CACHE)
-    SoupNetworkSession::clearCache(FileSystem::directoryName(m_diskCacheDirectory));
+    SoupNetworkSession::clearOldSoupCache(FileSystem::directoryName(m_diskCacheDirectory));
 
     OptionSet<NetworkCache::Cache::Option> cacheOptions { NetworkCache::Cache::Option::RegisterNotify };
     if (parameters.shouldEnableNetworkCacheEfficacyLogging)
@@ -132,20 +131,6 @@ void NetworkProcess::platformInitializeNetworkProcess(const NetworkProcessCreati
 #endif
 
     m_cache = NetworkCache::Cache::open(m_diskCacheDirectory, cacheOptions);
-#else
-    // We used to use the given cache directory for the soup cache, but now we use a subdirectory to avoid
-    // conflicts with other cache files in the same directory. Remove the old cache files if they still exist.
-    SoupNetworkSession::clearCache(FileSystem::directoryName(m_diskCacheDirectory));
-
-    GRefPtr<SoupCache> soupCache = adoptGRef(soup_cache_new(m_diskCacheDirectory.utf8().data(), SOUP_CACHE_SINGLE_USER));
-    NetworkStorageSession::defaultStorageSession().getOrCreateSoupNetworkSession().setCache(soupCache.get());
-    // Set an initial huge max_size for the SoupCache so the call to soup_cache_load() won't evict any cached
-    // resource. The final size of the cache will be set by NetworkProcess::platformSetCacheModel().
-    unsigned initialMaxSize = soup_cache_get_max_size(soupCache.get());
-    soup_cache_set_max_size(soupCache.get(), G_MAXUINT);
-    soup_cache_load(soupCache.get());
-    soup_cache_set_max_size(soupCache.get(), initialMaxSize);
-#endif
 
     if (!parameters.cookiePersistentStoragePath.isEmpty()) {
         supplement<WebCookieManager>()->setCookiePersistentStorage(parameters.cookiePersistentStoragePath,
@@ -159,13 +144,8 @@ void NetworkProcess::platformInitializeNetworkProcess(const NetworkProcessCreati
     setIgnoreTLSErrors(parameters.ignoreTLSErrors);
 }
 
-void NetworkProcess::platformSetURLCacheSize(unsigned /*urlCacheMemoryCapacity*/, uint64_t urlCacheDiskCapacity)
+void NetworkProcess::platformSetURLCacheSize(unsigned, uint64_t)
 {
-#if !ENABLE(NETWORK_CACHE)
-    soup_cache_set_max_size(NetworkStorageSession::defaultStorageSession().getOrCreateSoupNetworkSession().cache(), urlCacheDiskCapacity);
-#else
-    UNUSED_PARAM(urlCacheDiskCapacity);
-#endif
 }
 
 void NetworkProcess::setIgnoreTLSErrors(bool ignoreTLSErrors)
@@ -195,7 +175,6 @@ void NetworkProcess::clearDiskCache(WallTime modifiedSince, Function<void ()>&& 
 #else
     UNUSED_PARAM(modifiedSince);
     UNUSED_PARAM(completionHandler);
-    soup_cache_clear(NetworkStorageSession::defaultStorageSession().getOrCreateSoupNetworkSession().cache());
 #endif
 }
 

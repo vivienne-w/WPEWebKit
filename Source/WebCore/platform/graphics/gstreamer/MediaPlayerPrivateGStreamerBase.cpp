@@ -27,7 +27,6 @@
 
 #if ENABLE(VIDEO) && USE(GSTREAMER)
 
-#include "GStreamerUtilities.h"
 #include "GraphicsContext.h"
 #include "ImageGStreamer.h"
 #include "ImageOrientation.h"
@@ -295,6 +294,10 @@ MediaPlayerPrivateGStreamerBase::MediaPlayerPrivateGStreamerBase(MediaPlayer* pl
 #endif
 #endif
 
+#if ENABLE(ENCRYPTED_MEDIA)
+    // We usually have have two.
+    m_reportedProtectionEvents.reserveInitialCapacity(2);
+#endif
 }
 
 MediaPlayerPrivateGStreamerBase::~MediaPlayerPrivateGStreamerBase()
@@ -376,31 +379,6 @@ void MediaPlayerPrivateGStreamerBase::clearSamples()
     m_sample = nullptr;
 }
 
-#if ENABLE(ENCRYPTED_MEDIA)
-static std::pair<Vector<GRefPtr<GstEvent>>, Vector<String>> extractEventsAndSystemsFromMessage(GstMessage* message)
-{
-    const GstStructure* structure = gst_message_get_structure(message);
-
-    const GValue* streamEncryptionAllowedSystemsValue = gst_structure_get_value(structure, "stream-encryption-systems");
-    ASSERT(streamEncryptionAllowedSystemsValue && G_VALUE_HOLDS(streamEncryptionAllowedSystemsValue, G_TYPE_STRV));
-    const char** streamEncryptionAllowedSystems = reinterpret_cast<const char**>(g_value_get_boxed(streamEncryptionAllowedSystemsValue));
-    ASSERT(streamEncryptionAllowedSystems);
-    Vector<String> streamEncryptionAllowedSystemsVector;
-    unsigned i;
-    for (i = 0; streamEncryptionAllowedSystems[i]; ++i)
-        streamEncryptionAllowedSystemsVector.append(streamEncryptionAllowedSystems[i]);
-
-    const GValue* streamEncryptionEventsList = gst_structure_get_value(structure, "stream-encryption-events");
-    ASSERT(streamEncryptionEventsList && GST_VALUE_HOLDS_LIST(streamEncryptionEventsList));
-    unsigned streamEncryptionEventsListSize = gst_value_list_get_size(streamEncryptionEventsList);
-    Vector<GRefPtr<GstEvent>> streamEncryptionEventsVector;
-    for (i = 0; i < streamEncryptionEventsListSize; ++i)
-        streamEncryptionEventsVector.append(GRefPtr<GstEvent>(static_cast<GstEvent*>(g_value_get_boxed(gst_value_list_get_value(streamEncryptionEventsList, i)))));
-
-    return std::make_pair(streamEncryptionEventsVector, streamEncryptionAllowedSystemsVector);
-}
-#endif
-
 bool MediaPlayerPrivateGStreamerBase::handleSyncMessage(GstMessage* message)
 {
     UNUSED_PARAM(message);
@@ -427,11 +405,14 @@ bool MediaPlayerPrivateGStreamerBase::handleSyncMessage(GstMessage* message)
         }
         GST_DEBUG("handling drm-preferred-decryption-system-id need context message");
         LockHolder lock(m_protectionMutex);
-        std::pair<Vector<GRefPtr<GstEvent>>, Vector<String>> streamEncryptionInformation = extractEventsAndSystemsFromMessage(message);
+        std::pair<Vector<GRefPtr<GstEvent>>, Vector<String>> streamEncryptionInformation = GStreamerEMEUtilities::extractEventsAndSystemsFromMessage(message);
         GST_TRACE("found %" G_GSIZE_FORMAT " protection events", streamEncryptionInformation.first.size());
-        Vector<uint8_t> concatenatedInitDataChunks;
+        InitData concatenatedInitDataChunks;
         unsigned concatenatedInitDataChunksNumber = 0;
         String eventKeySystemIdString;
+#if USE(OPENCDM)
+        HashMap<String, GstEventSeqNum> keySystemProtectionEventMap;
+#endif
 
         for (auto& event : streamEncryptionInformation.first) {
             GST_TRACE("handling protection event %u", GST_EVENT_SEQNUM(event.get()));
@@ -445,13 +426,17 @@ bool MediaPlayerPrivateGStreamerBase::handleSyncMessage(GstMessage* message)
                 break;
             }
             GST_TRACE("appending init data for %s of size %" G_GSIZE_FORMAT, eventKeySystemId, mapInfo.size);
-            GST_MEMDUMP("init data", reinterpret_cast<const unsigned char *>(mapInfo.data), mapInfo.size);
-            concatenatedInitDataChunks.append(mapInfo.data, mapInfo.size);
+            GST_MEMDUMP("init data", reinterpret_cast<const uint8_t*>(mapInfo.data), mapInfo.size);
+            concatenatedInitDataChunks.append(reinterpret_cast<const uint8_t*>(mapInfo.data), mapInfo.size);
             ++concatenatedInitDataChunksNumber;
             eventKeySystemIdString = eventKeySystemId;
             if (streamEncryptionInformation.second.contains(eventKeySystemId)) {
-                GST_TRACE("considering init data handled for %s", eventKeySystemId);
-                m_handledProtectionEvents.add(GST_EVENT_SEQNUM(event.get()));
+                GST_TRACE("considering init data reported for %s", eventKeySystemId);
+                ASSERT(!m_reportedProtectionEvents.contains(GST_EVENT_SEQNUM(event.get())));
+                m_reportedProtectionEvents.append(GST_EVENT_SEQNUM(event.get()));
+#if USE(OPENCDM)
+                keySystemProtectionEventMap.add(eventKeySystemId, GST_EVENT_SEQNUM(event.get()));
+#endif
             }
             gst_buffer_unmap(data, &mapInfo);
         }
@@ -462,13 +447,13 @@ bool MediaPlayerPrivateGStreamerBase::handleSyncMessage(GstMessage* message)
         if (concatenatedInitDataChunksNumber > 1)
             eventKeySystemIdString = emptyString();
 
-        RunLoop::main().dispatch([weakThis = m_weakPtrFactory.createWeakPtr(*this), eventKeySystemIdString, initData = WTFMove(concatenatedInitDataChunks)] {
+        RunLoop::main().dispatch([weakThis = m_weakPtrFactory.createWeakPtr(*this), eventKeySystemIdString, initData = concatenatedInitDataChunks] {
             if (!weakThis)
                 return;
 
-            GST_DEBUG("scheduling initializationDataEncountered event for %s with concatenated init datas size of %" G_GSIZE_FORMAT, eventKeySystemIdString.utf8().data(), initData.size());
-            GST_MEMDUMP("init datas", initData.data(), initData.size());
-            weakThis->m_player->initializationDataEncountered(ASCIILiteral("cenc"), ArrayBuffer::create(initData.data(), initData.size()));
+            GST_DEBUG("scheduling initializationDataEncountered event for %s with concatenated init datas size of %" G_GSIZE_FORMAT, eventKeySystemIdString.utf8().data(), initData.sizeInBytes());
+            GST_MEMDUMP("init datas", reinterpret_cast<const uint8_t*>(initData.latin1().data()), initData.sizeInBytes());
+            weakThis->m_player->initializationDataEncountered(ASCIILiteral("cenc"), ArrayBuffer::create(reinterpret_cast<const uint8_t*>(initData.latin1().data()), initData.sizeInBytes()));
         });
 
         GST_INFO("waiting for a CDM instance");
@@ -483,6 +468,9 @@ bool MediaPlayerPrivateGStreamerBase::handleSyncMessage(GstMessage* message)
             GstStructure* contextStructure = gst_context_writable_structure(context.get());
             gst_structure_set(contextStructure, "decryption-system-id", G_TYPE_STRING, preferredKeySystemUuid, nullptr);
             gst_element_set_context(GST_ELEMENT(GST_MESSAGE_SRC(message)), context.get());
+#if USE(OPENCDM)
+            mapProtectionEventToInitData(concatenatedInitDataChunks, keySystemProtectionEventMap.get(preferredKeySystemUuid));
+#endif
         } else
             GST_WARNING("no proper CDM instance attached");
 
@@ -1373,55 +1361,162 @@ void MediaPlayerPrivateGStreamerBase::attemptToDecryptWithInstance(CDMInstance& 
 {
     ASSERT(m_cdmInstance.get() == &instance);
     GST_TRACE("instance %p, current stored %p", &instance, m_cdmInstance.get());
+    LockHolder lock(m_protectionMutex);
     attemptToDecryptWithLocalInstance();
 }
 
+// This method needs to be called with the protection lock held.
 void MediaPlayerPrivateGStreamerBase::attemptToDecryptWithLocalInstance()
 {
 #if USE(OPENCDM)
     if (is<CDMInstanceOpenCDM>(*m_cdmInstance)) {
         GST_DEBUG("handling OpenCDM %s keys", m_cdmInstance->keySystem().utf8().data());
         auto& cdmInstanceOpenCDM = downcast<CDMInstanceOpenCDM>(*m_cdmInstance);
-        //FIXME: Correct initData should be passed to cdmInstanceOpenCDM to retrieve proper session
-        String sessionId = cdmInstanceOpenCDM.sessionIdByInitData(String());
-        ASSERT(!sessionId.isEmpty());
-        dispatchDecryptionSession(sessionId);
-    }
+        for (const auto& initDataEventsMatch : m_initDataToProtectionEventsMap) {
+            // Retrieve SessionId using initData.
+            String sessionId = cdmInstanceOpenCDM.sessionIdByInitData(initDataEventsMatch.key, (m_initDataToProtectionEventsMap.size() == 1));
+            if (!sessionId.isEmpty()) {
+                if (cdmInstanceOpenCDM.isSessionIdUsable(sessionId)) {
+                    GST_TRACE("using %s", sessionId.utf8().data());
+                    dispatchDecryptionSession(sessionId, initDataEventsMatch.value);
+                } else
+                    GST_DEBUG("session %s is not usable yet", sessionId.utf8().data());
+            } else
+                GST_WARNING("found no session id to dispatch");
+        }
+    } else
 #endif
+    {
+        // FIXME.
+        GST_ERROR("wrong CDM instance");
+        ASSERT_NOT_REACHED();
+    }
 }
 
 void MediaPlayerPrivateGStreamerBase::dispatchDecryptionKey(GstBuffer* buffer)
 {
     bool eventHandled = gst_element_send_event(m_pipeline.get(), gst_event_new_custom(GST_EVENT_CUSTOM_DOWNSTREAM_OOB,
         gst_structure_new("drm-cipher", "key", GST_TYPE_BUFFER, buffer, nullptr)));
-    m_needToResendCredentials = m_handledProtectionEvents.size() > 0;
+    m_needToResendCredentials = m_reportedProtectionEvents.size() > 0;
     GST_TRACE("emitted decryption cipher key on pipeline, event handled %s, need to resend credentials %s", boolForPrinting(eventHandled), boolForPrinting(m_needToResendCredentials));
 }
 
-void MediaPlayerPrivateGStreamerBase::dispatchDecryptionSession(const String& sessionId)
+#if USE(OPENCDM)
+void MediaPlayerPrivateGStreamerBase::mapProtectionEventToInitData(const InitData& initData, GstEventSeqNum eventId)
 {
-    bool eventHandled = gst_element_send_event(m_pipeline.get(), gst_event_new_custom(GST_EVENT_CUSTOM_DOWNSTREAM_OOB,
-        gst_structure_new("drm-session", "session", G_TYPE_STRING, sessionId.utf8().data(), nullptr)));
-    m_needToResendCredentials = m_handledProtectionEvents.size() > 0;
-    GST_TRACE("emitted decryption session %s on pipeline, event handled %s, need to resend credentials %s", sessionId.utf8().data(), boolForPrinting(eventHandled), boolForPrinting(m_needToResendCredentials));
+    auto& eventIds = m_initDataToProtectionEventsMap.ensure(initData, [] { return Vector<GstEventSeqNum> { }; }).iterator->value;
+    eventIds.append(eventId);
+    m_protectionEventToInitDataMap.add(eventId, initData);
 }
+
+void MediaPlayerPrivateGStreamerBase::unmapProtectionEventFromInitData(GstEventSeqNum eventId)
+{
+    ASSERT(m_protectionEventToInitDataMap.contains(eventId));
+    const InitData& initData = m_protectionEventToInitDataMap.get(eventId);
+    const auto& addResult = m_initDataToProtectionEventsMap.add(initData, Vector<GstEventSeqNum>());
+    ASSERT(!addResult.isNewEntry);
+    Vector<GstEventSeqNum>& eventIds = addResult.iterator->value;
+    if (eventIds.size() <= 1)
+        m_initDataToProtectionEventsMap.remove(initData);
+    else
+        eventIds.removeFirst(eventId);
+    m_protectionEventToInitDataMap.remove(eventId);
+}
+
+bool MediaPlayerPrivateGStreamerBase::dispatchDecryptionSessionToPipeline(const String& sessionId, GstEventSeqNum eventId)
+{
+    return gst_element_send_event(m_pipeline.get(), gst_event_new_custom(GST_EVENT_CUSTOM_DOWNSTREAM_OOB,
+        gst_structure_new("drm-session", "session", G_TYPE_STRING, sessionId.utf8().data(), "protection-event", G_TYPE_UINT, eventId, nullptr)));
+}
+
+void MediaPlayerPrivateGStreamerBase::dispatchDecryptionSession(const String& sessionId, GstEventSeqNum eventId)
+{
+    bool eventHandled = dispatchDecryptionSessionToPipeline(sessionId, eventId);
+    if (eventHandled)
+        unmapProtectionEventFromInitData(eventId);
+    GST_TRACE("emitted decryption session %s on pipeline for event %u, event handled %s", sessionId.utf8().data(), eventId, boolForPrinting(eventHandled));
+ }
+
+void MediaPlayerPrivateGStreamerBase::dispatchDecryptionSession(const String& sessionId, const Vector<GstEventSeqNum>& eventIds)
+{
+    for (auto eventId : eventIds)
+        dispatchDecryptionSession(sessionId, eventId);
+ }
+#endif
 
 void MediaPlayerPrivateGStreamerBase::handleProtectionEvent(GstEvent* event)
 {
-    if (m_handledProtectionEvents.contains(GST_EVENT_SEQNUM(event))) {
-        GST_DEBUG("event %u already handled", GST_EVENT_SEQNUM(event));
-        m_handledProtectionEvents.remove(GST_EVENT_SEQNUM(event));
-        if (m_needToResendCredentials) {
-            GST_DEBUG("resending credentials");
-            attemptToDecryptWithLocalInstance();
+    LockHolder lock(m_protectionMutex);
+
+    // Check whether the protection event was already reported or not to JavaScript. If it was, we resend the decryption information to the decryptor.
+    size_t eventPosition = m_reportedProtectionEvents.find(GST_EVENT_SEQNUM(event));
+    if (eventPosition != notFound) {
+        GST_DEBUG("event %u already reported to JS", GST_EVENT_SEQNUM(event));
+        m_reportedProtectionEvents.remove(eventPosition);
+#if USE(OPENCDM)
+        GST_DEBUG("waiting for a CDM instance");
+        m_protectionCondition.waitFor(m_protectionMutex, Seconds(4), [this] {
+            return this->m_cdmInstance;
+            });
+        if (!m_cdmInstance) {
+            GST_ERROR("we should have a CDM instance at this point");
+            return;
+        }
+
+        if (is<CDMInstanceOpenCDM>(*m_cdmInstance)) {
+            auto mappedInitData = m_protectionEventToInitDataMap.find(GST_EVENT_SEQNUM(event));
+            if (mappedInitData != m_protectionEventToInitDataMap.end()) {
+                const InitData& initData = mappedInitData->value;
+                auto& cdmInstanceOpenCDM = downcast<CDMInstanceOpenCDM>(*m_cdmInstance);
+                String sessionId = cdmInstanceOpenCDM.sessionIdByInitData(initData, (m_initDataToProtectionEventsMap.size() == 1));
+                if (!sessionId.isEmpty()) {
+                    if (cdmInstanceOpenCDM.isSessionIdUsable(sessionId)) {
+                        GST_TRACE("using %s", sessionId.utf8().data());
+                        dispatchDecryptionSession(sessionId, GST_EVENT_SEQNUM(event));
+                    } else
+                        GST_DEBUG("session %s is not usable yet", sessionId.utf8().data());
+                } else
+                    GST_WARNING("found no session id to dispatch");
+            } else
+                GST_DEBUG("event %u is not mapped, decryptor should have the session already", GST_EVENT_SEQNUM(event));
+        } else
+#endif
+        {
+            if (m_needToResendCredentials) {
+                GST_DEBUG("resending credentials");
+                attemptToDecryptWithLocalInstance();
+            }
         }
         return;
     }
 
-    const gchar* eventKeySystemId = nullptr;
-    gst_event_parse_protection(event, &eventKeySystemId, nullptr, nullptr);
-    GST_WARNING("FIXME: unhandled protection event for %s", eventKeySystemId);
-    ASSERT_NOT_REACHED();
+    const char* eventKeySystemId = nullptr;
+    GstBuffer* data = nullptr;
+    gst_event_parse_protection(event, &eventKeySystemId, &data, nullptr);
+    GST_TRACE("reporting event %u to JS for %s", GST_EVENT_SEQNUM(event), eventKeySystemId);
+
+    GstMapInfo mapInfo;
+    if (!gst_buffer_map(data, &mapInfo, GST_MAP_READ)) {
+        GST_WARNING("cannot map %s protection data", eventKeySystemId);
+        return;
+    }
+
+    String eventKeySystemIdString = eventKeySystemId;
+    InitData initData(reinterpret_cast<const uint8_t*>(mapInfo.data), mapInfo.size);
+    gst_buffer_unmap(data, &mapInfo);
+    m_reportedProtectionEvents.append(GST_EVENT_SEQNUM(event));
+#if USE(OPENCDM)
+    mapProtectionEventToInitData(initData, GST_EVENT_SEQNUM(event));
+#endif
+
+    RunLoop::main().dispatch([weakThis = m_weakPtrFactory.createWeakPtr(*this), eventKeySystemIdString, initData] {
+        if (!weakThis)
+            return;
+
+        GST_DEBUG("scheduling initializationDataEncountered event for %s with concatenated init datas size of %" G_GSIZE_FORMAT, eventKeySystemIdString.utf8().data(), initData.sizeInBytes());
+        GST_MEMDUMP("init datas", reinterpret_cast<const uint8_t*>(initData.latin1().data()), initData.sizeInBytes());
+        weakThis->m_player->initializationDataEncountered(ASCIILiteral("cenc"), ArrayBuffer::create(reinterpret_cast<const uint8_t*>(initData.latin1().data()), initData.sizeInBytes()));
+    });
 }
 #endif
 
