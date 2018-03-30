@@ -45,8 +45,8 @@ public:
 
     virtual ~CDMFactoryOpenCDM();
 
-    virtual std::unique_ptr<CDMPrivate> createCDM(const String&) override;
-    virtual bool supportsKeySystem(const String&) override;
+    virtual std::unique_ptr<CDMPrivate> createCDM(const String&) final;
+    virtual bool supportsKeySystem(const String&) final;
 };
 
 class CDMInstanceOpenCDM final : public CDMInstance {

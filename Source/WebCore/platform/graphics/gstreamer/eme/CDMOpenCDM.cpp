@@ -135,7 +135,10 @@ std::unique_ptr<CDMPrivate> CDMFactoryOpenCDM::createCDM(const String& keySystem
 
 bool CDMFactoryOpenCDM::supportsKeySystem(const String& keySystem)
 {
-    return GStreamerEMEUtilities::isPlayReadyKeySystem(keySystem);
+    // by definition, we leave it up to the CDMServer to determine if this keySystem
+    // is supported (might be configured to not support in OCDMServer)
+    // So by definition, create an CDMOpenCDM instance so OpenCDM server can be queried.
+    return (true);
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------
