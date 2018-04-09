@@ -40,7 +40,12 @@ template<> struct ClientTraits<WKViewClientBase> {
 };
 }
 
-WKViewRef WKViewCreate(struct wpe_view_backend* backend, WKPageConfigurationRef configuration)
+WKViewRef WKViewCreate(WKPageConfigurationRef configuration)
+{
+    return toAPI(WKWPE::View::create(nullptr, *toImpl(configuration)));
+}
+
+WKViewRef WKViewCreateWithViewBackend(struct wpe_view_backend* backend, WKPageConfigurationRef configuration)
 {
     return toAPI(WKWPE::View::create(backend, *toImpl(configuration)));
 }

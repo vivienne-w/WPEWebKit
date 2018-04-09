@@ -336,7 +336,6 @@ if (EXPORT_DEPRECATED_WEBKIT2_C_API)
         ${WEBKIT_DIR}/Shared/API/c/WKUserScriptInjectionTime.h
 
         ${WEBKIT_DIR}/Shared/API/c/wpe/WKBaseWPE.h
-        ${WEBKIT_DIR}/Shared/API/c/wpe/WebKit.h
 
         ${WEBKIT_DIR}/WebProcess/InjectedBundle/API/c/WKBundle.h
         ${WEBKIT_DIR}/WebProcess/InjectedBundle/API/c/WKBundleBackForwardList.h
@@ -430,6 +429,15 @@ if (EXPORT_DEPRECATED_WEBKIT2_C_API)
         DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/wpe-${WPE_API_VERSION}/WPE/WebKit"
         COMPONENT "Development"
     )
+
+    set(WPE_INSTALLED_WEBKIT_HEADERS_INCLUDE
+        ${WEBKIT_DIR}/Shared/API/c/wpe/WebKit.h
+    )
+
+    install(FILES ${WPE_INSTALLED_WEBKIT_HEADERS_INCLUDE}
+        DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/wpe-${WPE_API_VERSION}/WPE"
+        COMPONENT "Development"
+    )
 endif()
 
 target_include_directories(WPEInjectedBundle PRIVATE ${WebKit_INCLUDE_DIRECTORIES})
@@ -441,6 +449,6 @@ install(FILES "${CMAKE_BINARY_DIR}/wpe-webkit.pc"
 )
 
 install(FILES ${WPE_API_INSTALLED_HEADERS}
-    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/wpe-${WPE_API_VERSION}/WPE/wpe"
+    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/wpe-${WPE_API_VERSION}/webkit"
     COMPONENT "Development"
 )
