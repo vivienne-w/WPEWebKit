@@ -371,7 +371,7 @@ MediaTime MediaPlayerPrivateGStreamer::playbackPosition() const
         return duration.isInvalid() ? MediaTime::zeroTime() : duration;
     }
 
-    Seconds now = WTF::currentCPUTime();
+    Seconds now(WTF::monotonicallyIncreasingTime());
     if (!!m_lastQuery && ((now - m_lastQuery) < Seconds(0.25)) && m_cachedPosition.isValid())
         return m_cachedPosition;
 
