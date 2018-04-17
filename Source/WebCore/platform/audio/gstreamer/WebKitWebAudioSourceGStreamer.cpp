@@ -359,11 +359,11 @@ static void webKitWebAudioSrcLoop(WebKitWebAudioSrc* src)
     if (priv->bus->isSilent()) {
         priv->numberOfSamples -= priv->framesToPull;
         if (!priv->silentStartTime)
-            priv->silentStartTime = WTF::currentTime();
+            priv->silentStartTime = WTF::monotonicallyIncreasingTime();
     }
     else {
         if (priv->silentStartTime) {
-            priv->numberOfSamples += (WTF::currentTime() - priv->silentStartTime) * priv->sampleRate;
+            priv->numberOfSamples += (WTF::monotonicallyIncreasingTime() - priv->silentStartTime) * priv->sampleRate;
             priv->silentStartTime = 0;
         }
     }
