@@ -29,9 +29,8 @@
 #include "CDMInstance.h"
 #include "GStreamerEMEUtilities.h"
 #include "MediaKeyStatus.h"
-#include <map>
 #include <open_cdm.h>
-#include <wtf/HashMap.h>
+#include <unordered_map>
 
 namespace WebCore {
 
@@ -59,7 +58,7 @@ private:
     CDMInstanceOpenCDM(const CDMInstanceOpenCDM&) = delete;
     CDMInstanceOpenCDM& operator=(const CDMInstanceOpenCDM&) = delete;
 
-    class Session {
+    class Session : public ThreadSafeRefCounted<Session> {
     private:
         Session() = delete;
         Session(const Session&) = delete;
@@ -124,7 +123,18 @@ public:
 private:
     media::OpenCdm m_openCDM;
     const char* m_mimeType;
-    std::map<std::string, Session> m_sessionsMap;
+
+    // Protects against concurrent access to m_sessionsMap. In addition to the main thread
+    // the GStreamer decryptor elements running in the streaming threads have a need to
+    // lookup values in this map.
+    mutable Lock m_sessionMapMutex;
+    // Unfortunately we can't use a WTF::String in a map, and we can't use a WTF::HashTable
+    // with a RefPtr, so we have to use this awkwardness.
+    std::unordered_map<std::string, RefPtr<Session>> m_sessionsMap;
+    bool addSession(const String& sessionId, RefPtr<Session> session);
+    bool removeSession(const String& sessionId);
+    RefPtr<Session> lookupSession(const String& sessionId) const;
+
     String m_keySystem;
 };
 

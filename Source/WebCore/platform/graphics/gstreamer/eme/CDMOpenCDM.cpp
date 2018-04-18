@@ -251,16 +251,17 @@ void CDMInstanceOpenCDM::requestLicense(LicenseType licenseType, const AtomicStr
     }
 
     String sessionIdValue = String::fromUTF8(sessionId.c_str());
-    std::pair<std::map<std::string, Session>::iterator, bool> newEntry =
-        m_sessionsMap.emplace(std::piecewise_construct, std::forward_as_tuple(sessionId), std::forward_as_tuple(openCDM, WTFMove(initData)));
+    RefPtr<Session> newSession = adoptRef(*new Session(openCDM, WTFMove(initData)));
+    if (!addSession(sessionIdValue, newSession)) {
+        GST_WARNING("Failed to add session %s", sessionId.c_str());
+        return;
+    }
 
-    const Session& newSession(newEntry.first->second);
-
-    if (newSession.isValid()) {
+    if (newSession->isValid()) {
         GST_TRACE("created valid session %s", sessionIdValue.utf8().data());
-        std::string message = newSession.message();
+        std::string message = newSession->message();
         Ref<SharedBuffer> licenseRequestMessage = SharedBuffer::create(message.c_str(), message.size());
-        callback(WTFMove(licenseRequestMessage), sessionIdValue, newSession.needsIndividualization(), Succeeded);
+        callback(WTFMove(licenseRequestMessage), sessionIdValue, newSession->needsIndividualization(), Succeeded);
     } else {
         GST_TRACE("created invalid session %s", sessionIdValue.utf8().data());
         callback(WTFMove(initData), sessionIdValue, false, Failed);
@@ -269,21 +270,19 @@ void CDMInstanceOpenCDM::requestLicense(LicenseType licenseType, const AtomicStr
 
 void CDMInstanceOpenCDM::updateLicense(const String& sessionId, LicenseType, const SharedBuffer& response, LicenseUpdateCallback callback)
 {
-    std::map<std::string, Session>::iterator iterator(m_sessionsMap.find(sessionId.utf8().data()));
-
-    if (iterator == m_sessionsMap.end()) {
+    auto session = lookupSession(sessionId);
+    if (!session) {
         GST_WARNING("cannot update the session %s cause we can't find it", sessionId.utf8().data());
         return;
     }
 
     std::string responseMessage;
-    Session& session(iterator->second);
-    media::OpenCdm::KeyStatus keyStatus = session.update(reinterpret_cast<const uint8_t*>(response.data()), response.size(), responseMessage);
+    media::OpenCdm::KeyStatus keyStatus = session->update(reinterpret_cast<const uint8_t*>(response.data()), response.size(), responseMessage);
     GST_DEBUG("session id %s, key status is %d (usable: %s)", sessionId.utf8().data(), keyStatus, boolForPrinting(keyStatus == media::OpenCdm::KeyStatus::Usable));
 
     if (keyStatus == media::OpenCdm::KeyStatus::Usable) {
         KeyStatusVector changedKeys;
-        SharedBuffer& initData(session.initData());
+        SharedBuffer& initData(session->initData());
 
         GST_TRACE("OpenCDM::update returned key is usable");
 
@@ -314,18 +313,15 @@ void CDMInstanceOpenCDM::updateLicense(const String& sessionId, LicenseType, con
 
 void CDMInstanceOpenCDM::loadSession(LicenseType, const String& sessionId, const String&, LoadSessionCallback callback)
 {
-    std::map<std::string, Session>::iterator iterator(m_sessionsMap.find(sessionId.utf8().data()));
-
-    if (iterator == m_sessionsMap.end()) {
+    auto session = lookupSession(sessionId);
+    if (!session) {
         GST_WARNING("cannot load the session %s cause we can't find it", sessionId.utf8().data());
         return;
     }
-
     std::string responseMessage;
     SessionLoadFailure sessionFailure(SessionLoadFailure::None);
-    Session& session(iterator->second);
 
-    if (!session.load(responseMessage)) {
+    if (!session->load(responseMessage)) {
         std::string request = "message:";
         if (!responseMessage.compare(0, request.length(), request.c_str())) {
             size_t length = messageLength(responseMessage, request);
@@ -333,7 +329,7 @@ void CDMInstanceOpenCDM::loadSession(LicenseType, const String& sessionId, const
             auto message = SharedBuffer::create(responseMessage.c_str() + length, responseMessage.length() - length);
             callback(std::nullopt, std::nullopt, std::nullopt, SuccessValue::Succeeded, sessionFailure);
         } else {
-            SharedBuffer& initData(session.initData());
+            SharedBuffer& initData(session->initData());
             KeyStatusVector knownKeys;
             MediaKeyStatus keyStatus = mediaKeyStatusFromOpenCDM(responseMessage);
             knownKeys.append(std::pair<Ref<SharedBuffer>, MediaKeyStatus>{initData, keyStatus});
@@ -347,55 +343,59 @@ void CDMInstanceOpenCDM::loadSession(LicenseType, const String& sessionId, const
 
 void CDMInstanceOpenCDM::removeSessionData(const String& sessionId, LicenseType, RemoveSessionDataCallback callback)
 {
-    std::map<std::string, Session>::iterator iterator(m_sessionsMap.find(sessionId.utf8().data()));
-
-    if (iterator == m_sessionsMap.end()) {
+    auto session = lookupSession(sessionId);
+    if (!session) {
         GST_WARNING("cannot remove session's data of %s cause we can't find it", sessionId.utf8().data());
         return;
     }
 
     std::string responseMessage;
     KeyStatusVector keys;
-    Session& session(iterator->second);
 
-    if (!session.remove(responseMessage)) {
+    if (!session->remove(responseMessage)) {
         std::string request = "message:";
         if (!responseMessage.compare(0, request.length(), request.c_str())) {
             size_t length = messageLength(responseMessage, request);
             GST_TRACE("message length %u", length);
 
             auto message = SharedBuffer::create(responseMessage.c_str() + length, responseMessage.length() - length);
-            SharedBuffer& initData = session.initData();
+            SharedBuffer& initData = session->initData();
             std::string status = "KeyReleased";
             MediaKeyStatus keyStatus = mediaKeyStatusFromOpenCDM(status);
             keys.append(std::pair<Ref<SharedBuffer>, MediaKeyStatus>{initData, keyStatus});
             callback(WTFMove(keys), std::move(WTFMove(message)), SuccessValue::Succeeded);
         }
     } else {
-        SharedBuffer& initData(session.initData());
+        SharedBuffer& initData(session->initData());
         MediaKeyStatus keyStatus = mediaKeyStatusFromOpenCDM(responseMessage);
         keys.append(std::pair<Ref<SharedBuffer>, MediaKeyStatus>{initData, keyStatus});
         callback(WTFMove(keys), std::nullopt, SuccessValue::Failed);
     }
-    m_sessionsMap.erase(iterator);
+
+    if (!removeSession(sessionId)) {
+        GST_WARNING("Failed to remove session %s", sessionId.utf8().data());
+    }
 }
 
-void CDMInstanceOpenCDM::closeSession(const String& session, CloseSessionCallback callback)
+void CDMInstanceOpenCDM::closeSession(const String& sessionId, CloseSessionCallback callback)
 {
-    std::string sessionId(session.utf8().data());
-    std::map<std::string, Session>::iterator iterator(m_sessionsMap.find(sessionId));
+    auto session = lookupSession(sessionId);
+    if (!session) {
+        GST_WARNING("cannot close session %s because it does not exist", sessionId.utf8().data());
+        return;
+    }
+    session->close();
 
-    if (iterator != m_sessionsMap.end())
-        iterator->second.close();
-
-    if (!m_sessionsMap.erase(sessionId))
-        GST_WARNING("%s is an unknown session", sessionId.c_str());
+    if (!removeSession(sessionId))
+        GST_WARNING("Failed to remove session %s", sessionId.utf8().data());
 
     callback();
 }
 
 String CDMInstanceOpenCDM::sessionIdByInitData(const InitData& initData, bool firstInLine) const
 {
+    LockHolder locker(m_sessionMapMutex);
+
     if (!m_sessionsMap.size()) {
         GST_WARNING("no sessions");
         return { };
@@ -405,10 +405,11 @@ String CDMInstanceOpenCDM::sessionIdByInitData(const InitData& initData, bool fi
     GST_MEMDUMP("init data", reinterpret_cast<const uint8_t*>(initData.characters8()), initData.length());
 
     String result;
+
     for (const auto& pair : m_sessionsMap) {
         const std::string& sessionId = pair.first;
-        const Session& session = pair.second;
-        if (session.containsInitData(initData)) {
+        const RefPtr<Session>& session = pair.second;
+        if (session->containsInitData(initData)) {
             result = String::fromUTF8(sessionId.c_str());
             break;
         }
@@ -428,10 +429,40 @@ String CDMInstanceOpenCDM::sessionIdByInitData(const InitData& initData, bool fi
 
 bool CDMInstanceOpenCDM::isSessionIdUsable(const String& sessionId) const
 {
-    std::string sessionIdAsStdString(sessionId.utf8().data());
-    const auto& element = m_sessionsMap.find(sessionIdAsStdString);
+    auto session = lookupSession(sessionId);
+    if (!session)
+        return false;
 
-    return element != m_sessionsMap.end() && element->second.lastStatus() == media::OpenCdm::KeyStatus::Usable;
+    return session->lastStatus() == media::OpenCdm::KeyStatus::Usable;
+}
+
+bool CDMInstanceOpenCDM::addSession(const String& sessionId, RefPtr<Session> session)
+{
+    LockHolder locker(m_sessionMapMutex);
+
+    std::string sessionIdAsString(sessionId.utf8().data());
+    auto insertResult = m_sessionsMap.insert({sessionIdAsString, session});
+    return insertResult.second;
+}
+
+bool CDMInstanceOpenCDM::removeSession(const String& sessionId)
+{
+    LockHolder locker(m_sessionMapMutex);
+
+    std::string sessionIdAsString(sessionId.utf8().data());
+    return m_sessionsMap.erase(sessionIdAsString) > 0;
+}
+
+RefPtr<CDMInstanceOpenCDM::Session> CDMInstanceOpenCDM::lookupSession(const String& sessionId) const
+{
+    LockHolder locker(m_sessionMapMutex);
+
+    std::string sessionIdAsString(sessionId.utf8().data());
+    auto iterator = m_sessionsMap.find(sessionIdAsString);
+    if (iterator == m_sessionsMap.end())
+        return nullptr;
+
+    return iterator->second;
 }
 
 } // namespace WebCore
