@@ -52,11 +52,12 @@
 #include "CDMInstance.h"
 #include "GStreamerEMEUtilities.h"
 #include "SharedBuffer.h"
-#include "WebKitClearKeyDecryptorGStreamer.h"
 #if USE(OPENCDM)
 #include "CDMOpenCDM.h"
 #include "WebKitOpenCDMPlayReadyDecryptorGStreamer.h"
 #include "WebKitOpenCDMWidevineDecryptorGStreamer.h"
+#else
+#include "WebKitClearKeyDecryptorGStreamer.h"
 #endif
 #endif
 
@@ -157,10 +158,6 @@ void registerWebKitGStreamerElements()
         return;
 
 #if ENABLE(ENCRYPTED_MEDIA)
-    GRefPtr<GstElementFactory> clearKeyDecryptorFactory = adoptGRef(gst_element_factory_find("webkitclearkey"));
-    if (!clearKeyDecryptorFactory)
-        gst_element_register(nullptr, "webkitclearkey", GST_RANK_PRIMARY + 100, WEBKIT_TYPE_MEDIA_CK_DECRYPT);
-
 #if USE(OPENCDM)
     GRefPtr<GstElementFactory> widevineDecryptorFactory = adoptGRef(gst_element_factory_find("webkitopencdmwidevine"));
     if (!widevineDecryptorFactory)
@@ -168,6 +165,10 @@ void registerWebKitGStreamerElements()
     GRefPtr<GstElementFactory> playReadyDecryptorFactory = adoptGRef(gst_element_factory_find("webkitplayreadydec"));
     if (!playReadyDecryptorFactory)
         gst_element_register(0, "webkitplayreadydec", GST_RANK_PRIMARY + 100, WEBKIT_TYPE_OPENCDM_PLAYREADY_DECRYPT);
+#else
+    GRefPtr<GstElementFactory> clearKeyDecryptorFactory = adoptGRef(gst_element_factory_find("webkitclearkey"));
+    if (!clearKeyDecryptorFactory)
+        gst_element_register(nullptr, "webkitclearkey", GST_RANK_PRIMARY + 100, WEBKIT_TYPE_MEDIA_CK_DECRYPT);
 #endif
 #endif
 }
