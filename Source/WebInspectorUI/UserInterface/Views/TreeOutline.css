@@ -115,7 +115,7 @@ body[dir=rtl] .tree-outline .item .disclosure-button {
 }
 
 .tree-outline .item.parent .disclosure-button {
-    display: block;
+    display: inline;
 }
 
 .tree-outline:matches(:focus, .force-focus) .item.selected .disclosure-button {
@@ -131,7 +131,7 @@ body[dir=rtl] .tree-outline .item .disclosure-button {
 }
 
 .tree-outline .item .icon {
-    float: left;
+    display: inline;
     position: relative;
     width: 16px;
     height: 16px;
@@ -189,8 +189,9 @@ body[dir=rtl] .tree-outline .item .status {
 }
 
 .tree-outline .item .titles {
+    display: inline;
     position: relative;
-    top: 2px;
+    top: -2px;
 
     line-height: normal;
 

@@ -1610,6 +1610,11 @@ function blobAsText(blob, callback)
     fileReader.readAsText(blob);
 }
 
+function getPropertyValueAsPx(style, propertyName)
+{
+    return Number(style.getPropertyValue(propertyName).replace(/px$/, "") || 0);
+}
+
 if (!window.handlePromiseException) {
     window.handlePromiseException = function handlePromiseException(error)
     {
