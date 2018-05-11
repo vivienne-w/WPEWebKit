@@ -56,6 +56,7 @@
 #include "CDMOpenCDM.h"
 #include "WebKitOpenCDMPlayReadyDecryptorGStreamer.h"
 #include "WebKitOpenCDMWidevineDecryptorGStreamer.h"
+#include "WebKitOpenCDMClearKeyDecryptorGStreamer.h"
 #else
 #include "WebKitClearKeyDecryptorGStreamer.h"
 #endif
@@ -165,6 +166,9 @@ void registerWebKitGStreamerElements()
     GRefPtr<GstElementFactory> playReadyDecryptorFactory = adoptGRef(gst_element_factory_find("webkitplayreadydec"));
     if (!playReadyDecryptorFactory)
         gst_element_register(0, "webkitplayreadydec", GST_RANK_PRIMARY + 100, WEBKIT_TYPE_OPENCDM_PLAYREADY_DECRYPT);
+    GRefPtr<GstElementFactory> clearKeyDecryptorFactory = adoptGRef(gst_element_factory_find("webkitclearkeydec"));
+    if (!clearKeyDecryptorFactory)
+        gst_element_register(0, "webkitclearkeydec", GST_RANK_PRIMARY + 100, WEBKIT_TYPE_OPENCDM_CLEARKEY_DECRYPT);
 #else
     GRefPtr<GstElementFactory> clearKeyDecryptorFactory = adoptGRef(gst_element_factory_find("webkitclearkey"));
     if (!clearKeyDecryptorFactory)
