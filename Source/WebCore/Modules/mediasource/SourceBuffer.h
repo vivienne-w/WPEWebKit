@@ -170,7 +170,7 @@ private:
     void monitorBufferingRate();
 
     void removeTimerFired();
-    void removeCodedFrames(const MediaTime& start, const MediaTime& end, bool keepDecodeQueue);
+    void removeCodedFrames(const MediaTime& start, const MediaTime& end);
 
     size_t extraMemoryCost() const;
     void reportExtraMemoryAllocated();
