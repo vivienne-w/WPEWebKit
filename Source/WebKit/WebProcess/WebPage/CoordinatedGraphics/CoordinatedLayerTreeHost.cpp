@@ -86,6 +86,11 @@ void CoordinatedLayerTreeHost::cancelPendingLayerFlush()
     m_layerFlushTimer.stop();
 }
 
+void CoordinatedLayerTreeHost::commitScrollOffset(uint32_t layerID, const WebCore::IntSize& offset)
+{
+    m_coordinator.commitScrollOffset(layerID, offset);
+}
+
 void CoordinatedLayerTreeHost::setViewOverlayRootLayer(GraphicsLayer* viewOverlayRootLayer)
 {
     LayerTreeHost::setViewOverlayRootLayer(viewOverlayRootLayer);
