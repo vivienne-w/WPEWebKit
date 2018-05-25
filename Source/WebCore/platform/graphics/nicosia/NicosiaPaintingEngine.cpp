@@ -29,13 +29,13 @@
 #include "config.h"
 #include "NicosiaPaintingEngine.h"
 
-#include "NicosiaPaintingEngineBasic.h"
+#include "NicosiaPaintingEngineThreaded.h"
 
 namespace Nicosia {
 
 std::unique_ptr<PaintingEngine> PaintingEngine::create()
 {
-    return std::unique_ptr<PaintingEngine>(new PaintingEngineBasic);
+    return std::unique_ptr<PaintingEngine>(new PaintingEngineThreaded);
 }
 
 } // namespace Nicosia
