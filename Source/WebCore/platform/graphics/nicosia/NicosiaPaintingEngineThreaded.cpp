@@ -77,7 +77,7 @@ static void paintLayer(GraphicsContext& context, GraphicsLayer& layer, const Int
 PaintingEngineThreaded::PaintingEngineThreaded()
 {
     // FIXME: these parameters should be fine-tuned, or maybe made configurable.
-    m_threadPool = g_thread_pool_new(s_threadFunc, nullptr, 4, TRUE, nullptr);
+    m_threadPool = g_thread_pool_new(s_threadFunc, nullptr, 2, TRUE, nullptr);
 }
 
 PaintingEngineThreaded::~PaintingEngineThreaded()

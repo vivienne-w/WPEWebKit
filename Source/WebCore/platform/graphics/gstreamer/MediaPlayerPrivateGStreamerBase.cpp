@@ -28,6 +28,7 @@
 #if ENABLE(VIDEO) && USE(GSTREAMER)
 
 #include "GraphicsContext.h"
+#include "GraphicsContext3D.h"
 #include "ImageGStreamer.h"
 #include "ImageOrientation.h"
 #include "IntRect.h"
