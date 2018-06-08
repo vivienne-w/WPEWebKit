@@ -132,6 +132,22 @@ SourceBuffer::~SourceBuffer()
     m_private->setClient(nullptr);
 }
 
+// DEBUG
+String SourceBuffer::lastTrackID()
+{
+    String trackID = "no-track";
+
+    VideoTrack* vtrack = m_videoTracks ? m_videoTracks->lastItem() : nullptr;
+    if (vtrack)
+        trackID = vtrack->id().string();
+
+    AudioTrack* atrack = m_audioTracks ? m_audioTracks->lastItem() : nullptr;
+    if (atrack)
+        trackID = atrack->id().string();
+
+    return trackID;
+}
+
 // Allow hasCurrentTime() to be off by as much as the length of two 24fps video frames
 MediaTime& SourceBuffer::currentTimeFudgeFactor() const
 {
@@ -658,7 +674,7 @@ void SourceBuffer::sourceBufferPrivateAppendComplete(AppendResult result)
     if (extraMemoryCost() > this->maximumBufferSize())
         m_bufferFull = true;
 
-    LOG(Media, "SourceBuffer::sourceBufferPrivateAppendComplete(%p) - buffered = %s", this, toString(m_buffered->ranges()).utf8().data());
+    LOG(Media, "SourceBuffer::sourceBufferPrivateAppendComplete(%p) %s - buffered = %s", this, lastTrackID().utf8().data(), toString(m_buffered->ranges()).utf8().data());
 }
 
 void SourceBuffer::sourceBufferPrivateDidReceiveRenderingError(int error)
@@ -875,7 +891,7 @@ void SourceBuffer::removeCodedFrames(const MediaTime& start, const MediaTime& en
     // 4. If buffer full flag equals true and this object is ready to accept more bytes, then set the buffer full flag to false.
     // No-op
 
-    LOG(Media, "SourceBuffer::removeCodedFrames(%p) - buffered = %s", this, toString(m_buffered->ranges()).utf8().data());
+    LOG(Media, "SourceBuffer::removeCodedFrames(%p) %s - buffered = %s", this, lastTrackID().utf8().data(), toString(m_buffered->ranges()).utf8().data());
 }
 
 void SourceBuffer::removeTimerFired()
