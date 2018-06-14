@@ -820,11 +820,12 @@ const static HashSet<AtomicString>& codecSet()
             { VideoDecoder, "video/x-h264, stream-format=avc", { "avc*"} },
             // An autoplugged h264parse in decodebin can convert from byte-stream to avc.
             { VideoDecoder, "video/x-h264, stream-format=byte-stream", { "avc*"} },
-            { VideoDecoder, "video/mpeg, mpegversion=(int){1,2}, systemstream=(boolean)false", { "mpeg" } },
+            { VideoDecoder, "video/mpeg, mpegversion=(int){1,2}, systemstream=(boolean)false", { "mpeg" } } /*,
             { VideoDecoder, "video/x-vp8", { "vp8", "x-vp8" } },
             { VideoDecoder, "video/x-vp9", { "vp9", "x-vp9" } },
             { AudioDecoder, "audio/x-vorbis", { "vorbis", "x-vorbis" } },
             { AudioDecoder, "audio/x-opus", { "opus", "x-opus" } }
+            */
         } };
 
         for (auto& current : mapping) {
