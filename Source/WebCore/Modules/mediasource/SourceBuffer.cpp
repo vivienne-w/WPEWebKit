@@ -144,7 +144,7 @@ SourceBuffer::~SourceBuffer()
 }
 
 // DEBUG
-String SourceBuffer::lastTrackID()
+String SourceBuffer::lastTrackID() const
 {
     String trackID = "no-track";
 
@@ -728,7 +728,9 @@ static PlatformTimeRanges removeSamplesFromTrackBuffer(const DecodeOrderSampleMa
 
         const RefPtr<MediaSample>& sample = sampleIt.second;
         if (UNLIKELY(mediaSourceLogEnabled()))
-            LOG(MediaSource, "SourceBuffer::%s(%p) - removing sample(%s)", logPrefix, buffer, toString(*sampleIt.second).utf8().data());
+            LOG(MediaSource, "SourceBuffer::%s(%p) %s - removing sample(%s)", logPrefix, buffer,
+                buffer->lastTrackID().utf8().data(),
+                toString(*sampleIt.second).utf8().data());
         // Remove the erased samples from the TrackBuffer sample map.
         trackBuffer.samples.removeSample(sample.get());
 
@@ -791,7 +793,7 @@ static PlatformTimeRanges removeSamplesFromTrackBuffer(const DecodeOrderSampleMa
 
 void SourceBuffer::removeCodedFrames(const MediaTime& start, const MediaTime& end, bool keepDecodeQueue)
 {
-    LOG(MediaSource, "SourceBuffer::removeCodedFrames(%p) - start(%s), end(%s)", this, toString(start).utf8().data(), toString(end).utf8().data());
+    LOG(MediaSource, "SourceBuffer::removeCodedFrames(%p) %s - start(%s), end(%s)", this, lastTrackID().utf8().data(), toString(start).utf8().data(), toString(end).utf8().data());
 
     // 3.5.9 Coded Frame Removal Algorithm
     // https://dvcs.w3.org/hg/html-media/raw-file/tip/media-source/media-source.html#sourcebuffer-coded-frame-removal
@@ -869,6 +871,14 @@ void SourceBuffer::removeCodedFrames(const MediaTime& start, const MediaTime& en
         auto removeDecodeLast = trackBuffer.samples.decodeOrder().findSampleWithDecodeKey({lastSample.decodeTime(), lastSample.presentationTime()});
         auto removeDecodeEnd = trackBuffer.samples.decodeOrder().findSyncSampleAfterDecodeIterator(removeDecodeLast);
 
+        {
+          MediaSample& s = *(removeDecodeEnd->second);
+          printf("!!! RemoveDecodeEnd %s sample PTS: %s %s\n",
+              lastTrackID().utf8().data(),
+              s.presentationTime().toString().utf8().data(),
+              s.isSync() ? "[sync]" : "[no-sync]"); fflush(stdout);
+        }
+
         DecodeOrderSampleMap::MapType erasedSamples(removeDecodeStart, removeDecodeEnd);
         PlatformTimeRanges erasedRanges = removeSamplesFromTrackBuffer(erasedSamples, trackBuffer, this, "removeCodedFrames", keepDecodeQueue);
 
@@ -903,6 +913,13 @@ void SourceBuffer::removeCodedFrames(const MediaTime& start, const MediaTime& en
     // No-op
 
     LOG(Media, "SourceBuffer::removeCodedFrames(%p) %s - buffered = %s", this, lastTrackID().utf8().data(), toString(m_buffered->ranges()).utf8().data());
+    printf("!!! Detailed buffered:\n");
+    for (auto& trackBuffer : m_trackBufferMap.values()) {
+      for (std::pair<const MediaTime, RefPtr<MediaSample>>& pair : trackBuffer.samples.presentationOrder()) {
+        printf("!!! %s\n", pair.second->presentationTime().toString().utf8().data());
+      }
+    }
+    fflush(stdout);
 }
 
 void SourceBuffer::removeTimerFired()

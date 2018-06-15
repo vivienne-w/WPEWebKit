@@ -119,7 +119,7 @@ public:
     bool hasPendingActivity() const final;
 
     // DEBUG
-    String lastTrackID();
+    String lastTrackID() const;
 
 private:
     SourceBuffer(Ref<SourceBufferPrivate>&&, MediaSource*);
