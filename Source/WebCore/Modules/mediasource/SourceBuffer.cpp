@@ -710,11 +710,12 @@ static PlatformTimeRanges removeSamplesFromTrackBuffer(const DecodeOrderSampleMa
             trackBuffer.decodeQueue.erase(decodeKey);
 
         auto startTime = sample->presentationTime();
-#if USE(GSTREAMER)
-        auto endTime = startTime + sample->duration() + microsecond;
-#else
+//#if USE(GSTREAMER)
+          // WARNING: THIS MAKES THE SOURCEBUFFER WRONGLY BELIEVE THAT A LARGER RANGE HAS BEEN DELETED AND CAN CAUSE A LEAK OF THE NEXT SAMPLE BEYOND THE ERASED RANGE
+//        auto endTime = startTime + sample->duration() + microsecond;
+//#else
         auto endTime = startTime + sample->duration();
-#endif
+//#endif
         erasedRanges.add(startTime, endTime);
 
 #if !LOG_DISABLED
