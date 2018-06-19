@@ -164,10 +164,6 @@ public:
 			    GST_TIME_ARGS(GST_BUFFER_PTS(buffer)),
 			    GST_TIME_ARGS(GST_BUFFER_DTS(buffer)),
 			    GST_TIME_ARGS(GST_BUFFER_DURATION(buffer)));
-
-	    GST_WARNING("### BufferMetadataCompleter: buffer: %p, refcount: %d, PTS: %" GST_TIME_FORMAT,
-                buffer, GST_MINI_OBJECT_REFCOUNT_VALUE(GST_MINI_OBJECT(buffer)),
-                GST_TIME_ARGS(GST_BUFFER_PTS(buffer)));
         }
     }
 
@@ -226,7 +222,6 @@ AppendPipeline::AppendPipeline(Ref<MediaSourceClientGStreamerMSE> mediaSourceCli
 
     gst_app_sink_set_emit_signals(GST_APP_SINK(m_appsink.get()), TRUE);
     gst_base_sink_set_sync(GST_BASE_SINK(m_appsink.get()), FALSE);
-    gst_base_sink_set_last_sample_enabled(GST_BASE_SINK(m_appsink.get()), FALSE);
 
     GRefPtr<GstPad> appsinkPad = adoptGRef(gst_element_get_static_pad(m_appsink.get(), "sink"));
     g_signal_connect(appsinkPad.get(), "notify::caps", G_CALLBACK(appendPipelineAppsinkCapsChanged), this);
@@ -817,10 +812,6 @@ void AppendPipeline::appsinkNewSample(GstSample* sample)
         gst_sample_unref(sample);
         return;
     }
-
-    GST_WARNING("### AppendPipeline: buffer: %p, refcount: %d, PTS: %" GST_TIME_FORMAT,
-        buffer, GST_MINI_OBJECT_REFCOUNT_VALUE(GST_MINI_OBJECT(buffer)),
-        GST_TIME_ARGS(GST_BUFFER_PTS(buffer)));
 
     // This increases sample refcount, as GStreamerMediaSample manages its own reference.
     // We must still unref our own current ref before exiting this method.
