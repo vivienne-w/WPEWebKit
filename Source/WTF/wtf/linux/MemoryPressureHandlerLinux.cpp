@@ -51,7 +51,12 @@
 
 #define LOG_CHANNEL_PREFIX Log
 
+#undef LOG_DISABLED
+#define LOG(channel, msg, ...) do { printf("%s: ", #channel); printf(msg, ## __VA_ARGS__); printf("\n"); fflush(stdout); } while (false)
+
 namespace WTF {
+
+static String getProcessName();
 
 // Disable memory event reception for a minimum of s_minimumHoldOffTime
 // seconds after receiving an event. Don't let events fire any sooner than
@@ -93,6 +98,8 @@ static GSourceFuncs eventFDSourceFunctions = {
     // dispatch
     [](GSource* source, GSourceFunc callback, gpointer userData) -> gboolean
     {
+        printf("MemoryPressure: %s: %s\n", getProcessName().utf8().data(), __PRETTY_FUNCTION__); fflush(stdout);
+
         EventFDSource* eventFDSource = reinterpret_cast<EventFDSource*>(source);
         unsigned events = g_source_query_unix_fd(source, eventFDSource->fdTag) & eventFDSourceCondition;
         if (events & G_IO_HUP || events & G_IO_ERR || events & G_IO_NVAL)
@@ -114,6 +121,7 @@ MemoryPressureHandler::EventFDPoller::EventFDPoller(int fd, WTF::Function<void (
     : m_fd(fd)
     , m_notifyHandler(WTFMove(notifyHandler))
 {
+    printf("MemoryPressure: %s: %s\n", getProcessName().utf8().data(), __PRETTY_FUNCTION__); fflush(stdout);
 #if USE(GLIB)
     if (m_fd.value() == -1) {
         m_thread = Thread::create("WTF: MemoryPressureHandler",
@@ -148,6 +156,7 @@ MemoryPressureHandler::EventFDPoller::EventFDPoller(int fd, WTF::Function<void (
 
 MemoryPressureHandler::EventFDPoller::~EventFDPoller()
 {
+    printf("MemoryPressure: %s: %s\n", getProcessName().utf8().data(), __PRETTY_FUNCTION__); fflush(stdout);
     m_fd = std::nullopt;
 #if USE(GLIB)
     if (m_source)
@@ -159,6 +168,7 @@ MemoryPressureHandler::EventFDPoller::~EventFDPoller()
 
 static inline bool isFatalReadError(int error)
 {
+    printf("MemoryPressure: %s: %s\n", getProcessName().utf8().data(), __PRETTY_FUNCTION__); fflush(stdout);
 #if USE(GLIB)
     // We don't really need to read the buffer contents, if the poller
     // notified us, but read would block or is no longer available, is
@@ -171,6 +181,7 @@ static inline bool isFatalReadError(int error)
 
 void MemoryPressureHandler::EventFDPoller::readAndNotify() const
 {
+    printf("MemoryPressure: %s: %s\n", getProcessName().utf8().data(), __PRETTY_FUNCTION__); fflush(stdout);
     if (!m_fd) {
         LOG(MemoryPressure, "Invalidate eventfd.");
         return;
@@ -271,16 +282,22 @@ static bool defaultPollMaximumProcessMemory(size_t &criticalLimit, size_t &nonCr
             if (!fnmatch(key.utf8().data(), processName.utf8().data(), 0)) {
                 criticalLimit = size * units;
                 nonCriticalLimit = criticalLimit * 0.95; //0.75;
+                printf("MemoryPressure: %s: %s: critical: %zu, non-critical_ %zu\n",
+                    getProcessName().utf8().data(), __PRETTY_FUNCTION__,
+                    criticalLimit, nonCriticalLimit); fflush(stdout);
                 return true;
             }
         }
     }
 
+    printf("MemoryPressure: %s: %s: No limits defined\n", getProcessName().utf8().data(), __PRETTY_FUNCTION__); fflush(stdout);
     return false;
 }
 
 void MemoryPressureHandler::pollMemoryPressure()
 {
+    printf("MemoryPressure: %s: %s\n", getProcessName().utf8().data(), __PRETTY_FUNCTION__); fflush(stdout);
+
     ASSERT(!isMainThread());
 
     bool critical;
@@ -291,6 +308,10 @@ void MemoryPressureHandler::pollMemoryPressure()
 
             if (!vmRSS)
                 return;
+
+            printf("MemoryPressure: %s: %s: vmRSS: %zu, nonCriticalLimit: %zu, criticalLimit: %zu\n",
+                getProcessName().utf8().data(), __PRETTY_FUNCTION__,
+                vmRSS, s_pollMaximumProcessMemoryNonCriticalLimit, s_pollMaximumProcessMemoryCriticalLimit); fflush(stdout);
 
             if (vmRSS > s_pollMaximumProcessMemoryNonCriticalLimit) {
                 critical = vmRSS > s_pollMaximumProcessMemoryCriticalLimit;
@@ -322,6 +343,7 @@ void MemoryPressureHandler::pollMemoryPressure()
 
 inline void MemoryPressureHandler::logErrorAndCloseFDs(const char* log)
 {
+    printf("MemoryPressure: %s: %s\n", getProcessName().utf8().data(), __PRETTY_FUNCTION__); fflush(stdout);
     if (log)
         LOG(MemoryPressure, "%s, error : %m", log);
 
@@ -337,6 +359,7 @@ inline void MemoryPressureHandler::logErrorAndCloseFDs(const char* log)
 
 bool MemoryPressureHandler::tryEnsureEventFD()
 {
+    printf("MemoryPressure: %s: %s\n", getProcessName().utf8().data(), __PRETTY_FUNCTION__); fflush(stdout);
     // If the env var to use the poll method based on meminfo is set, this method overrides anything else.
     if (m_eventFD != -1 && defaultPollMaximumProcessMemory(s_pollMaximumProcessMemoryCriticalLimit, s_pollMaximumProcessMemoryNonCriticalLimit)) {
         m_eventFD = -1;
@@ -381,6 +404,7 @@ bool MemoryPressureHandler::tryEnsureEventFD()
 
 void MemoryPressureHandler::install()
 {
+    printf("MemoryPressure: %s: %s\n", getProcessName().utf8().data(), __PRETTY_FUNCTION__); fflush(stdout);
     if (m_installed || m_holdOffTimer.isActive())
         return;
 
@@ -391,6 +415,7 @@ void MemoryPressureHandler::install()
         // FIXME: Current memcg does not provide any way for users to know how serious the memory pressure is.
         // So we assume all notifications from memcg are critical for now. If memcg had better inferfaces
         // to get a detailed memory pressure level in the future, we should update here accordingly.
+        printf("MemoryPressure: %s: %s\n", getProcessName().utf8().data(), __PRETTY_FUNCTION__); fflush(stdout);
         bool critical = true;
         if (ReliefLogger::loggingEnabled())
             LOG(MemoryPressure, "Got memory pressure notification (%s)", critical ? "critical" : "non-critical");
@@ -411,6 +436,7 @@ void MemoryPressureHandler::install()
 
 void MemoryPressureHandler::uninstall()
 {
+    printf("MemoryPressure: %s: %s\n", getProcessName().utf8().data(), __PRETTY_FUNCTION__); fflush(stdout);
     if (!m_installed)
         return;
 
@@ -433,16 +459,19 @@ void MemoryPressureHandler::uninstall()
 
 void MemoryPressureHandler::holdOffTimerFired()
 {
+    printf("MemoryPressure: %s: %s\n", getProcessName().utf8().data(), __PRETTY_FUNCTION__); fflush(stdout);
     install();
 }
 
 void MemoryPressureHandler::holdOff(unsigned seconds)
 {
+    printf("MemoryPressure: %s: %s\n", getProcessName().utf8().data(), __PRETTY_FUNCTION__); fflush(stdout);
     m_holdOffTimer.startOneShot(seconds);
 }
 
 static size_t processMemoryUsage()
 {
+    printf("MemoryPressure: %s: %s\n", getProcessName().utf8().data(), __PRETTY_FUNCTION__); fflush(stdout);
     ProcessMemoryStatus memoryStatus;
     currentProcessMemoryStatus(memoryStatus);
     return (memoryStatus.resident - memoryStatus.shared);
@@ -450,6 +479,7 @@ static size_t processMemoryUsage()
 
 void MemoryPressureHandler::respondToMemoryPressure(Critical critical, Synchronous synchronous)
 {
+    printf("MemoryPressure: %s: %s\n", getProcessName().utf8().data(), __PRETTY_FUNCTION__); fflush(stdout);
     uninstall();
 
     double startTime = monotonicallyIncreasingTime();
@@ -465,6 +495,7 @@ void MemoryPressureHandler::respondToMemoryPressure(Critical critical, Synchrono
 
 void MemoryPressureHandler::platformReleaseMemory(Critical)
 {
+    printf("MemoryPressure: %s: %s\n", getProcessName().utf8().data(), __PRETTY_FUNCTION__); fflush(stdout);
 #ifdef __GLIBC__
     malloc_trim(0);
 #endif
@@ -481,6 +512,7 @@ std::optional<MemoryPressureHandler::ReliefLogger::MemoryUsage> MemoryPressureHa
 
 void MemoryPressureHandler::setMemoryPressureMonitorHandle(int fd)
 {
+    printf("MemoryPressure: %s: %s\n", getProcessName().utf8().data(), __PRETTY_FUNCTION__); fflush(stdout);
     ASSERT(!m_eventFD);
     m_eventFD = fd;
 }

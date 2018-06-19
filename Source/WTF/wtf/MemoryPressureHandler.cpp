@@ -28,6 +28,7 @@
 
 #include <wtf/MemoryFootprint.h>
 #include <wtf/NeverDestroyed.h>
+#include <wtf/text/WTFString.h>
 
 #define LOG_CHANNEL_PREFIX Log
 
@@ -39,7 +40,42 @@ WTFLogChannel LogMemoryPressure = { WTFLogChannelOn, "MemoryPressure", WTFLogLev
 WTFLogChannel LogMemoryPressure = { WTFLogChannelOn, "MemoryPressure", WTFLogLevelError, LOG_CHANNEL_WEBKIT_SUBSYSTEM, OS_LOG_DEFAULT };
 #endif
 
-WTF_EXPORT_PRIVATE bool MemoryPressureHandler::ReliefLogger::s_loggingEnabled = false;
+WTF_EXPORT_PRIVATE bool MemoryPressureHandler::ReliefLogger::s_loggingEnabled = true;
+
+static const char* s_cmdline = "/proc/self/cmdline";
+
+static inline String nextToken(FILE* file)
+{
+    if (!file)
+        return String();
+
+    static const unsigned bufferSize = 128;
+    char buffer[bufferSize] = {0, };
+    unsigned index = 0;
+    while (index < bufferSize) {
+        int ch = fgetc(file);
+        if (ch == EOF || (isASCIISpace(ch) && index)) // Break on non-initial ASCII space.
+            break;
+        if (!isASCIISpace(ch)) {
+            buffer[index] = ch;
+            index++;
+        }
+    }
+
+    return String(buffer);
+}
+
+static String getProcessName()
+{
+    FILE* file = fopen(s_cmdline, "r");
+    if (!file)
+        return String();
+
+    String result = nextToken(file);
+    fclose(file);
+
+    return result;
+}
 
 MemoryPressureHandler& MemoryPressureHandler::singleton()
 {
@@ -54,10 +90,13 @@ MemoryPressureHandler::MemoryPressureHandler()
     : m_windowsMeasurementTimer(RunLoop::main(), this, &MemoryPressureHandler::windowsMeasurementTimerFired)
 #endif
 {
+    printf("MemoryPressure: %s: %s\n", getProcessName().utf8().data(), __PRETTY_FUNCTION__); fflush(stdout);
 }
 
 void MemoryPressureHandler::setShouldUsePeriodicMemoryMonitor(bool use)
 {
+    printf("MemoryPressure: %s: %s\n", getProcessName().utf8().data(), __PRETTY_FUNCTION__); fflush(stdout);
+
     if (!isFastMallocEnabled()) {
         // If we're running with FastMalloc disabled, some kind of testing or debugging is probably happening.
         // Let's be nice and not enable the memory kill mechanism.
@@ -137,6 +176,7 @@ static MemoryUsagePolicy policyForFootprint(size_t footprint)
 
 void MemoryPressureHandler::shrinkOrDie()
 {
+    printf("MemoryPressure: %s: %s\n", getProcessName().utf8().data(), __PRETTY_FUNCTION__); fflush(stdout);
     RELEASE_LOG(MemoryPressure, "Process is above the memory kill threshold. Trying to shrink down.");
     releaseMemory(Critical::Yes, Synchronous::Yes);
 
@@ -156,6 +196,7 @@ void MemoryPressureHandler::shrinkOrDie()
 
 void MemoryPressureHandler::setMemoryUsagePolicyBasedOnFootprint(size_t footprint)
 {
+    printf("MemoryPressure: %s: %s\n", getProcessName().utf8().data(), __PRETTY_FUNCTION__); fflush(stdout);
     auto newPolicy = policyForFootprint(footprint);
     if (newPolicy == m_memoryUsagePolicy)
         return;
@@ -167,6 +208,7 @@ void MemoryPressureHandler::setMemoryUsagePolicyBasedOnFootprint(size_t footprin
 
 void MemoryPressureHandler::measurementTimerFired()
 {
+    printf("MemoryPressure: %s: %s\n", getProcessName().utf8().data(), __PRETTY_FUNCTION__); fflush(stdout);
     auto footprint = memoryFootprint();
     if (!footprint)
         return;
@@ -198,6 +240,7 @@ void MemoryPressureHandler::measurementTimerFired()
 
 void MemoryPressureHandler::doesExceedInactiveLimitWhileActive()
 {
+    printf("MemoryPressure: %s: %s\n", getProcessName().utf8().data(), __PRETTY_FUNCTION__); fflush(stdout);
     if (m_hasInvokedDidExceedInactiveLimitWhileActiveCallback)
         return;
     if (m_didExceedInactiveLimitWhileActiveCallback)
@@ -207,11 +250,13 @@ void MemoryPressureHandler::doesExceedInactiveLimitWhileActive()
 
 void MemoryPressureHandler::doesNotExceedInactiveLimitWhileActive()
 {
+    printf("MemoryPressure: %s: %s\n", getProcessName().utf8().data(), __PRETTY_FUNCTION__); fflush(stdout);
     m_hasInvokedDidExceedInactiveLimitWhileActiveCallback = false;
 }
 
 void MemoryPressureHandler::setProcessState(WebsamProcessState state)
 {
+    printf("MemoryPressure: %s: %s\n", getProcessName().utf8().data(), __PRETTY_FUNCTION__); fflush(stdout);
     if (m_processState == state)
         return;
     m_processState = state;
@@ -219,6 +264,7 @@ void MemoryPressureHandler::setProcessState(WebsamProcessState state)
 
 void MemoryPressureHandler::beginSimulatedMemoryPressure()
 {
+    printf("MemoryPressure: %s: %s\n", getProcessName().utf8().data(), __PRETTY_FUNCTION__); fflush(stdout);
     if (m_isSimulatingMemoryPressure)
         return;
     m_isSimulatingMemoryPressure = true;
@@ -228,6 +274,7 @@ void MemoryPressureHandler::beginSimulatedMemoryPressure()
 
 void MemoryPressureHandler::endSimulatedMemoryPressure()
 {
+    printf("MemoryPressure: %s: %s\n", getProcessName().utf8().data(), __PRETTY_FUNCTION__); fflush(stdout);
     if (!m_isSimulatingMemoryPressure)
         return;
     m_isSimulatingMemoryPressure = false;
@@ -236,6 +283,8 @@ void MemoryPressureHandler::endSimulatedMemoryPressure()
 
 void MemoryPressureHandler::releaseMemory(Critical critical, Synchronous synchronous)
 {
+    printf("MemoryPressure: %s: %s %s, %s (but using sync=critical inside)\n", getProcessName().utf8().data(), __PRETTY_FUNCTION__,
+        (critical == Critical::Yes) ? "critical" : "not critical", (synchronous == Synchronous::Yes) ? "sync" : "not sync"); fflush(stdout);
     if (!m_lowMemoryHandler)
         return;
 
@@ -246,6 +295,7 @@ void MemoryPressureHandler::releaseMemory(Critical critical, Synchronous synchro
 
 void MemoryPressureHandler::setUnderMemoryPressure(bool underMemoryPressure)
 {
+    printf("MemoryPressure: %s: %s\n", getProcessName().utf8().data(), __PRETTY_FUNCTION__); fflush(stdout);
     if (m_underMemoryPressure == underMemoryPressure)
         return;
     m_underMemoryPressure = underMemoryPressure;
@@ -254,12 +304,14 @@ void MemoryPressureHandler::setUnderMemoryPressure(bool underMemoryPressure)
 
 void MemoryPressureHandler::memoryPressureStatusChanged()
 {
+    printf("MemoryPressure: %s: %s\n", getProcessName().utf8().data(), __PRETTY_FUNCTION__); fflush(stdout);
     if (m_memoryPressureStatusChangedCallback)
         m_memoryPressureStatusChangedCallback(isUnderMemoryPressure());
 }
 
 void MemoryPressureHandler::ReliefLogger::logMemoryUsageChange()
 {
+    printf("MemoryPressure: %s: %s\n", getProcessName().utf8().data(), __PRETTY_FUNCTION__); fflush(stdout);
 #if !RELEASE_LOG_DISABLED
 #define STRING_SPECIFICATION "%{public}s"
 #define MEMORYPRESSURE_LOG(...) RELEASE_LOG(MemoryPressure, __VA_ARGS__)

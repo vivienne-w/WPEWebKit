@@ -113,11 +113,11 @@ public:
         static void setLoggingEnabled(bool enabled) { s_loggingEnabled = enabled; }
         static bool loggingEnabled()
         {
-#if RELEASE_LOG_DISABLED
-            return s_loggingEnabled;
-#else
+//#if RELEASE_LOG_DISABLED
+//            return s_loggingEnabled;
+//#else
             return true;
-#endif
+//#endif
         }
 
     private:
