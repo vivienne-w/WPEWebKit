@@ -66,10 +66,10 @@ static String getProcessName();
 // we wait longer to try again (s_maximumHoldOffTime).
 // These value seems reasonable and testing verifies that it throttles frequent
 // low memory events, greatly reducing CPU usage.
-static const unsigned s_minimumHoldOffTime = 5;
-static const unsigned s_maximumHoldOffTime = 30;
+static const unsigned s_minimumHoldOffTime = 1;
+static const unsigned s_maximumHoldOffTime = 5;
 static const size_t s_minimumBytesFreedToUseMinimumHoldOffTime = 1 * MB;
-static const unsigned s_holdOffMultiplier = 20;
+static const unsigned s_holdOffMultiplier = 2;
 static const unsigned s_pollTimeSec = 1;
 static const size_t s_memCriticalLimit = 3 * KB * KB; // 3 MB
 static const size_t s_memNonCriticalLimit = 5 * KB * KB; // 5 MB
@@ -337,7 +337,8 @@ void MemoryPressureHandler::pollMemoryPressure()
 
     MemoryPressureHandler::singleton().setUnderMemoryPressure(critical);
     callOnMainThread([critical] {
-        MemoryPressureHandler::singleton().respondToMemoryPressure(critical ? Critical::Yes : Critical::No);
+        // We also want to make sync memory releases when the memory status is critical.
+        MemoryPressureHandler::singleton().respondToMemoryPressure(critical ? Critical::Yes : Critical::No, critical ? Synchronous::Yes : Synchronous::No);
     });
 }
 
@@ -421,12 +422,13 @@ void MemoryPressureHandler::install()
             LOG(MemoryPressure, "Got memory pressure notification (%s)", critical ? "critical" : "non-critical");
 
         setUnderMemoryPressure(critical);
-        if (isMainThread())
-            respondToMemoryPressure(critical ? Critical::Yes : Critical::No);
-        else
-            RunLoop::main().dispatch([this, critical] { respondToMemoryPressure(critical ? Critical::Yes : Critical::No); });
-    });
 
+        // We also want to make sync memory releases when the memory status is critical.
+        if (isMainThread())
+            respondToMemoryPressure(critical ? Critical::Yes : Critical::No, critical ? Synchronous::Yes : Synchronous::No);
+        else
+            RunLoop::main().dispatch([this, critical] { respondToMemoryPressure(critical ? Critical::Yes : Critical::No, critical ? Synchronous::Yes : Synchronous::No); });
+    });
     if (ReliefLogger::loggingEnabled() && isUnderMemoryPressure())
         LOG(MemoryPressure, "System is no longer under memory pressure.");
 
