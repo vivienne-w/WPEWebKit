@@ -61,11 +61,14 @@ inline double percentAvailableMemoryInUse()
 
 inline bool isUnderMemoryPressure()
 {
+    return true;
+/*
 #if BPLATFORM(IOS)
     return percentAvailableMemoryInUse() > memoryPressureThreshold;
 #else
     return false;
 #endif
+*/
 }
     
 } // namespace bmalloc
