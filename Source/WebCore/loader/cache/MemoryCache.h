@@ -168,7 +168,6 @@ public:
     WEBCORE_EXPORT void pruneDeadResourcesToSize(unsigned targetSize);
     WEBCORE_EXPORT void pruneLiveResourcesToSize(unsigned targetSize, bool shouldDestroyDecodedDataForAllLiveResources = false);
 
-    void dumpStats();
 private:
     typedef HashMap<std::pair<URL, String /* partitionName */>, CachedResource*> CachedResourceMap;
     typedef ListHashSet<CachedResource*> LRUList;
@@ -177,7 +176,10 @@ private:
     ~MemoryCache(); // Not implemented to make sure nobody accidentally calls delete -- WebCore does not delete singletons.
 
     LRUList& lruListFor(CachedResource&);
+#ifndef NDEBUG
+    void dumpStats();
     void dumpLRULists(bool includeLive) const;
+#endif
 
     unsigned liveCapacity() const;
     unsigned deadCapacity() const;
