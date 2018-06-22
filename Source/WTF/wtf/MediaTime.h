@@ -41,6 +41,13 @@ namespace WTF {
 
 class PrintStream;
 
+class MediaTimePrinter {
+public:
+    MediaTimePrinter(void *ptr) : m_ptr(ptr) { printf("### MediaTime: %p: CREATE\n", m_ptr); fflush(stdout); }
+    ~MediaTimePrinter() { printf("### MediaTime: %p: DESTROY\n", m_ptr); fflush(stdout); }
+    void *m_ptr;
+};
+
 class WTF_EXPORT_PRIVATE MediaTime {
     WTF_MAKE_FAST_ALLOCATED;
 public:
@@ -144,6 +151,7 @@ private:
     };
     uint32_t m_timeScale;
     uint8_t m_timeFlags;
+    MediaTimePrinter p = MediaTimePrinter(this);
 };
 
 inline MediaTime operator*(int32_t lhs, const MediaTime& rhs) { return rhs.operator*(lhs); }
