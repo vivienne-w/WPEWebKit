@@ -36,14 +36,6 @@ class PrintStream;
 
 namespace WebCore {
 
-class PlatformTimeRangesPrinter {
-public:
-    PlatformTimeRangesPrinter(const char* clazz, void *ptr) : m_class(clazz), m_ptr(ptr) { printf("### %s: %p: CREATE\n", m_class, m_ptr); fflush(stdout); }
-    ~PlatformTimeRangesPrinter() { printf("### %s: %p: DESTROY\n", m_class, m_ptr); fflush(stdout); }
-    const char* m_class;
-    void *m_ptr;
-};
-
 class PlatformTimeRanges {
 public:
     explicit PlatformTimeRanges() { }
@@ -86,7 +78,6 @@ private:
 
         MediaTime m_start;
         MediaTime m_end;
-        PlatformTimeRangesPrinter p = PlatformTimeRangesPrinter("Range", this);
 
         inline bool isPointInRange(const MediaTime& point) const
         {
@@ -120,7 +111,6 @@ private:
     };
     
     Vector<Range> m_ranges;
-    PlatformTimeRangesPrinter p = PlatformTimeRangesPrinter("PlatformTimeRanges", this);
 };
 
 } // namespace WebCore
