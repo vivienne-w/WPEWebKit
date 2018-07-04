@@ -251,7 +251,7 @@ static AvoidanceReasonFlags canUseForStyle(const RenderStyle& style, IncludeReas
 
 AvoidanceReasonFlags canUseForWithReason(const RenderBlockFlow& flow, IncludeReasons includeReasons)
 {
-#ifndef NDEBUG
+#if 0
     static std::once_flag onceFlag;
     std::call_once(onceFlag, [] {
         registerNotifyCallback("com.apple.WebKit.showSimpleLineLayoutCoverage", WTF::Function<void()> { printSimpleLineLayoutCoverage });
