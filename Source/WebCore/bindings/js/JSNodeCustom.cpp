@@ -61,6 +61,7 @@
 #include "SVGElement.h"
 #include "ScriptState.h"
 #include "ShadowRoot.h"
+#include "GCReachableRef.h"
 #include "StyleSheet.h"
 #include "StyledElement.h"
 #include "Text.h"
@@ -98,6 +99,10 @@ static inline bool isReachableFromDOM(Node* node, SlotVisitor& visitor)
         // its wrapper is responsible for marking those event listeners.
         if (node->isFiringEventListeners())
             return true;
+
+        if (GCReachableRefMap::contains(*node))
+            return true;
+
     }
 
     return visitor.containsOpaqueRoot(root(node));
