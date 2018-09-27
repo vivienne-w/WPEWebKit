@@ -4602,13 +4602,6 @@ void Internals::setTimelineCurrentTime(AnimationTimeline& timeline, double curre
     timeline.setCurrentTime(Seconds::fromMilliseconds(currentTime));
 }
 
-void Internals::testIncomingSyncIPCMessageWhileWaitingForSyncReply()
-{
-    ASSERT(contextDocument());
-    ASSERT(contextDocument()->page());
-    contextDocument()->page()->chrome().client().testIncomingSyncIPCMessageWhileWaitingForSyncReply();
-}
-
 #if ENABLE(APPLE_PAY)
 MockPaymentCoordinator& Internals::mockPaymentCoordinator() const
 {

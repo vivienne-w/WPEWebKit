@@ -483,8 +483,6 @@ public:
     virtual void didInsertMenuItemElement(HTMLMenuItemElement&) { }
     virtual void didRemoveMenuItemElement(HTMLMenuItemElement&) { }
 
-    virtual void testIncomingSyncIPCMessageWhileWaitingForSyncReply() { }
-
     virtual String signedPublicKeyAndChallengeString(unsigned, const String&, const URL&) const { return emptyString(); }
 
     virtual bool isViewVisible() { return true; }
