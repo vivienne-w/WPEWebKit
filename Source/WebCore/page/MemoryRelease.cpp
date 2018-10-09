@@ -82,6 +82,10 @@ static void releaseNoncriticalMemory(MaintainMemoryCache maintainMemoryCache)
         MemoryCache::singleton().pruneDeadResourcesToSize(0);
 
     InlineStyleSheetOwner::clearCache();
+
+#if PLATFORM(WPE)
+    GCController::singleton().garbageCollectSoon();
+#endif
 }
 
 static void releaseCriticalMemory(Synchronous synchronous, MaintainBackForwardCache maintainBackForwardCache, MaintainMemoryCache maintainMemoryCache)
@@ -117,7 +121,7 @@ static void releaseCriticalMemory(Synchronous synchronous, MaintainBackForwardCa
     if (synchronous == Synchronous::Yes) {
         GCController::singleton().garbageCollectNow();
     } else {
-#if PLATFORM(IOS_FAMILY)
+#if PLATFORM(IOS_FAMILY) || PLATFORM(WPE)
         GCController::singleton().garbageCollectNowIfNotDoneRecently();
 #else
         GCController::singleton().garbageCollectSoon();
