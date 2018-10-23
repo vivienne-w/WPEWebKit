@@ -281,6 +281,9 @@ protected:
 #if ENABLE(ENCRYPTED_MEDIA)
     RefPtr<const CDMInstance> m_cdmInstance;
 #endif
+
+public:
+    gulong debugProbeIds[10] = { 0 };
 };
 
 }
