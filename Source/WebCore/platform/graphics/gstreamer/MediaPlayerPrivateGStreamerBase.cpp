@@ -1385,6 +1385,7 @@ void MediaPlayerPrivateGStreamerBase::initializationDataEncountered(const InitDa
     GST_MEMDUMP("init data", initData.characters8(), initData.sizeInBytes());
 
     m_player->initializationDataEncountered(ASCIILiteral("cenc"), ArrayBuffer::create(reinterpret_cast<const uint8_t*>(initData.characters8()), initData.sizeInBytes()));
+    GST_TRACE("init data queued");
 }
 
 void MediaPlayerPrivateGStreamerBase::cdmInstanceAttached(const CDMInstance& instance)

@@ -86,6 +86,7 @@
 #include "TimeRanges.h"
 #include "UserContentController.h"
 #include "UserGestureIndicator.h"
+#include <gst/gst.h>
 #include <limits>
 #include <pal/Logger.h>
 #include <pal/SessionID.h>
@@ -164,6 +165,9 @@
 #if PLATFORM(IOS) || (PLATFORM(MAC) && ENABLE(VIDEO_PRESENTATION_MODE))
 #include "VideoFullscreenModel.h"
 #endif
+
+GST_DEBUG_CATEGORY_EXTERN(webkit_unaffiliated_debug);
+#define GST_CAT_DEFAULT webkit_unaffiliated_debug
 
 namespace PAL {
 template <>
@@ -2684,8 +2688,11 @@ void HTMLMediaElement::mediaPlayerInitializationDataEncountered(const String& in
     //    The event interface MediaEncryptedEvent has:
     //      initDataType = initDataType
     //      initData = initData
+    GST_TRACE("queuing initializationDataEncountered event of init data type %s with size %u", initDataType.utf8().data(), initData->byteLength());
+    GST_MEMDUMP("init data", reinterpret_cast<const uint8_t*>(initData->data()), initData->byteLength());
     MediaEncryptedEventInit initializer { initDataType, WTFMove(initData) };
     m_asyncEventQueue.enqueueEvent(MediaEncryptedEvent::create(eventNames().encryptedEvent, initializer, Event::IsTrusted::Yes));
+    GST_TRACE("event successfully queued");
 }
 
 void HTMLMediaElement::attemptToDecrypt()

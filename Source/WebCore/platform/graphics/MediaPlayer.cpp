@@ -36,6 +36,7 @@
 #include "MediaPlayerPrivate.h"
 #include "PlatformTimeRanges.h"
 #include "Settings.h"
+#include <gst/gst.h>
 #include <wtf/NeverDestroyed.h>
 #include <wtf/text/CString.h>
 
@@ -93,6 +94,10 @@
 #if USE(HOLE_PUNCH_EXTERNAL)
 #include "MediaPlayerPrivateHolePunchDummy.h"
 #endif
+
+GST_DEBUG_CATEGORY_EXTERN(webkit_unaffiliated_debug);
+#define GST_CAT_DEFAULT webkit_unaffiliated_debug
+
 namespace WebCore {
 
 const PlatformMedia NoPlatformMedia = { PlatformMedia::None, {0} };
@@ -1289,7 +1294,10 @@ String MediaPlayer::mediaKeysStorageDirectory() const
 #if ENABLE(ENCRYPTED_MEDIA)
 void MediaPlayer::initializationDataEncountered(const String& initDataType, RefPtr<ArrayBuffer>&& initData)
 {
+    GST_TRACE("queuing initializationDataEncountered event of init data type %s with size %u", initDataType.utf8().data(), initData->byteLength());
+    GST_MEMDUMP("init data", reinterpret_cast<const uint8_t*>(initData->data()), initData->byteLength());
     client().mediaPlayerInitializationDataEncountered(initDataType, WTFMove(initData));
+    GST_TRACE("init data queued");
 }
 #endif
 
