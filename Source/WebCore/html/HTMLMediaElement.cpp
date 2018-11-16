@@ -2738,6 +2738,7 @@ void HTMLMediaElement::attemptToResumePlaybackIfNecessary()
     // FIXME: ^
 
     // 3. Run the Attempt to Decrypt algorithm on the media element.
+    GST_DEBUG("attempting to decrypt");
     attemptToDecrypt();
 
     // 4. If the user agent can advance the current playback position in the direction of playback:
