@@ -1264,12 +1264,12 @@ static GstPadProbeReturn appendPipelinePadProbeDebugInformation(GstPad*, GstPadP
 void AppendPipeline::cacheProtectionEvent(GstEvent* event)
 {
     if (!m_isProcessingProtectionEvents) {
-        GST_TRACE("first event, resetting list");
+        GST_INFO("first event, resetting list");
         m_isProcessingProtectionEvents = true;
         g_value_reset(&m_cachedProtectionEvents);
     }
 
-    GST_DEBUG("caching protection event %u on append pipeline appsink pad", GST_EVENT_SEQNUM(event));
+    GST_INFO("caching protection event %u on append pipeline appsink pad", GST_EVENT_SEQNUM(event));
     GValue* eventValue = g_new0(GValue, 1);
     g_value_init(eventValue, GST_TYPE_EVENT);
     g_value_take_boxed(eventValue, event);
@@ -1288,7 +1288,7 @@ void AppendPipeline::handleProtectedBufferProbeInformation(GstPadProbeInfo* info
         return;
 
     if (wasProcessingProtectionEvents) {
-        GST_TRACE("sending %u protection events to the main thread", listSize);
+        GST_INFO("sending %u protection events to the main thread", listSize);
         GstStructure* structure = gst_structure_new_empty("demuxer-done-sending-protection-events");
         gst_structure_set_value(structure, "stream-encryption-events", &m_cachedProtectionEvents);
         GstMessage* message = gst_message_new_application(GST_OBJECT(m_demux.get()), structure);
@@ -1300,7 +1300,7 @@ void AppendPipeline::handleProtectedBufferProbeInformation(GstPadProbeInfo* info
     if (!protectionMeta)
         return;
 
-    GST_DEBUG("adding %u protection events to buffer %p", listSize, buffer);
+    GST_INFO("adding %u protection events to buffer %p", listSize, buffer);
     gst_structure_set_value(protectionMeta->info, "stream-encryption-events", &m_cachedProtectionEvents);
 }
 
@@ -1333,7 +1333,7 @@ void AppendPipeline::demuxerIsDoneSendingProtectionEvents(const GstStructure* st
     const GValue* streamEncryptionEventsList = gst_structure_get_value(structure, "stream-encryption-events");
     ASSERT(streamEncryptionEventsList && GST_VALUE_HOLDS_LIST(streamEncryptionEventsList));
     unsigned streamEncryptionEventsListSize = gst_value_list_get_size(streamEncryptionEventsList);
-    GST_DEBUG("forwarding %u protection events to the player", streamEncryptionEventsListSize);
+    GST_INFO("forwarding %u protection events to the player", streamEncryptionEventsListSize);
     if (!streamEncryptionEventsListSize)
         return;
     Vector<GstEvent*> protectionEvents;
@@ -1341,7 +1341,7 @@ void AppendPipeline::demuxerIsDoneSendingProtectionEvents(const GstStructure* st
     for (unsigned i = 0; i < streamEncryptionEventsListSize; ++i)
         protectionEvents.uncheckedAppend(static_cast<GstEvent*>(g_value_get_boxed(gst_value_list_get_value(streamEncryptionEventsList, i))));
     m_playerPrivate->handleProtectionEvents(protectionEvents);
-    GST_TRACE("events forwarded");
+    GST_INFO("events forwarded");
 }
 #endif
 

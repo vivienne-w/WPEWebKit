@@ -1294,10 +1294,10 @@ String MediaPlayer::mediaKeysStorageDirectory() const
 #if ENABLE(ENCRYPTED_MEDIA)
 void MediaPlayer::initializationDataEncountered(const String& initDataType, RefPtr<ArrayBuffer>&& initData)
 {
-    GST_TRACE("queuing initializationDataEncountered event of init data type %s with size %u", initDataType.utf8().data(), initData->byteLength());
+    GST_INFO("queuing initializationDataEncountered event of init data type %s with size %u", initDataType.utf8().data(), initData->byteLength());
     GST_MEMDUMP("init data", reinterpret_cast<const uint8_t*>(initData->data()), initData->byteLength());
     client().mediaPlayerInitializationDataEncountered(initDataType, WTFMove(initData));
-    GST_TRACE("init data queued");
+    GST_INFO("init data queued");
 }
 #endif
 

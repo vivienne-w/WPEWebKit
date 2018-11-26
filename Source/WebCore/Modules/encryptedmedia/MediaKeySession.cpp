@@ -120,7 +120,7 @@ void MediaKeySession::generateRequest(const AtomicString& initDataType, const Bu
     // 1. If this object is closed, return a promise rejected with an InvalidStateError.
     // 2. If this object's uninitialized value is false, return a promise rejected with an InvalidStateError.
     LOG(EME, "EME - generateRequest");
-    GST_TRACE("generating request");
+    GST_INFO("generating request");
 
     if (m_closed || !m_uninitialized) {
         promise->reject(InvalidStateError);
@@ -197,7 +197,7 @@ void MediaKeySession::generateRequest(const AtomicString& initDataType, const Bu
         }
 
         LOG(EME, "EME - request license from CDM implementation");
-        GST_TRACE("requesting license, init data type %s with size %u", initDataType.string().utf8().data(), initData->size());
+        GST_INFO("requesting license, init data type %s with size %u", initDataType.string().utf8().data(), initData->size());
         m_instance->requestLicense(m_sessionType, initDataType, WTFMove(initData), WTFMove(customData), [this, weakThis = m_weakPtrFactory.createWeakPtr(*this), promise = WTFMove(promise)] (Ref<SharedBuffer>&& message, const String& sessionId, bool needsIndividualization, CDMInstance::SuccessValue succeeded) mutable {
             if (!weakThis)
                 return;
@@ -361,7 +361,7 @@ void MediaKeySession::update(const BufferSource& response, Ref<DeferredPromise>&
     // W3C Editor's Draft 09 November 2016
 
     LOG(EME, "EME - update session for %s", m_sessionId.utf8().data());
-    GST_TRACE("updating session");
+    GST_INFO("updating session");
 
     // When this method is invoked, the user agent must run the following steps:
     // 1. If this object is closed, return a promise rejected with an InvalidStateError.
@@ -397,7 +397,7 @@ void MediaKeySession::update(const BufferSource& response, Ref<DeferredPromise>&
         // 6.7. Use the cdm to execute the following steps:
 
         LOG(EME, "EME - updating CDM license for %s", m_sessionId.utf8().data());
-        GST_TRACE("updating license");
+        GST_INFO("updating license");
         m_instance->updateLicense(m_sessionId, m_sessionType, *sanitizedResponse, [this, weakThis = m_weakPtrFactory.createWeakPtr(*this), promise = WTFMove(promise)] (bool sessionWasClosed, std::optional<CDMInstance::KeyStatusVector>&& changedKeys, std::optional<double>&& changedExpiration, std::optional<CDMInstance::Message>&& message, CDMInstance::SuccessValue succeeded) mutable {
             if (!weakThis)
                 return;

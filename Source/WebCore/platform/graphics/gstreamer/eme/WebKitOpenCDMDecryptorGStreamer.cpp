@@ -150,16 +150,16 @@ static SessionResult webKitMediaOpenCDMDecryptorResetSessionFromInitDataIfNeeded
     SessionResult returnValue = InvalidSession;
     String session = cdmInstanceOpenCDM.sessionIdByInitData(initData);
     if (session.isEmpty() || !cdmInstanceOpenCDM.isSessionIdUsable(session)) {
-        GST_DEBUG_OBJECT(self, "session %s is empty or unusable, resetting", session.utf8().data());
+        GST_INFO_OBJECT(self, "session %s is empty or unusable, resetting", session.utf8().data());
         priv->m_session = String();
         priv->m_openCdm = nullptr;
     } else if (session != priv->m_session) {
         priv->m_session = session;
         priv->m_openCdm = std::make_unique<media::OpenCdm>(priv->m_session.utf8().data());
-        GST_DEBUG_OBJECT(self, "new session %s is usable", session.utf8().data());
+        GST_INFO_OBJECT(self, "new session %s is usable", session.utf8().data());
         returnValue = NewSession;
     } else {
-        GST_DEBUG_OBJECT(self, "same session %s", session.utf8().data());
+        GST_INFO_OBJECT(self, "same session %s", session.utf8().data());
         returnValue = OldSession;
     }
 
@@ -168,13 +168,13 @@ static SessionResult webKitMediaOpenCDMDecryptorResetSessionFromInitDataIfNeeded
 
 static bool webKitMediaOpenCDMDecryptorHandleInitData(WebKitMediaCommonEncryptionDecrypt* self, const WebCore::InitData& initData)
 {
-    GST_TRACE_OBJECT(self, "handling init data of size %u and MD5 %s", initData.sizeInBytes(), WebCore::GStreamerEMEUtilities::initDataMD5(initData).utf8().data());
+    GST_INFO_OBJECT(self, "handling init data of size %u and MD5 %s", initData.sizeInBytes(), WebCore::GStreamerEMEUtilities::initDataMD5(initData).utf8().data());
     return webKitMediaOpenCDMDecryptorResetSessionFromInitDataIfNeeded(self, initData) == InvalidSession;
 }
 
 static bool webKitMediaOpenCDMDecryptorAttemptToDecryptWithLocalInstance(WebKitMediaCommonEncryptionDecrypt* self, const WebCore::InitData& initData)
 {
-    GST_TRACE_OBJECT(self, "attempting to decrypt with local instance and init data of size %u and MD5 %s", initData.sizeInBytes(), WebCore::GStreamerEMEUtilities::initDataMD5(initData).utf8().data());
+    GST_INFO_OBJECT(self, "attempting to decrypt with local instance and init data of size %u and MD5 %s", initData.sizeInBytes(), WebCore::GStreamerEMEUtilities::initDataMD5(initData).utf8().data());
     return webKitMediaOpenCDMDecryptorResetSessionFromInitDataIfNeeded(self, initData) != InvalidSession;
 }
 
@@ -237,7 +237,7 @@ static bool webKitMediaOpenCDMDecryptorDecrypt(WebKitMediaCommonEncryptionDecryp
         gst_byte_reader_set_pos(reader.get(), 0);
 
         // Decrypt cipher.
-        GST_TRACE_OBJECT(self, "decrypting (subsample)");
+        GST_INFO_OBJECT(self, "decrypting (subsample)");
         if ((errorCode = priv->m_openCdm->Decrypt(holdEncryptedData.get(), static_cast<uint32_t>(totalEncrypted), mappedIV.data(), static_cast<uint32_t>(mappedIV.size()), mappedKeyID.size(), mappedKeyID.data(), WEBCORE_GSTREAMER_EME_LICENSE_KEY_RESPONSE_TIMEOUT.millisecondsAs<uint32_t>()))) {
             GST_ERROR_OBJECT(self, "subsample decryption failed, error code %d", errorCode);
             return false;
@@ -256,7 +256,7 @@ static bool webKitMediaOpenCDMDecryptorDecrypt(WebKitMediaCommonEncryptionDecryp
             total += inClear + inEncrypted;
         }
     } else {
-        GST_TRACE_OBJECT(self, "decrypting (no subsamples)");
+        GST_INFO_OBJECT(self, "decrypting (no subsamples)");
 
         if ((errorCode = priv->m_openCdm->Decrypt(mappedBuffer.data(), static_cast<uint32_t>(mappedBuffer.size()), mappedIV.data(), static_cast<uint32_t>(mappedIV.size()), mappedKeyID.size(), mappedKeyID.data(), WEBCORE_GSTREAMER_EME_LICENSE_KEY_RESPONSE_TIMEOUT.millisecondsAs<uint32_t>()))) {
             GST_ERROR_OBJECT(self, "decryption failed, error code %d", errorCode);

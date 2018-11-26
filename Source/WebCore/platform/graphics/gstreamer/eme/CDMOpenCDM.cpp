@@ -284,14 +284,14 @@ void CDMInstanceOpenCDM::requestLicense(LicenseType licenseType, const AtomicStr
 {
     InitData initData = InitData(reinterpret_cast<const uint8_t*>(rawInitData->data()), rawInitData->size());
 
-    GST_TRACE("Going to request a new session id, init data size %u and MD5 %s", initData.sizeInBytes(), GStreamerEMEUtilities::initDataMD5(initData).utf8().data());
+    GST_INFO("Going to request a new session id, init data size %u and MD5 %s", initData.sizeInBytes(), GStreamerEMEUtilities::initDataMD5(initData).utf8().data());
     GST_MEMDUMP("init data", initData.characters8(), initData.sizeInBytes());
 
     String sessionIdAsString = sessionIdByInitData(initData);
     if (!sessionIdAsString.isEmpty()) {
         auto session = lookupSession(sessionIdAsString);
         if (session->isValid()){
-            GST_DEBUG("session %s exists and is valid, we can return now", sessionIdAsString.utf8().data());
+            GST_INFO("session %s exists and is valid, we can return now", sessionIdAsString.utf8().data());
             callback(session->message(), sessionIdAsString, session->needsIndividualization(), Succeeded);
         } else {
             GST_WARNING("existing session %s is invalid, bailing out", sessionIdAsString.utf8().data());
@@ -319,7 +319,7 @@ void CDMInstanceOpenCDM::requestLicense(LicenseType licenseType, const AtomicStr
         return;
     }
 
-    GST_DEBUG("created valid session %s", sessionIdAsString.utf8().data());
+    GST_INFO("created valid session %s", sessionIdAsString.utf8().data());
     callback(newSession->message(), sessionIdAsString, newSession->needsIndividualization(), Succeeded);
 
     if (!addSession(sessionIdAsString, newSession.ptr()))
@@ -335,7 +335,7 @@ void CDMInstanceOpenCDM::updateLicense(const String& sessionId, LicenseType, con
     }
 
     auto result = session->update(reinterpret_cast<const uint8_t*>(response.data()), response.size());
-    GST_DEBUG("session id %s, key status is %d (usable: %s)", sessionId.utf8().data(), result.first, boolForPrinting(result.first == media::OpenCdm::KeyStatus::Usable));
+    GST_INFO("session id %s, key status is %d (usable: %s)", sessionId.utf8().data(), result.first, boolForPrinting(result.first == media::OpenCdm::KeyStatus::Usable));
 
     if (result.first == media::OpenCdm::KeyStatus::Usable) {
         KeyStatusVector changedKeys;
@@ -454,7 +454,7 @@ String CDMInstanceOpenCDM::sessionIdByInitData(const InitData& initData) const
         return { };
     }
 
-    GST_TRACE("init data MD5 %s", GStreamerEMEUtilities::initDataMD5(initData).utf8().data());
+    GST_INFO("init data MD5 %s", GStreamerEMEUtilities::initDataMD5(initData).utf8().data());
     GST_MEMDUMP("init data", reinterpret_cast<const uint8_t*>(initData.characters8()), initData.length());
 
     String result;

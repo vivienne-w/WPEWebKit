@@ -2688,11 +2688,11 @@ void HTMLMediaElement::mediaPlayerInitializationDataEncountered(const String& in
     //    The event interface MediaEncryptedEvent has:
     //      initDataType = initDataType
     //      initData = initData
-    GST_TRACE("queuing initializationDataEncountered event of init data type %s with size %u", initDataType.utf8().data(), initData->byteLength());
+    GST_INFO("queuing initializationDataEncountered event of init data type %s with size %u", initDataType.utf8().data(), initData->byteLength());
     GST_MEMDUMP("init data", reinterpret_cast<const uint8_t*>(initData->data()), initData->byteLength());
     MediaEncryptedEventInit initializer { initDataType, WTFMove(initData) };
     m_asyncEventQueue.enqueueEvent(MediaEncryptedEvent::create(eventNames().encryptedEvent, initializer, Event::IsTrusted::Yes));
-    GST_TRACE("event successfully queued");
+    GST_INFO("event successfully queued");
 }
 
 void HTMLMediaElement::attemptToDecrypt()
@@ -2738,7 +2738,7 @@ void HTMLMediaElement::attemptToResumePlaybackIfNecessary()
     // FIXME: ^
 
     // 3. Run the Attempt to Decrypt algorithm on the media element.
-    GST_DEBUG("attempting to decrypt");
+    GST_INFO("attempting to decrypt");
     attemptToDecrypt();
 
     // 4. If the user agent can advance the current playback position in the direction of playback:

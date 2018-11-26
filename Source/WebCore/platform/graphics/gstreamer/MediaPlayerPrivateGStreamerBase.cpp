@@ -1356,9 +1356,9 @@ void MediaPlayerPrivateGStreamerBase::handleProtectionEvents(const Vector<GstEve
         const char* eventKeySystemUUID = nullptr;
         gst_event_parse_protection(event, &eventKeySystemUUID, &buffer, nullptr);
 
-        GST_TRACE("handling protection event %u for %s", GST_EVENT_SEQNUM(event), eventKeySystemUUID);
+        GST_INFO("handling protection event %u for %s", GST_EVENT_SEQNUM(event), eventKeySystemUUID);
         if (m_cdmInstance && g_strcmp0(eventKeySystemUUID, GStreamerEMEUtilities::keySystemToUuid(m_cdmInstance->keySystem()))) {
-            GST_TRACE("protection event for a different key system");
+            GST_INFO("protection event for a different key system");
             continue;
         }
 
@@ -1369,7 +1369,7 @@ void MediaPlayerPrivateGStreamerBase::handleProtectionEvents(const Vector<GstEve
         }
 
         concatenatedInitDatas.append(mappedBuffer.data(), mappedBuffer.size());
-        GST_DEBUG("init data of size %u", mappedBuffer.size());
+        GST_INFO("init data of size %u", mappedBuffer.size());
         GST_MEMDUMP("init data", mappedBuffer.data(), mappedBuffer.size());
     }
 
@@ -1381,11 +1381,11 @@ void MediaPlayerPrivateGStreamerBase::initializationDataEncountered(const InitDa
 {
     ASSERT(isMainThread());
 
-    GST_TRACE("init data encountered of size %" G_GSIZE_FORMAT " with MD5 %s", initData.sizeInBytes(), GStreamerEMEUtilities::initDataMD5(initData).utf8().data());
+    GST_INFO("init data encountered of size %" G_GSIZE_FORMAT " with MD5 %s", initData.sizeInBytes(), GStreamerEMEUtilities::initDataMD5(initData).utf8().data());
     GST_MEMDUMP("init data", initData.characters8(), initData.sizeInBytes());
 
     m_player->initializationDataEncountered(ASCIILiteral("cenc"), ArrayBuffer::create(reinterpret_cast<const uint8_t*>(initData.characters8()), initData.sizeInBytes()));
-    GST_TRACE("init data queued");
+    GST_INFO("init data queued");
 }
 
 void MediaPlayerPrivateGStreamerBase::cdmInstanceAttached(const CDMInstance& instance)
@@ -1408,7 +1408,7 @@ void MediaPlayerPrivateGStreamerBase::cdmInstanceAttached(const CDMInstance& ins
     gst_structure_set(contextStructure, "cdm-instance", G_TYPE_POINTER, m_cdmInstance.get(), nullptr);
     gst_element_set_context(GST_ELEMENT(m_pipeline.get()), context.get());
 
-    GST_DEBUG_OBJECT(m_pipeline.get(), "CDM instance %p dispatched as context", m_cdmInstance.get());
+    GST_INFO_OBJECT(m_pipeline.get(), "CDM instance %p dispatched as context", m_cdmInstance.get());
 }
 
 void MediaPlayerPrivateGStreamerBase::cdmInstanceDetached(const CDMInstance& instance)
@@ -1423,7 +1423,7 @@ void MediaPlayerPrivateGStreamerBase::cdmInstanceDetached(const CDMInstance& ins
 
     ASSERT(m_pipeline);
 
-    GST_DEBUG_OBJECT(m_pipeline.get(), "detaching CDM instance %p, setting empty context", m_cdmInstance.get());
+    GST_INFO_OBJECT(m_pipeline.get(), "detaching CDM instance %p, setting empty context", m_cdmInstance.get());
     m_cdmInstance = nullptr;
 
     GRefPtr<GstContext> context = adoptGRef(gst_context_new("drm-cdm-instance", FALSE));
@@ -1434,13 +1434,13 @@ void MediaPlayerPrivateGStreamerBase::attemptToDecryptWithInstance(const CDMInst
 {
     ASSERT(isMainThread());
     ASSERT(m_cdmInstance.get() == &instance);
-    GST_TRACE("instance %p, current stored %p", &instance, m_cdmInstance.get());
+    GST_INFO("instance %p, current stored %p", &instance, m_cdmInstance.get());
     attemptToDecryptWithLocalInstance();
 }
 
 void MediaPlayerPrivateGStreamerBase::attemptToDecryptWithLocalInstance()
 {
-    GST_TRACE("dispatching attempt to decrypt with local instance");
+    GST_INFO("dispatching attempt to decrypt with local instance");
     dispatchDecryptionStructure(GUniquePtr<GstStructure>(gst_structure_new_empty("drm-attempt-to-decrypt-with-local-instance")));
 }
 
@@ -1454,7 +1454,7 @@ void MediaPlayerPrivateGStreamerBase::dispatchDecryptionKey(GstBuffer* buffer)
 void MediaPlayerPrivateGStreamerBase::dispatchDecryptionStructure(GUniquePtr<GstStructure>&& structure)
 {
     bool eventHandled = gst_element_send_event(m_pipeline.get(), gst_event_new_custom(GST_EVENT_CUSTOM_DOWNSTREAM_OOB, structure.release()));
-    GST_TRACE("emitted decryption structure on pipeline, event handled %s", boolForPrinting(eventHandled));
+    GST_INFO("emitted decryption structure on pipeline, event handled %s", boolForPrinting(eventHandled));
 }
 #endif
 
@@ -1466,7 +1466,7 @@ bool MediaPlayerPrivateGStreamerBase::supportsKeySystem(const String& keySystem,
     result = GStreamerEMEUtilities::isClearKeyKeySystem(keySystem);
 #endif
 
-    GST_DEBUG("checking for KeySystem support with %s and type %s: %s", keySystem.utf8().data(), mimeType.utf8().data(), boolForPrinting(result));
+    GST_INFO("checking for KeySystem support with %s and type %s: %s", keySystem.utf8().data(), mimeType.utf8().data(), boolForPrinting(result));
     return result;
 }
 
