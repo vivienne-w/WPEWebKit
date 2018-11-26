@@ -127,8 +127,9 @@ static void webkit_media_opencdm_decrypt_init(WebKitOpenCDMDecrypt* self)
     WebKitOpenCDMDecryptPrivate* priv = GST_WEBKIT_OPENCDM_DECRYPT_GET_PRIVATE(self);
     self->priv = priv;
     new (priv) WebKitOpenCDMDecryptPrivate();
+    GST_INFO_OBJECT(self, "creating OpenCDM object");
     self->priv->m_openCdm = std::make_unique<media::OpenCdm>();
-    GST_TRACE_OBJECT(self, "created");
+    GST_INFO_OBJECT(self, "OpenCDM object and decryptor created");
 }
 
 static void webKitMediaOpenCDMDecryptorFinalize(GObject* object)
@@ -155,6 +156,7 @@ static SessionResult webKitMediaOpenCDMDecryptorResetSessionFromInitDataIfNeeded
         priv->m_openCdm = nullptr;
     } else if (session != priv->m_session) {
         priv->m_session = session;
+        GST_INFO_OBJECT(self, "creating session");
         priv->m_openCdm = std::make_unique<media::OpenCdm>(priv->m_session.utf8().data());
         GST_INFO_OBJECT(self, "new session %s is usable", session.utf8().data());
         returnValue = NewSession;
@@ -242,6 +244,7 @@ static bool webKitMediaOpenCDMDecryptorDecrypt(WebKitMediaCommonEncryptionDecryp
             GST_ERROR_OBJECT(self, "subsample decryption failed, error code %d", errorCode);
             return false;
         }
+        GST_INFO_OBJECT(self, "decrypted");
 
         // Re-build sub-sample data.
         index = 0;
@@ -262,6 +265,7 @@ static bool webKitMediaOpenCDMDecryptorDecrypt(WebKitMediaCommonEncryptionDecryp
             GST_ERROR_OBJECT(self, "decryption failed, error code %d", errorCode);
             return false;
         }
+        GST_INFO_OBJECT(self, "decrypted");
     }
 
     return true;

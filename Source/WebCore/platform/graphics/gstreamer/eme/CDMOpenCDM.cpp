@@ -227,7 +227,9 @@ CDMInstanceOpenCDM::Session::Session(const media::OpenCdm& source, Ref<WebCore::
     uint16_t temporaryURLLength = sizeof(temporaryURL);
 
     std::string message;
+    GST_INFO("getting key message");
     m_session.GetKeyMessage(message, temporaryURL, temporaryURLLength);
+    GST_INFO("got key message");
 
     if (message.empty() || !temporaryURLLength)
         return;
@@ -248,21 +250,27 @@ CDMInstanceOpenCDM::Session::Session(const media::OpenCdm& source, Ref<WebCore::
 std::pair<media::OpenCdm::KeyStatus, String> CDMInstanceOpenCDM::Session::update(const uint8_t* data, const unsigned length)
 {
     std::string response;
+    GST_INFO("updating session");
     m_lastStatus = m_session.Update(data, length, response);
+    GST_INFO("session updated");
     return std::make_pair(m_lastStatus, String(response.c_str(), response.empty() ? 0 : response.size()));
 }
 
 std::pair<bool, String> CDMInstanceOpenCDM::Session::load()
 {
     std::string response;
+    GST_INFO("loading session");
     bool result = !m_session.Load(response);
+    GST_INFO("session loaded");
     return std::make_pair(result, String(response.c_str(), response.empty() ? 0 : response.size()));
 }
 
 std::pair<bool, String> CDMInstanceOpenCDM::Session::remove()
 {
     std::string response;
+    GST_INFO("removing session");
     bool result = !m_session.Remove(response);
+    GST_INFO("session removed");
     return std::make_pair(result, String(response.c_str(), response.empty() ? 0 : response.size()));
 }
 
@@ -271,13 +279,18 @@ CDMInstanceOpenCDM::CDMInstanceOpenCDM(media::OpenCdm& system, const String& key
     , m_mimeType("video/x-h264")
     , m_openCDM(system)
 {
+    GST_INFO("selecting key system");
     m_openCDM.SelectKeySystem(keySystem.utf8().data());
+    GST_INFO("key system selected");
 }
 
 CDMInstance::SuccessValue CDMInstanceOpenCDM::setServerCertificate(Ref<SharedBuffer>&& certificate)
 {
-    return m_openCDM.SetServerCertificate(reinterpret_cast<unsigned char*>(const_cast<char*>(certificate->data())), certificate->size())
+    GST_INFO("selecting server cert");
+    auto returnValue = m_openCDM.SetServerCertificate(reinterpret_cast<unsigned char*>(const_cast<char*>(certificate->data())), certificate->size())
         ? WebCore::CDMInstance::SuccessValue::Succeeded : WebCore::CDMInstance::SuccessValue::Failed;
+    GST_INFO("server cert selected");
+    return returnValue;
 }
 
 void CDMInstanceOpenCDM::requestLicense(LicenseType licenseType, const AtomicString&, Ref<SharedBuffer>&& rawInitData, Ref<SharedBuffer>&& rawCustomData, LicenseCallback callback)
@@ -301,8 +314,11 @@ void CDMInstanceOpenCDM::requestLicense(LicenseType licenseType, const AtomicStr
     }
 
     // FIXME: Why do we have this weirdness here? It looks like this is a way to reference count on the OpenCDM object.
+    GST_INFO("dupping m_openCDM");
     media::OpenCdm openCDM(m_openCDM);
+    GST_INFO("m_openCDM dupped, creating session");
     std::string sessionId = openCDM.CreateSession(m_mimeType, reinterpret_cast<const uint8_t*>(rawInitData->data()), rawInitData->size(), !rawCustomData->isEmpty() ? reinterpret_cast<const uint8_t*>(rawCustomData->data()) : nullptr, rawCustomData->size(), openCDMLicenseType(licenseType));
+    GST_INFO("session created");
 
     if (sessionId.empty()) {
         GST_ERROR("could not create session id");
