@@ -44,6 +44,7 @@ struct _WebKitMediaCommonEncryptionDecryptPrivate {
     Vector<GRefPtr<GstEvent>> m_protectionEvents;
     uint32_t m_currentEvent { 0 };
     bool m_isFlushing { false };
+    int locks { 0 };
 };
 
 static GstStateChangeReturn webKitMediaCommonEncryptionDecryptorChangeState(GstElement*, GstStateChange transition);
@@ -166,10 +167,12 @@ static GstCaps* webkitMediaCommonEncryptionDecryptTransformCaps(GstBaseTransform
             gst_structure_set_name(outgoingStructure.get(), "application/x-cenc");
 
             WebKitMediaCommonEncryptionDecryptPrivate* priv = self->priv;
+            GST_INFO_OBJECT(self, "locking %d", g_atomic_int_add(&priv->locks, 1) + 1);
             LockHolder locker(priv->m_mutex);
             if (webkitMediaCommonEncryptionDecryptIsCDMInstanceAvailable(self))
                 gst_structure_set(outgoingStructure.get(),
                     "protection-system", G_TYPE_STRING, WebCore::GStreamerEMEUtilities::keySystemToUuid(priv->m_cdmInstance->keySystem()), nullptr);
+            GST_INFO_OBJECT(self, "unlocking %d", g_atomic_int_add(&priv->locks, -1) - 1);
         }
 
         bool duplicate = false;
@@ -203,10 +206,12 @@ static GstFlowReturn webkitMediaCommonEncryptionDecryptTransformInPlace(GstBaseT
     WebKitMediaCommonEncryptionDecrypt* self = WEBKIT_MEDIA_CENC_DECRYPT(base);
     WebKitMediaCommonEncryptionDecryptPrivate* priv = WEBKIT_MEDIA_CENC_DECRYPT_GET_PRIVATE(self);
 
+    GST_INFO_OBJECT(self, "locking %d", g_atomic_int_add(&priv->locks, 1) + 1);
     LockHolder locker(priv->m_mutex);
 
     if (priv->m_isFlushing) {
         GST_INFO_OBJECT(self, "flushing");
+        GST_INFO_OBJECT(self, "unlocking %d", g_atomic_int_add(&priv->locks, -1) - 1);
         return GST_FLOW_FLUSHING;
     }
 
@@ -224,6 +229,7 @@ static GstFlowReturn webkitMediaCommonEncryptionDecryptTransformInPlace(GstBaseT
         gst_structure_remove_field(protectionMeta->info, "stream-encryption-events");
         if (!gst_structure_n_fields(protectionMeta->info)) {
             GST_ERROR_OBJECT(self, "buffer %p did not have enough protection meta-data", buffer);
+            GST_INFO_OBJECT(self, "unlocking %d", g_atomic_int_add(&priv->locks, -1) - 1);
             return GST_FLOW_NOT_SUPPORTED;
         }
     }
@@ -236,17 +242,23 @@ static GstFlowReturn webkitMediaCommonEncryptionDecryptTransformInPlace(GstBaseT
         GST_INFO_OBJECT(self, "key not available yet, waiting for it");
         if (GST_STATE(GST_ELEMENT(self)) < GST_STATE_PAUSED || (GST_STATE_TARGET(GST_ELEMENT(self)) != GST_STATE_VOID_PENDING && GST_STATE_TARGET(GST_ELEMENT(self)) < GST_STATE_PAUSED)) {
             GST_ERROR_OBJECT(self, "can't process key requests in less than PAUSED state");
+            GST_INFO_OBJECT(self, "unlocking %d", g_atomic_int_add(&priv->locks, -1) - 1);
             return GST_FLOW_NOT_SUPPORTED;
         }
+        GST_INFO_OBJECT(self, "waiting, unlocking %d", g_atomic_int_add(&priv->locks, -1) - 1);
         if (!priv->m_condition.waitFor(priv->m_mutex, WEBCORE_GSTREAMER_EME_LICENSE_KEY_RESPONSE_TIMEOUT, [priv] { return priv->m_isFlushing || priv->m_keyReceived; })) {
+            GST_INFO_OBJECT(self, "waiting done, locking %d", g_atomic_int_add(&priv->locks, 1) + 1);
             if (priv->m_isFlushing) {
                 GST_INFO_OBJECT(self, "flushing");
+                GST_INFO_OBJECT(self, "unlocking %d", g_atomic_int_add(&priv->locks, -1) - 1);
                 return GST_FLOW_FLUSHING;
             } else {
                 GST_ERROR_OBJECT(self, "key not available");
+                GST_INFO_OBJECT(self, "unlocking %d", g_atomic_int_add(&priv->locks, -1) - 1);
                 return GST_FLOW_NOT_SUPPORTED;
             }
         }
+        GST_INFO_OBJECT(self, "waiting done, locking %d", g_atomic_int_add(&priv->locks, 1) + 1);
         GST_INFO_OBJECT(self, "key received, continuing");
     }
 
@@ -254,6 +266,7 @@ static GstFlowReturn webkitMediaCommonEncryptionDecryptTransformInPlace(GstBaseT
     if (!gst_structure_get_uint(protectionMeta->info, "iv_size", &ivSize)) {
         GST_ERROR_OBJECT(self, "Failed to get iv_size");
         gst_buffer_remove_meta(buffer, reinterpret_cast<GstMeta*>(protectionMeta));
+        GST_INFO_OBJECT(self, "unlocking %d", g_atomic_int_add(&priv->locks, -1) - 1);
         return GST_FLOW_NOT_SUPPORTED;
     }
 
@@ -261,11 +274,13 @@ static GstFlowReturn webkitMediaCommonEncryptionDecryptTransformInPlace(GstBaseT
     if (!gst_structure_get_boolean(protectionMeta->info, "encrypted", &encrypted)) {
         GST_ERROR_OBJECT(self, "Failed to get encrypted flag");
         gst_buffer_remove_meta(buffer, reinterpret_cast<GstMeta*>(protectionMeta));
+        GST_INFO_OBJECT(self, "unlocking %d", g_atomic_int_add(&priv->locks, -1) - 1);
         return GST_FLOW_NOT_SUPPORTED;
     }
 
     if (!ivSize || !encrypted) {
         gst_buffer_remove_meta(buffer, reinterpret_cast<GstMeta*>(protectionMeta));
+        GST_INFO_OBJECT(self, "unlocking %d", g_atomic_int_add(&priv->locks, -1) - 1);
         return GST_FLOW_OK;
     }
 
@@ -275,6 +290,7 @@ static GstFlowReturn webkitMediaCommonEncryptionDecryptTransformInPlace(GstBaseT
     if (!gst_structure_get_uint(protectionMeta->info, "subsample_count", &subSampleCount)) {
         GST_ERROR_OBJECT(self, "Failed to get subsample_count");
         gst_buffer_remove_meta(buffer, reinterpret_cast<GstMeta*>(protectionMeta));
+        GST_INFO_OBJECT(self, "unlocking %d", g_atomic_int_add(&priv->locks, -1) - 1);
         return GST_FLOW_NOT_SUPPORTED;
     }
 
@@ -285,6 +301,7 @@ static GstFlowReturn webkitMediaCommonEncryptionDecryptTransformInPlace(GstBaseT
         if (!value) {
             GST_ERROR_OBJECT(self, "Failed to get subsamples");
             gst_buffer_remove_meta(buffer, reinterpret_cast<GstMeta*>(protectionMeta));
+            GST_INFO_OBJECT(self, "unlocking %d", g_atomic_int_add(&priv->locks, -1) - 1);
             return GST_FLOW_NOT_SUPPORTED;
         }
         subSamplesBuffer = gst_value_get_buffer(value);
@@ -294,6 +311,7 @@ static GstFlowReturn webkitMediaCommonEncryptionDecryptTransformInPlace(GstBaseT
     GstBuffer* keyIDBuffer = nullptr;
     if (!value) {
         GST_ERROR_OBJECT(self, "No key ID available for encrypted sample");
+        GST_INFO_OBJECT(self, "unlocking %d", g_atomic_int_add(&priv->locks, -1) - 1);
         return GST_FLOW_NOT_SUPPORTED;
     }
 
@@ -303,6 +321,7 @@ static GstFlowReturn webkitMediaCommonEncryptionDecryptTransformInPlace(GstBaseT
         GstMappedBuffer mappedKeyID(keyIDBuffer, GST_MAP_READ);
         if (!mappedKeyID) {
             GST_ERROR_OBJECT(self, "failed to map key ID buffer");
+            GST_INFO_OBJECT(self, "unlocking %d", g_atomic_int_add(&priv->locks, -1) - 1);
             return GST_FLOW_NOT_SUPPORTED;
         }
         GST_MEMDUMP_OBJECT(self, "key ID for sample", mappedKeyID.data(), mappedKeyID.size());
@@ -313,6 +332,7 @@ static GstFlowReturn webkitMediaCommonEncryptionDecryptTransformInPlace(GstBaseT
     if (!klass->setupCipher(self, keyIDBuffer)) {
         GST_ERROR_OBJECT(self, "Failed to configure cipher");
         gst_buffer_remove_meta(buffer, reinterpret_cast<GstMeta*>(protectionMeta));
+        GST_INFO_OBJECT(self, "unlocking %d", g_atomic_int_add(&priv->locks, -1) - 1);
         return GST_FLOW_NOT_SUPPORTED;
     }
 
@@ -321,6 +341,7 @@ static GstFlowReturn webkitMediaCommonEncryptionDecryptTransformInPlace(GstBaseT
         GST_ERROR_OBJECT(self, "Failed to get IV for sample");
         klass->releaseCipher(self);
         gst_buffer_remove_meta(buffer, reinterpret_cast<GstMeta*>(protectionMeta));
+        GST_INFO_OBJECT(self, "unlocking %d", g_atomic_int_add(&priv->locks, -1) - 1);
         return GST_FLOW_NOT_SUPPORTED;
     }
 
@@ -330,11 +351,13 @@ static GstFlowReturn webkitMediaCommonEncryptionDecryptTransformInPlace(GstBaseT
         GST_ERROR_OBJECT(self, "Decryption failed");
         klass->releaseCipher(self);
         gst_buffer_remove_meta(buffer, reinterpret_cast<GstMeta*>(protectionMeta));
+        GST_INFO_OBJECT(self, "unlocking %d", g_atomic_int_add(&priv->locks, -1) - 1);
         return GST_FLOW_NOT_SUPPORTED;
     }
 
     klass->releaseCipher(self);
     gst_buffer_remove_meta(buffer, reinterpret_cast<GstMeta*>(protectionMeta));
+    GST_INFO_OBJECT(self, "unlocking %d", g_atomic_int_add(&priv->locks, -1) - 1);
     return GST_FLOW_OK;
 }
 
@@ -425,6 +448,7 @@ static void webkitMediaCommonEncryptionDecryptProcessProtectionEvents(WebKitMedi
                 }
             } else {
                 GST_INFO_OBJECT(self, "key is already usable");
+                GST_INFO_OBJECT(self, "waking up");
                 priv->m_condition.notifyOne();
                 break;
             }
@@ -465,10 +489,12 @@ static gboolean webkitMediaCommonEncryptionDecryptSinkEventHandler(GstBaseTransf
         gst_event_parse_protection(event, &systemId, nullptr, nullptr);
         GST_INFO_OBJECT(self, "received protection event %u for %s", GST_EVENT_SEQNUM(event), systemId);
 
+        GST_INFO_OBJECT(self, "locking %d", g_atomic_int_add(&priv->locks, 1) + 1);
         LockHolder locker(priv->m_mutex);
         priv->m_protectionEvents.append(event);
         result = TRUE;
         gst_event_unref(event);
+        GST_INFO_OBJECT(self, "unlocking %d", g_atomic_int_add(&priv->locks, -1) - 1);
         break;
     }
     case GST_EVENT_CUSTOM_DOWNSTREAM_OOB: {
@@ -476,12 +502,16 @@ static gboolean webkitMediaCommonEncryptionDecryptSinkEventHandler(GstBaseTransf
         if (gst_structure_has_name(structure, "drm-attempt-to-decrypt-with-local-instance")) {
             gst_event_unref(event);
             result = TRUE;
+            GST_INFO_OBJECT(self, "locking %d", g_atomic_int_add(&priv->locks, 1) + 1);
             LockHolder locker(priv->m_mutex);
             RELEASE_ASSERT(webkitMediaCommonEncryptionDecryptIsCDMInstanceAvailable(self));
             priv->m_keyReceived = klass->attemptToDecryptWithLocalInstance(self, priv->m_initDatas.get(WebCore::GStreamerEMEUtilities::keySystemToUuid(priv->m_cdmInstance->keySystem())));
             GST_INFO_OBJECT(self, "attempted to decrypt with local instance %p, key received %s", priv->m_cdmInstance.get(), WTF::boolForPrinting(priv->m_keyReceived));
-            if (priv->m_keyReceived)
+            if (priv->m_keyReceived) {
+                GST_INFO_OBJECT(self, "waking up");
                 priv->m_condition.notifyOne();
+            }
+            GST_INFO_OBJECT(self, "unlocking %d", g_atomic_int_add(&priv->locks, -1) - 1);
         }
         break;
     }
@@ -523,6 +553,7 @@ static GstStateChangeReturn webKitMediaCommonEncryptionDecryptorChangeState(GstE
     case GST_STATE_CHANGE_PAUSED_TO_READY:
         GST_DEBUG_OBJECT(self, "PAUSED->READY");
         priv->m_isFlushing = false;
+        GST_INFO_OBJECT(self, "waking up");
         priv->m_condition.notifyOne();
         break;
     default:
