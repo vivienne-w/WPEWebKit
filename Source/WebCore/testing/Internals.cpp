@@ -4729,4 +4729,12 @@ bool Internals::supportsVCPEncoder()
 #endif
 }
 
+void Internals::setAlwaysAllowLocalWebarchive() const
+{
+    auto* document = contextDocument();
+    if (!document)
+        return;
+    document->setAlwaysAllowLocalWebarchive();
+}
+
 } // namespace WebCore

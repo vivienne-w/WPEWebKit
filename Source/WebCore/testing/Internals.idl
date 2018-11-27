@@ -669,4 +669,6 @@ enum CompositingPolicy {
     unsigned long primaryScreenDisplayID();
 
     boolean supportsVCPEncoder();
+
+    void setAlwaysAllowLocalWebarchive();
 };

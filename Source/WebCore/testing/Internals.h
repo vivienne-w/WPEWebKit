@@ -735,6 +735,8 @@ public:
 
     bool supportsVCPEncoder();
         
+    void setAlwaysAllowLocalWebarchive() const;
+
 private:
     explicit Internals(Document&);
     Document* contextDocument() const;
