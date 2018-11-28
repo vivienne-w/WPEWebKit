@@ -254,6 +254,9 @@ static GstFlowReturn webkitMediaCommonEncryptionDecryptTransformInPlace(GstBaseT
                 return GST_FLOW_FLUSHING;
             } else {
                 GST_ERROR_OBJECT(self, "key not available");
+                GstObject* pipeline;
+                for (pipeline = GST_OBJECT_PARENT(self); GST_OBJECT_PARENT(pipeline); pipeline = GST_OBJECT_PARENT(pipeline));
+                GST_DEBUG_BIN_TO_DOT_FILE_WITH_TS(GST_BIN(pipeline), GST_DEBUG_GRAPH_SHOW_ALL, "webkit-key-not-received");
                 GST_INFO_OBJECT(self, "unlocking %d", g_atomic_int_add(&priv->locks, -1) - 1);
                 return GST_FLOW_NOT_SUPPORTED;
             }
