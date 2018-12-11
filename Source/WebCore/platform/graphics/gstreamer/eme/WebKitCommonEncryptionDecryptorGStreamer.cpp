@@ -522,6 +522,7 @@ static GstStateChangeReturn webKitMediaCommonEncryptionDecryptorChangeState(GstE
     switch (transition) {
     case GST_STATE_CHANGE_PAUSED_TO_READY:
         GST_DEBUG_OBJECT(self, "PAUSED->READY");
+        priv->m_isFlushing = false;
         priv->m_condition.notifyOne();
         break;
     default:
