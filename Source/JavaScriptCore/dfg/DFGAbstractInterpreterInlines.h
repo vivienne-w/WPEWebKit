@@ -1858,17 +1858,19 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
                 if (isNuked(structureIDEarly))
                     return false;
 
-                WTF::loadLoadFence();
-                Butterfly* butterfly = array->butterfly();
-
-                WTF::loadLoadFence();
-                StructureID structureIDLate = array->structureID();
-
-                if (structureIDEarly != structureIDLate)
-                    return false;
-
-                Structure* structure = m_vm.getStructure(structureIDLate);
                 if (node->arrayMode().arrayClass() == Array::OriginalCopyOnWriteArray) {
+
+                    WTF::loadLoadFence();
+                    Butterfly* butterfly = array->butterfly();
+
+                    WTF::loadLoadFence();
+                    StructureID structureIDLate = array->structureID();
+
+                    if (structureIDEarly != structureIDLate)
+                        return false;
+
+                    Structure* structure = m_vm.getStructure(structureIDLate);
+
                     if (!isCopyOnWrite(structure->indexingMode()))
                         return false;
 
@@ -1901,16 +1903,26 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
                 }
 
                 if (node->arrayMode().type() == Array::ArrayStorage || node->arrayMode().type() == Array::SlowPutArrayStorage) {
-                    if (!hasAnyArrayStorage(structure->indexingMode()))
-                        return false;
-
-                    if (structure->typeInfo().interceptsGetOwnPropertySlotByIndexEvenWhenLengthIsNotZero())
-                        return false;
-
                     JSValue value;
                     {
                         // ArrayStorage's Butterfly can be half-broken state.
                         auto locker = holdLock(array->cellLock());
+
+                        WTF::loadLoadFence();
+                        Butterfly* butterfly = array->butterfly();
+
+                        WTF::loadLoadFence();
+                        StructureID structureIDLate = array->structureID();
+
+                        if (structureIDEarly != structureIDLate)
+                            return false;
+
+                        Structure* structure = m_vm.getStructure(structureIDLate);
+                        if (!hasAnyArrayStorage(structure->indexingMode()))
+                            return false;
+
+                        if (structure->typeInfo().interceptsGetOwnPropertySlotByIndexEvenWhenLengthIsNotZero())
+                            return false;
 
                         ArrayStorage* storage = butterfly->arrayStorage();
                         if (index >= storage->length())
