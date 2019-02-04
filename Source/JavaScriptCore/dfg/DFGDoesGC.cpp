@@ -144,7 +144,6 @@ bool doesGC(Graph& graph, Node* node)
     case CompareBelow:
     case CompareBelowEq:
     case CompareEqPtr:
-    case SameValue:
     case Call:
     case DirectCall:
     case TailCallInlinedCaller:
@@ -427,6 +426,11 @@ bool doesGC(Graph& graph, Node* node)
         // FIXME: Should we constant fold this case?
         // https://bugs.webkit.org/show_bug.cgi?id=194308
         if (node->child1()->isInt32Constant() && (node->child1()->asUInt32() <= maxSingleCharacterString))
+            return false;
+        return true;
+
+    case SameValue:
+        if (node->isBinaryUseKind(DoubleRepUse))
             return false;
         return true;
 
