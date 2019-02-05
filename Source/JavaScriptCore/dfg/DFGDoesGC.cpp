@@ -141,11 +141,6 @@ bool doesGC(Graph& graph, Node* node)
     case CheckNotEmpty:
     case AssertNotEmpty:
     case CheckStringIdent:
-    case RegExpExec:
-    case RegExpExecNonGlobalOrSticky:
-    case RegExpTest:
-    case RegExpMatchFast:
-    case RegExpMatchFastGlobal:
     case CompareBelow:
     case CompareBelowEq:
     case CompareEqPtr:
@@ -186,8 +181,6 @@ bool doesGC(Graph& graph, Node* node)
     case ToNumber:
     case ToString:
     case CallStringConstructor:
-    case NumberToStringWithRadix:
-    case NumberToStringWithValidRadixConstant:
     case InByVal:
     case InById:
     case HasOwnProperty:
@@ -206,7 +199,6 @@ bool doesGC(Graph& graph, Node* node)
     case ForceOSRExit:
     case CPUIntrinsic:
     case CheckTraps:
-    case StringFromCharCode:
     case NormalizeMapKey:
     case GetMapBucket:
     case GetMapBucketHead:
@@ -367,6 +359,13 @@ bool doesGC(Graph& graph, Node* node)
     case ParseInt: // We might resolve a rope even though we don't clobber anything.
     case SetAdd:
     case MapSet:
+    case RegExpExec:
+    case RegExpExecNonGlobalOrSticky:
+    case RegExpTest:
+    case RegExpMatchFast:
+    case RegExpMatchFastGlobal:
+    case NumberToStringWithRadix:
+    case NumberToStringWithValidRadixConstant:
         return true;
 
     case CompareEq:
@@ -423,6 +422,13 @@ bool doesGC(Graph& graph, Node* node)
         
     case MultiPutByOffset:
         return node->multiPutByOffsetData().reallocatesStorage();
+
+    case StringFromCharCode:
+        // FIXME: Should we constant fold this case?
+        // https://bugs.webkit.org/show_bug.cgi?id=194308
+        if (node->child1()->isInt32Constant() && (node->child1()->asUInt32() <= maxSingleCharacterString))
+            return false;
+        return true;
 
     case LastNodeType:
         RELEASE_ASSERT_NOT_REACHED();
