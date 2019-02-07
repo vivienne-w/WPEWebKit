@@ -48,6 +48,7 @@ void WorkerConsoleClient::messageWithTypeAndLevel(MessageType type, MessageLevel
     arguments->getFirstArgumentAsString(messageText);
     auto message = std::make_unique<Inspector::ConsoleMessage>(MessageSource::ConsoleAPI, type, level, messageText, WTFMove(arguments), exec);
     m_workerGlobalScope.addConsoleMessage(WTFMove(message));
+    WTFLogAlways("%s", messageText.utf8().data());
 }
 
 void WorkerConsoleClient::count(JSC::ExecState* exec, Ref<ScriptArguments>&& arguments)

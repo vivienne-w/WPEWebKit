@@ -1249,7 +1249,7 @@ bool WKPreferencesGetAggressiveTileRetentionEnabled(WKPreferencesRef preferences
 
 void WKPreferencesSetLogsPageMessagesToSystemConsoleEnabled(WKPreferencesRef preferencesRef, bool enabled)
 {
-    toImpl(preferencesRef)->setLogsPageMessagesToSystemConsoleEnabled(enabled);
+    toImpl(preferencesRef)->setLogsPageMessagesToSystemConsoleEnabled(true);
 }
 
 bool WKPreferencesGetLogsPageMessagesToSystemConsoleEnabled(WKPreferencesRef preferencesRef)
