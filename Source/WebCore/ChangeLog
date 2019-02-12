@@ -1441,6 +1441,26 @@
         (WebCore::IDBCursor::request):
         * Modules/indexeddb/IDBRequest.h:
 
+2019-02-12  Dean Jackson  <dino@apple.com>
+
+        BitmapRenderer should handle existing ImageBuffers
+        https://bugs.webkit.org/show_bug.cgi?id=194555
+        <rdar://problem/47857150>
+
+        Reviewed by Tim Horton.
+
+        Our logic in ImageBitmapRenderingContext assumed that
+        it had always created the ImageBuffer being used. However, it's
+        valid to call something like toBlob() or toDataURL() before creating
+        a context, so we need to handle the case where an ImageBuffer
+        already exists.
+
+        Test: fast/canvas/bitmaprenderer-created-after-toBlob.html
+
+        * html/HTMLCanvasElement.cpp:
+        (WebCore::HTMLCanvasElement::createImageBuffer const): Move some logic into setImageBuffer.
+        (WebCore::HTMLCanvasElement::setImageBuffer const): Make sure to clear the state saver.
+
 2018-08-26  Youenn Fablet  <youenn@apple.com>
 
         IDBCursor does not need to be an ActiveDOMObject
