@@ -670,5 +670,5 @@ enum CompositingPolicy {
 
     boolean supportsVCPEncoder();
 
-    void setAlwaysAllowLocalWebarchive();
+    void setAlwaysAllowLocalWebarchive(boolean alwaysAllowLocalWebarchive);
 };
