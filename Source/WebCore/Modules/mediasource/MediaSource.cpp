@@ -402,6 +402,12 @@ void MediaSource::monitorSourceBuffers()
     if (isClosed())
         return;
 
+    LOG(MediaSource, "MediaSource::monitorSourceBuffers(): Ranges buffered in MediaSource: %s", buffered()->toString().utf8().data());
+    for (auto i = m_activeSourceBuffers->begin(); i != m_activeSourceBuffers->end(); ++i) {
+        SourceBuffer *sb = (*i).get();
+        LOG(MediaSource, "MediaSource::monitorSourceBuffers(): Ranges buffered in SourceBuffer (%p): %s", sb, sb->bufferedInternal().ranges().toString().utf8().data());
+    }
+
     // 2.4.4 SourceBuffer Monitoring
     // https://rawgit.com/w3c/media-source/45627646344eea0170dd1cbc5a3d508ca751abb8/media-source-respec.html#buffer-monitoring
 

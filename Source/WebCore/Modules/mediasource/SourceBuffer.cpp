@@ -2252,6 +2252,20 @@ Vector<String> SourceBuffer::bufferedSamplesForTrackID(const AtomicString& track
     return sampleDescriptions;
 }
 
+// DEBUG
+String SourceBuffer::lastTrackID()
+{
+    VideoTrack* vtrack = videoTracks().lastItem();
+    if (vtrack)
+        return vtrack->id().string();
+
+    AudioTrack* atrack = audioTracks().lastItem();
+    if (atrack)
+        return atrack->id().string();
+
+    return "no-track";
+}
+
 Vector<String> SourceBuffer::enqueuedSamplesForTrackID(const AtomicString& trackID)
 {
     return m_private->enqueuedSamplesForTrackID(trackID);

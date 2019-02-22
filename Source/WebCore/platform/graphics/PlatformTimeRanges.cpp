@@ -268,4 +268,16 @@ void PlatformTimeRanges::dump(PrintStream& out) const
         out.print("[", start(i), "..", end(i), "] ");
 }
 
+String PlatformTimeRanges::toString() const
+{
+    String s;
+
+    if (!length())
+        return s;
+
+    for (size_t i = 0; i < length(); ++i)
+        s = s + "[" + start(i).toString().utf8().data() + ", " + end(i).toString().utf8().data() + "] ";
+    return s;
+}
+
 }
