@@ -120,6 +120,9 @@ public:
 
     void trySignalAllSamplesEnqueued();
 
+    // DEBUG
+    String lastTrackID();
+
 private:
     SourceBuffer(Ref<SourceBufferPrivate>&&, MediaSource*);
 

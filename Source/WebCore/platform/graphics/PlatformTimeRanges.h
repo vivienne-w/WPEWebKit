@@ -29,6 +29,7 @@
 #include <algorithm>
 #include <wtf/MediaTime.h>
 #include <wtf/Vector.h>
+#include <wtf/text/WTFString.h>
 
 namespace WTF {
 class PrintStream;
@@ -65,6 +66,7 @@ public:
     MediaTime totalDuration() const;
 
     void dump(WTF::PrintStream&) const;
+    String toString() const;
 
 private:
     // We consider all the Ranges to be semi-bounded as follow: [start, end[
