@@ -38,7 +38,6 @@ void WebPageCreationParameters::encode(IPC::Encoder& encoder) const
     encoder << store;
     encoder.encodeEnum(drawingAreaType);
     encoder << pageGroupData;
-    encoder << drawsBackground;
     encoder << isEditable;
     encoder << underlayColor;
     encoder << useFixedLayout;
@@ -120,6 +119,7 @@ void WebPageCreationParameters::encode(IPC::Encoder& encoder) const
     encoder << contentRuleLists;
 #endif
     encoder << localStorageQuota;
+    encoder << backgroundColor;
 }
 
 std::optional<WebPageCreationParameters> WebPageCreationParameters::decode(IPC::Decoder& decoder)
@@ -138,8 +138,6 @@ std::optional<WebPageCreationParameters> WebPageCreationParameters::decode(IPC::
     if (!pageGroupData)
         return std::nullopt;
     parameters.pageGroupData = WTFMove(*pageGroupData);
-    if (!decoder.decode(parameters.drawsBackground))
-        return std::nullopt;
     if (!decoder.decode(parameters.isEditable))
         return std::nullopt;
     if (!decoder.decode(parameters.underlayColor))
@@ -346,6 +344,12 @@ std::optional<WebPageCreationParameters> WebPageCreationParameters::decode(IPC::
 
     if (!decoder.decode(parameters.localStorageQuota))
         return std::nullopt;
+
+    std::optional<std::optional<WebCore::Color>> backgroundColor;
+    decoder >> backgroundColor;
+    if (!backgroundColor)
+        return std::nullopt;
+    parameters.backgroundColor = WTFMove(*backgroundColor);
 
     return WTFMove(parameters);
 }

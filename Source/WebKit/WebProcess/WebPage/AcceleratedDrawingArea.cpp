@@ -98,14 +98,6 @@ void AcceleratedDrawingArea::scroll(const IntRect& scrollRect, const IntSize& sc
         m_layerTreeHost->scrollNonCompositedContents(scrollRect);
 }
 
-void AcceleratedDrawingArea::pageBackgroundTransparencyChanged()
-{
-    if (m_layerTreeHost)
-        m_layerTreeHost->pageBackgroundTransparencyChanged();
-    else if (m_previousLayerTreeHost)
-        m_previousLayerTreeHost->pageBackgroundTransparencyChanged();
-}
-
 void AcceleratedDrawingArea::setLayerTreeStateIsFrozen(bool isFrozen)
 {
     if (m_layerTreeStateIsFrozen == isFrozen)
@@ -350,22 +342,17 @@ void AcceleratedDrawingArea::handleIsInWindowChanged()
     // We don't use suspendPainting() to suspend cause that will disable layer flushes, and we need one
     // flush more to tell the ThreadedCompositor to render the transparent background. The change in the
     // IsInWindow flag will deattach the GraphicsLayer tree from the root layer and request a layer
-    // flush, which will cause the ThreadedCompositor to render an empty content. By setting
-    // forceBackgroundTransparency we tell the LayerTreeHost to set drawsBackground to false, so
-    // besides the empty content we have a transparent background.
+    // flush, which will cause the ThreadedCompositor to render an empty content. We set the page
+    // background color to transparent, so besides the empty content we have a transparent background.
 
     if (!m_webPage.corePage()->isInWindow()) {
-        if (m_layerTreeHost)
-            m_layerTreeHost->forceBackgroundTransparency();
-
+        m_webPage.setBackgroundColor(Color(Color::transparent));
         m_webPage.corePage()->suspendActiveDOMObjectsAndAnimations();
         m_webPage.corePage()->suspendScriptedAnimations();
         return;
     }
 
-    if (m_layerTreeHost)
-        m_layerTreeHost->restoreBackgroundTransparency();
-
+    m_webPage.setBackgroundColor(std::nullopt);
     setNeedsDisplay();
     m_webPage.corePage()->resumeActiveDOMObjectsAndAnimations();
     m_webPage.corePage()->resumeScriptedAnimations();

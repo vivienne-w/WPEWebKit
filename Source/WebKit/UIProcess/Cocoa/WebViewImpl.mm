@@ -1395,7 +1395,10 @@ void WebViewImpl::didRelaunchProcess()
 
 void WebViewImpl::setDrawsBackground(bool drawsBackground)
 {
-    m_page->setDrawsBackground(drawsBackground);
+    std::optional<WebCore::Color> backgroundColor;
+    if (!drawsBackground)
+        backgroundColor = WebCore::Color(WebCore::Color::transparent);
+    m_page->setBackgroundColor(backgroundColor);
 
     // Make sure updateLayer gets called on the web view.
     [m_view setNeedsDisplay:YES];
@@ -1403,7 +1406,8 @@ void WebViewImpl::setDrawsBackground(bool drawsBackground)
 
 bool WebViewImpl::drawsBackground() const
 {
-    return m_page->drawsBackground();
+    auto& backgroundColor = m_page->backgroundColor();
+    return !backgroundColor || backgroundColor.value().isVisible();
 }
 
 void WebViewImpl::setBackgroundColor(NSColor *backgroundColor)
@@ -1423,7 +1427,7 @@ NSColor *WebViewImpl::backgroundColor() const
 
 bool WebViewImpl::isOpaque() const
 {
-    return m_page->drawsBackground();
+    return drawsBackground();
 }
 
 void WebViewImpl::setShouldSuppressFirstResponderChanges(bool shouldSuppress)

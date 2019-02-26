@@ -37,10 +37,6 @@
 #include <WebCore/RefPtrCairo.h>
 #include <cairo.h>
 
-#if PLATFORM(GTK)
-#include <gtk/gtk.h>
-#endif
-
 #if PLATFORM(GTK) && PLATFORM(X11) && defined(GDK_WINDOWING_X11)
 #include <WebCore/BackingStoreBackendCairoX11.h>
 #include <WebCore/PlatformDisplayX11.h>
@@ -92,15 +88,6 @@ void BackingStore::incorporateUpdate(ShareableBitmap* bitmap, const UpdateInfo& 
     for (const auto& updateRect : updateInfo.updateRects) {
         IntRect srcRect = updateRect;
         srcRect.move(-updateRectLocation.x(), -updateRectLocation.y());
-#if PLATFORM(GTK)
-        if (!m_webPageProxy.drawsBackground()) {
-            const WebCore::Color color = m_webPageProxy.backgroundColor();
-            if (!color.isOpaque())
-                graphicsContext.clearRect(srcRect);
-            if (color.isVisible())
-                graphicsContext.fillRect(srcRect, color);
-        }
-#endif
         bitmap->paint(graphicsContext, deviceScaleFactor(), updateRect.location(), srcRect);
     }
 }

@@ -409,7 +409,6 @@ WebPageProxy::WebPageProxy(PageClient& pageClient, WebProcessProxy& process, uin
     , m_cpuLimit(m_configuration->cpuLimit())
     , m_backForwardList(WebBackForwardList::create(*this))
     , m_waitsForPaintAfterViewDidMoveToWindow(m_configuration->waitsForPaintAfterViewDidMoveToWindow())
-    , m_drawsBackground(m_configuration->drawsBackground())
     , m_pageID(pageID)
     , m_controlledByAutomation(m_configuration->isControlledByAutomation())
 #if PLATFORM(COCOA)
@@ -420,6 +419,9 @@ WebPageProxy::WebPageProxy(PageClient& pageClient, WebProcessProxy& process, uin
     , m_resetRecentCrashCountTimer(RunLoop::main(), this, &WebPageProxy::resetRecentCrashCount)
     , m_httpCookieStorage(API::HTTPCookieStorage::create(*this))
 {
+    if (!m_configuration->drawsBackground())
+        m_backgroundColor = Color(Color::transparent);
+
     m_webProcessLifetimeTracker.addObserver(m_visitedLinkStore);
     m_webProcessLifetimeTracker.addObserver(m_websiteDataStore);
 
@@ -1360,15 +1362,14 @@ void WebPageProxy::setRemoteInspectionNameOverride(const String& name)
 
 #endif
 
-void WebPageProxy::setDrawsBackground(bool drawsBackground)
+void WebPageProxy::setBackgroundColor(const std::optional<Color>& color)
 {
-    if (m_drawsBackground == drawsBackground)
+    if (m_backgroundColor == color)
         return;
 
-    m_drawsBackground = drawsBackground;
-
+    m_backgroundColor = color;
     if (isValid())
-        m_process->send(Messages::WebPage::SetDrawsBackground(drawsBackground), m_pageID);
+        m_process->send(Messages::WebPage::SetBackgroundColor(color), m_pageID);
 }
 
 void WebPageProxy::setTopContentInset(float contentInset)
@@ -6232,7 +6233,6 @@ WebPageCreationParameters WebPageProxy::creationParameters()
     parameters.drawingAreaType = m_drawingArea->type();
     parameters.store = preferencesStore();
     parameters.pageGroupData = m_pageGroup->data();
-    parameters.drawsBackground = m_drawsBackground;
     parameters.isEditable = m_isEditable;
     parameters.underlayColor = m_underlayColor;
     parameters.useFixedLayout = m_useFixedLayout;
@@ -6326,6 +6326,8 @@ WebPageCreationParameters WebPageProxy::creationParameters()
 #if ENABLE(APPLICATION_MANIFEST)
     parameters.applicationManifest = m_configuration->applicationManifest() ? std::optional<WebCore::ApplicationManifest>(m_configuration->applicationManifest()->applicationManifest()) : std::nullopt;
 #endif
+
+    parameters.backgroundColor = m_backgroundColor;
 
     m_process->addWebUserContentControllerProxy(m_userContentController, parameters);
 

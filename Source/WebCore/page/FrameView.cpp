@@ -2935,12 +2935,13 @@ void FrameView::setBaseBackgroundColor(const Color& backgroundColor)
     renderView()->compositor().rootBackgroundColorOrTransparencyChanged();
 }
 
-void FrameView::updateBackgroundRecursively(const Color& backgroundColor, bool transparent)
+void FrameView::updateBackgroundRecursively(const std::optional<Color>& backgroundColor)
 {
+    Color baseBackgroundColor = backgroundColor.value_or(Color::white);
     for (auto* frame = m_frame.ptr(); frame; frame = frame->tree().traverseNext(m_frame.ptr())) {
         if (FrameView* view = frame->view()) {
-            view->setTransparent(transparent);
-            view->setBaseBackgroundColor(backgroundColor);
+            view->setTransparent(!baseBackgroundColor.isVisible());
+            view->setBaseBackgroundColor(baseBackgroundColor);
             if (view->needsLayout())
                 view->layoutContext().scheduleLayout();
         }

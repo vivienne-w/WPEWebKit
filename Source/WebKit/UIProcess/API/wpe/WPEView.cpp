@@ -77,7 +77,7 @@ View::View(struct wpe_view_backend* backend, const API::PageConfiguration& baseC
 #endif
 
 #if PLATFORM(INTEL_CE)
-    m_pageProxy->setDrawsBackground(false);
+    m_pageProxy->setBackgroundColor(WebCore::Color(WebCore::Color::transparent));
 #endif
 
     m_compositingManagerProxy.initialize();
@@ -102,13 +102,13 @@ View::View(struct wpe_view_backend* backend, const API::PageConfiguration& baseC
             auto& view = *reinterpret_cast<View*>(data);
             OptionSet<WebCore::ActivityState::Flag> flags;
             if (state & wpe_view_activity_state_visible)
-                flags.add(WebCore::ActivityState::IsVisible);
+                flags |= WebCore::ActivityState::IsVisible;
             if (state & wpe_view_activity_state_focused) {
-                flags.add(WebCore::ActivityState::IsFocused);
-                flags.add(WebCore::ActivityState::WindowIsActive);
+                flags |= WebCore::ActivityState::IsFocused;
+                flags |= WebCore::ActivityState::WindowIsActive;
             }
             if (state & wpe_view_activity_state_in_window)
-                flags.add(WebCore::ActivityState::IsInWindow);
+                flags |= WebCore::ActivityState::IsInWindow;
             view.setViewState(flags);
         },
 #else

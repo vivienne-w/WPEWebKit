@@ -501,8 +501,6 @@ WebPage::WebPage(uint64_t pageID, WebPageCreationParameters&& parameters)
 
     setUseFixedLayout(parameters.useFixedLayout);
 
-    setDrawsBackground(parameters.drawsBackground);
-
     setUnderlayColor(parameters.underlayColor);
 
     setPaginationMode(parameters.paginationMode);
@@ -625,6 +623,8 @@ WebPage::WebPage(uint64_t pageID, WebPageCreationParameters&& parameters)
 #endif
 
     m_page->settings().setLocalStorageQuota(parameters.localStorageQuota);
+
+    setBackgroundColor(parameters.backgroundColor);
 }
 
 #if ENABLE(WEB_RTC)
@@ -2651,20 +2651,16 @@ void WebPage::setRemoteInspectionNameOverride(const String& name)
 }
 #endif
 
-void WebPage::setDrawsBackground(bool drawsBackground)
+void WebPage::setBackgroundColor(const std::optional<WebCore::Color>& backgroundColor)
 {
-    if (m_drawsBackground == drawsBackground)
+    if (m_backgroundColor == backgroundColor)
         return;
 
-    m_drawsBackground = drawsBackground;
+    m_backgroundColor = backgroundColor;
 
-    if (FrameView* frameView = mainFrameView()) {
-        Color backgroundColor = drawsBackground ? Color::white : Color::transparent;
-        bool isTransparent = !drawsBackground;
-        frameView->updateBackgroundRecursively(backgroundColor, isTransparent);
-    }
+    if (FrameView* frameView = mainFrameView())
+        frameView->updateBackgroundRecursively(backgroundColor);
 
-    m_drawingArea->pageBackgroundTransparencyChanged();
     m_drawingArea->setNeedsDisplay();
 }
 

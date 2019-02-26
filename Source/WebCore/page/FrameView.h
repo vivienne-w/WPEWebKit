@@ -190,7 +190,7 @@ public:
 
     WEBCORE_EXPORT Color baseBackgroundColor() const;
     WEBCORE_EXPORT void setBaseBackgroundColor(const Color&);
-    WEBCORE_EXPORT void updateBackgroundRecursively(const Color&, bool);
+    WEBCORE_EXPORT void updateBackgroundRecursively(const std::optional<Color>& backgroundColor);
 
     enum ExtendedBackgroundModeFlags {
         ExtendedBackgroundModeNone          = 0,

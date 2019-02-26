@@ -73,7 +73,6 @@ struct WebPageCreationParameters {
     DrawingAreaType drawingAreaType;
     WebPageGroupData pageGroupData;
 
-    bool drawsBackground;
     bool isEditable;
 
     WebCore::Color underlayColor;
@@ -188,6 +187,8 @@ struct WebPageCreationParameters {
 
     // LocalStorageQuota setting
     uint32_t localStorageQuota;
+
+    std::optional<WebCore::Color> backgroundColor;
 };
 
 } // namespace WebKit

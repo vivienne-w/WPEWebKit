@@ -55,9 +55,6 @@ protected:
     void sizeDidChange(const WebCore::IntSize& newSize) override;
 
     void deviceOrPageScaleFactorChanged() override;
-    void pageBackgroundTransparencyChanged() override;
-    void forceBackgroundTransparency() override { };
-    void restoreBackgroundTransparency() override { };
 
     void setVisibleContentsRect(const WebCore::FloatRect&);
     void renderNextFrame(bool);

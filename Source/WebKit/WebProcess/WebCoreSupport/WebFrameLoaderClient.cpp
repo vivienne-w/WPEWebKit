@@ -1394,9 +1394,7 @@ void WebFrameLoaderClient::transitionToCommittedForNewPage()
 {
     WebPage* webPage = m_frame->page();
 
-    Color backgroundColor = webPage->drawsBackground() ? Color::white : Color::transparent;
     bool isMainFrame = m_frame->isMainFrame();
-    bool isTransparent = !webPage->drawsBackground();
     bool shouldUseFixedLayout = isMainFrame && webPage->useFixedLayout();
     bool shouldDisableScrolling = isMainFrame && !webPage->mainFrameIsScrollable();
     bool shouldHideScrollbars = shouldDisableScrolling;
@@ -1421,7 +1419,7 @@ void WebFrameLoaderClient::transitionToCommittedForNewPage()
     bool horizontalLock = shouldHideScrollbars || webPage->alwaysShowsHorizontalScroller();
     bool verticalLock = shouldHideScrollbars || webPage->alwaysShowsVerticalScroller();
 
-    m_frame->coreFrame()->createView(webPage->size(), backgroundColor, isTransparent,
+    m_frame->coreFrame()->createView(webPage->size(), webPage->backgroundColor(),
         webPage->fixedLayoutSize(), fixedVisibleContentRect, shouldUseFixedLayout,
         horizontalScrollbarMode, horizontalLock, verticalScrollbarMode, verticalLock);
 

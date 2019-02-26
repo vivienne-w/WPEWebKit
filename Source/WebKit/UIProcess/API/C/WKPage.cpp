@@ -77,6 +77,7 @@
 #include "WebProcessPool.h"
 #include "WebProcessProxy.h"
 #include "WebProtectionSpace.h"
+#include <WebCore/Color.h>
 #include <WebCore/Page.h>
 #include <WebCore/SSLKeyGenerator.h>
 #include <WebCore/SecurityOriginData.h>
@@ -714,7 +715,10 @@ bool WKPageBackgroundExtendsBeyondPage(WKPageRef pageRef)
 
 void WKPageSetDrawsBackground(WKPageRef pageRef, bool drawsBackground)
 {
-    toImpl(pageRef)->setDrawsBackground(drawsBackground);
+    std::optional<WebCore::Color> backgroundColor;
+    if (!drawsBackground)
+        backgroundColor = WebCore::Color(WebCore::Color::transparent);
+    toImpl(pageRef)->setBackgroundColor(backgroundColor);
 }
 
 void WKPageSetPaginationMode(WKPageRef pageRef, WKPaginationMode paginationMode)

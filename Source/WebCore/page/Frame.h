@@ -129,7 +129,7 @@ public:
     WEBCORE_EXPORT void initWithSimpleHTMLDocument(const String& style, const URL&);
 #endif
     WEBCORE_EXPORT void setView(RefPtr<FrameView>&&);
-    WEBCORE_EXPORT void createView(const IntSize&, const Color& backgroundColor, bool transparent,
+    WEBCORE_EXPORT void createView(const IntSize&, const std::optional<Color>& backgroundColor,
         const IntSize& fixedLayoutSize, const IntRect& fixedVisibleContentRect,
         bool useFixedLayout = false, ScrollbarMode = ScrollbarAuto, bool horizontalLock = false,
         ScrollbarMode = ScrollbarAuto, bool verticalLock = false);

@@ -226,10 +226,6 @@ void CoordinatedLayerTreeHost::deviceOrPageScaleFactorChanged()
     m_webPage.corePage()->pageOverlayController().didChangeDeviceScaleFactor();
 }
 
-void CoordinatedLayerTreeHost::pageBackgroundTransparencyChanged()
-{
-}
-
 GraphicsLayerFactory* CoordinatedLayerTreeHost::graphicsLayerFactory()
 {
     return &m_coordinator;
