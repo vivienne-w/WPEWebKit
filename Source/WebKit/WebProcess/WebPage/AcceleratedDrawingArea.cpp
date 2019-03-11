@@ -493,6 +493,13 @@ void AcceleratedDrawingArea::activityStateDidChange(OptionSet<ActivityState::Fla
 {
     if (changed & ActivityState::IsInWindow)
         handleIsInWindowChanged();
+
+    if (changed & ActivityState::IsVisible) {
+        if (m_webPage.isVisible())
+            resumePainting();
+        else
+            suspendPainting();
+    }
 }
 
 void AcceleratedDrawingArea::attachViewOverlayGraphicsLayer(Frame* frame, GraphicsLayer* viewOverlayRootLayer)
