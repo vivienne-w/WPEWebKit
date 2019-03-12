@@ -61,6 +61,7 @@ public:
     void setClient(std::unique_ptr<API::ViewClient>&&);
     void frameDisplayed();
     void handleDownloadRequest(WebKit::DownloadProxy&);
+    void willStartLoad();
 
     WebKit::WebPageProxy& page() { return *m_pageProxy; }
 
