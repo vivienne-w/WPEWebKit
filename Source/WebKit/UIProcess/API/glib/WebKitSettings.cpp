@@ -167,6 +167,12 @@ enum {
     PROP_ENABLE_BACK_FORWARD_NAVIGATION_GESTURES,
 #endif
     PROP_ENABLE_JAVASCRIPT_MARKUP,
+#if PLATFORM(WPE)
+    PROP_ALLOW_RUNNING_OF_INSECURE_CONTENT,
+    PROP_ALLOW_DISPLAY_OF_INSECURE_CONTENT,
+    PROP_JAVASCRIPT_CAN_CLOSE_WINDOW,
+    PROP_ENABLE_WEB_SECURITY
+#endif
 };
 
 static void webKitSettingsDispose(GObject* object)
@@ -393,6 +399,20 @@ static void webKitSettingsSetProperty(GObject* object, guint propId, const GValu
     case PROP_ENABLE_JAVASCRIPT_MARKUP:
         webkit_settings_set_enable_javascript_markup(settings, g_value_get_boolean(value));
         break;
+#if PLATFORM(WPE)
+    case PROP_ALLOW_RUNNING_OF_INSECURE_CONTENT:
+        webkit_settings_set_allow_running_of_insecure_content(settings, g_value_get_boolean(value));
+        break;
+    case PROP_ALLOW_DISPLAY_OF_INSECURE_CONTENT:
+        webkit_settings_set_allow_display_of_insecure_content(settings, g_value_get_boolean(value));
+        break;
+    case PROP_JAVASCRIPT_CAN_CLOSE_WINDOW:
+        webkit_settings_set_javascript_can_close_window(settings, g_value_get_boolean(value));
+        break;
+    case PROP_ENABLE_WEB_SECURITY:
+        webkit_settings_set_enable_web_security(settings, g_value_get_boolean(value));
+        break;
+#endif
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID(object, propId, paramSpec);
         break;
@@ -578,6 +598,20 @@ static void webKitSettingsGetProperty(GObject* object, guint propId, GValue* val
     case PROP_ENABLE_JAVASCRIPT_MARKUP:
         g_value_set_boolean(value, webkit_settings_get_enable_javascript_markup(settings));
         break;
+#if PLATFORM(WPE)
+    case PROP_ALLOW_RUNNING_OF_INSECURE_CONTENT:
+        g_value_set_boolean(value, webkit_settings_get_allow_running_of_insecure_content(settings));
+        break;
+    case PROP_ALLOW_DISPLAY_OF_INSECURE_CONTENT:
+        g_value_set_boolean(value, webkit_settings_get_allow_display_of_insecure_content(settings));
+        break;
+    case PROP_JAVASCRIPT_CAN_CLOSE_WINDOW:
+        g_value_set_boolean(value, webkit_settings_get_javascript_can_close_window(settings));
+        break;
+    case PROP_ENABLE_WEB_SECURITY:
+        g_value_set_boolean(value, webkit_settings_get_enable_web_security(settings));
+        break;
+#endif
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID(object, propId, paramSpec);
         break;
@@ -1493,6 +1527,60 @@ static void webkit_settings_class_init(WebKitSettingsClass* klass)
             _("Enable JavaScript in document markup."),
             TRUE,
             readWriteConstructParamFlags));
+
+#if PLATFORM(WPE)
+    /**
+     * WebKitSettings:allow-running-of-insecure-content:
+     *
+     * Allow running of insecure content
+     */
+    g_object_class_install_property(gObjectClass,
+                                    PROP_ALLOW_RUNNING_OF_INSECURE_CONTENT,
+                                    g_param_spec_boolean("allow-running-of-insecure-content",
+                                                         _("Allow running of insecure content"),
+                                                         _("Whether to allow running of insecure content"),
+                                                         FALSE,
+                                                         readWriteConstructParamFlags));
+
+    /**
+     * WebKitSettings:allow-display-of-insecure-content:
+     *
+     * Allow running of insecure content
+     */
+    g_object_class_install_property(gObjectClass,
+                                    PROP_ALLOW_DISPLAY_OF_INSECURE_CONTENT,
+                                    g_param_spec_boolean("allow-display-of-insecure-content",
+                                                         _("Allow display of insecure content"),
+                                                         _("Whether to allow display of insecure content"),
+                                                         FALSE,
+                                                         readWriteConstructParamFlags));
+
+    /**
+     * WebKitSettings:javascript-can-close-window:
+     *
+     * Enable or disable if scripts can close the window.
+     */
+    g_object_class_install_property(gObjectClass,
+                                    PROP_JAVASCRIPT_CAN_CLOSE_WINDOW,
+                                    g_param_spec_boolean("javascript-can-close-window",
+                                                         _("Javascript can close window "),
+                                                         _("Whether scripts can close the window"),
+                                                         TRUE,
+                                                         readWriteConstructParamFlags));
+
+    /**
+     * WebKitSettings:enable-web-security:
+     *
+     * Enable or disable web security
+     */
+    g_object_class_install_property(gObjectClass,
+                                    PROP_ENABLE_WEB_SECURITY,
+                                    g_param_spec_boolean("enable-web-security",
+                                                         _("Enable web security"),
+                                                         _("Whether to enable web security"),
+                                                         TRUE,
+                                                         readWriteConstructParamFlags));
+#endif
 }
 
 WebPreferences* webkitSettingsGetPreferences(WebKitSettings* settings)
@@ -3674,3 +3762,145 @@ void webkit_settings_set_enable_javascript_markup(WebKitSettings* settings, gboo
     priv->preferences->setJavaScriptMarkupEnabled(enabled);
     g_object_notify(G_OBJECT(settings), "enable-javascript-markup");
 }
+
+#if PLATFORM(WPE)
+/**
+ * webkit_settings_get_allow_running_of_insecure_content:
+ * @settings: a #WebKitSettings
+ *
+ * Get the #WebKitSettings:allow-running-of-insecure-content property.
+ *
+ * Returns: %TRUE if running of insecure content is allowed or %FALSE otherwise.
+ */
+gboolean webkit_settings_get_allow_running_of_insecure_content(WebKitSettings* settings)
+{
+    g_return_val_if_fail(WEBKIT_IS_SETTINGS(settings), FALSE);
+
+    return settings->priv->preferences->allowRunningOfInsecureContent();
+}
+
+/**
+ * webkit_settings_set_allow_running_of_insecure_content:
+ * @settings: a #WebKitSettings
+ * @allowed: Value to be set
+ *
+ * Set the #WebKitSettings:allow-running-of-insecure-content property.
+ */
+void webkit_settings_set_allow_running_of_insecure_content(WebKitSettings* settings, gboolean allowed)
+{
+    g_return_if_fail(WEBKIT_IS_SETTINGS(settings));
+
+    WebKitSettingsPrivate* priv = settings->priv;
+    bool currentValue = priv->preferences->allowRunningOfInsecureContent();
+    if (currentValue == allowed)
+        return;
+
+    priv->preferences->setAllowRunningOfInsecureContent(allowed);
+    g_object_notify(G_OBJECT(settings), "allow-running-of-insecure-content");
+}
+
+/**
+ * webkit_settings_get_allow_display_of_insecure_content:
+ * @settings: a #WebKitSettings
+ *
+ * Get the #WebKitSettings:allow-display-of-insecure-content property.
+ *
+ * Returns: %TRUE if display of insecure content is allowed or %FALSE otherwise.
+ */
+gboolean webkit_settings_get_allow_display_of_insecure_content(WebKitSettings* settings)
+{
+    g_return_val_if_fail(WEBKIT_IS_SETTINGS(settings), FALSE);
+
+    return settings->priv->preferences->allowDisplayOfInsecureContent();
+}
+
+/**
+ * webkit_settings_set_allow_display_of_insecure_content:
+ * @settings: a #WebKitSettings
+ * @allowed: Value to be set
+ *
+ * Set the #WebKitSettings:allow-display-of-insecure-content property.
+ */
+void webkit_settings_set_allow_display_of_insecure_content(WebKitSettings* settings, gboolean allowed)
+{
+    g_return_if_fail(WEBKIT_IS_SETTINGS(settings));
+
+    WebKitSettingsPrivate* priv = settings->priv;
+    bool currentValue = priv->preferences->allowDisplayOfInsecureContent();
+    if (currentValue == allowed)
+        return;
+
+    priv->preferences->setAllowDisplayOfInsecureContent(allowed);
+    g_object_notify(G_OBJECT(settings), "allow-display-of-insecure-content");
+}
+
+/**
+ * webkit_settings_get_javascript_can_close_window:
+ * @settings: a #WebKitSettings
+ *
+ * Get the #WebKitSettings:javascript-can-close-window property.
+ *
+ * Returns: %TRUE if scripts can close the window or %FALSE otherwise.
+ */
+gboolean webkit_settings_get_javascript_can_close_window(WebKitSettings* settings)
+{
+    g_return_val_if_fail(WEBKIT_IS_SETTINGS(settings), FALSE);
+
+    return settings->priv->preferences->allowScriptsToCloseWindows();
+}
+
+/**
+ * webkit_settings_set_javascript_can_close_window:
+ * @settings: a #WebKitSettings
+ * @enabled: Value to be set
+ *
+ * Set the #WebKitSettings:javascript-can-close-window property.
+ */
+void webkit_settings_set_javascript_can_close_window(WebKitSettings* settings, gboolean enabled)
+{
+    g_return_if_fail(WEBKIT_IS_SETTINGS(settings));
+
+    WebKitSettingsPrivate* priv = settings->priv;
+    bool currentValue = priv->preferences->allowScriptsToCloseWindows();
+    if (currentValue == enabled)
+        return;
+
+    priv->preferences->setAllowScriptsToCloseWindows(enabled);
+    g_object_notify(G_OBJECT(settings), "javascript-can-close-window");
+}
+
+/**
+ * webkit_settings_get_enable_web_security:
+ * @settings: a #WebKitSettings
+ *
+ * Get the #WebKitSettings:enable-web-security
+ *
+ * Returns: %TRUE if web security is enabled or %FALSE otherwise.
+ */
+gboolean webkit_settings_get_enable_web_security(WebKitSettings* settings)
+{
+    g_return_val_if_fail(WEBKIT_IS_SETTINGS(settings), FALSE);
+
+    return settings->priv->preferences->webSecurityEnabled();
+}
+
+/**
+ * webkit_settings_set_enable_web_security:
+ * @settings: a #WebKitSettings
+ * @enabled: Value to be set
+ *
+ * Set the #WebKitSettings:enable-web-security property.
+ */
+void webkit_settings_set_enable_web_security(WebKitSettings* settings, gboolean enabled)
+{
+    g_return_if_fail(WEBKIT_IS_SETTINGS(settings));
+
+    WebKitSettingsPrivate* priv = settings->priv;
+    bool currentValue = priv->preferences->webSecurityEnabled();
+    if (currentValue == enabled)
+        return;
+
+    priv->preferences->setWebSecurityEnabled(enabled);
+    g_object_notify(G_OBJECT(settings), "enable-web-security");
+}
+#endif // PLATFORM(WPE)

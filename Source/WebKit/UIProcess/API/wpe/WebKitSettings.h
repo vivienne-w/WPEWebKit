@@ -449,6 +449,33 @@ WEBKIT_API void
 webkit_settings_set_enable_javascript_markup                   (WebKitSettings *settings,
                                                                 gboolean        enabled);
 
+WEBKIT_API gboolean
+webkit_settings_get_allow_running_of_insecure_content          (WebKitSettings *settings);
+
+WEBKIT_API void
+webkit_settings_set_allow_running_of_insecure_content          (WebKitSettings *settings,
+                                                                gboolean        allowed);
+
+WEBKIT_API gboolean
+webkit_settings_get_allow_display_of_insecure_content          (WebKitSettings *settings);
+
+WEBKIT_API void
+webkit_settings_set_allow_display_of_insecure_content          (WebKitSettings *settings,
+                                                                gboolean        allowed);
+
+WEBKIT_API gboolean
+webkit_settings_get_javascript_can_close_window                (WebKitSettings *settings);
+
+WEBKIT_API void
+webkit_settings_set_javascript_can_close_window                (WebKitSettings *settings,
+                                                                gboolean        enabled);
+WEBKIT_API gboolean
+webkit_settings_get_enable_web_security                        (WebKitSettings  *settings);
+
+WEBKIT_API void
+webkit_settings_set_enable_web_security                        (WebKitSettings  *settings,
+                                                                gboolean         enabled);
+
 G_END_DECLS
 
 #endif /* WebKitSettings_h */

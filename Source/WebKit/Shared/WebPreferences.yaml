@@ -1549,3 +1549,20 @@ MediaCaptureRequiresSecureConnection:
   type: bool
   defaultValue: true
   condition: ENABLE(MEDIA_STREAM)
+
+# WPE
+
+AllowRunningOfInsecureContent:
+  type: bool
+  defaultValue: false
+  condition: PLATFORM(WPE)
+
+AllowDisplayOfInsecureContent:
+  type: bool
+  defaultValue: false
+  condition: PLATFORM(WPE)
+
+AllowScriptsToCloseWindows:
+  type: bool
+  defaultValue: false
+  condition: PLATFORM(WPE)
