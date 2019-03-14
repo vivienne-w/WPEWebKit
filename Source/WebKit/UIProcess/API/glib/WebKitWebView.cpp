@@ -4143,4 +4143,19 @@ void webkit_web_view_remove_frame_displayed_callback(WebKitWebView* webView, uns
     } else
         webView->priv->frameDisplayedCallbacks.removeFirstMatching(matchFunction);
 }
+
+/**
+ * webkit_web_view_set_custom_device_scale_factor:
+ * @web_view: a #WebKitWebView
+ * @factor: the scale factor to set
+ *
+ * Override the intrinsic device scale factor of @web_view using custom @factor instead.
+ */
+void webkit_web_view_set_custom_device_scale_factor(WebKitWebView* webView, double factor)
+{
+    g_return_if_fail(WEBKIT_IS_WEB_VIEW(webView));
+
+    getPage(webView).setCustomDeviceScaleFactor(factor);
+}
+
 #endif // PLATFORM(WPE)

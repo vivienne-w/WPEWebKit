@@ -525,6 +525,10 @@ WEBKIT_API void
 webkit_web_view_get_background_color                 (WebKitWebView               *web_view,
                                                       WebKitColor                 *color);
 
+WEBKIT_API void
+webkit_web_view_set_custom_device_scale_factor       (WebKitWebView               *web_view,
+                                                      double                       factor);
+
 G_END_DECLS
 
 #endif
