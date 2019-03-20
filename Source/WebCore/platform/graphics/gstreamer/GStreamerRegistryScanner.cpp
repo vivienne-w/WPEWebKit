@@ -186,6 +186,9 @@ void GStreamerRegistryScanner::initialize()
         m_codecMap.add(AtomicString("mp4v*"), h264DecoderAvailable.isUsingHardware);
     }
 
+    if (hasElementForMediaType(m_demuxerFactories, "video/mpegts"))
+        m_mimeTypeSet.add(AtomicString("video/mpegts"));
+
     if (m_isMediaSource)
         return;
 
