@@ -29,6 +29,17 @@
 #include <wtf/text/WTFString.h>
 
 #define WEBCORE_GSTREAMER_EME_UTILITIES_CLEARKEY_UUID "1077efec-c0b2-4d02-ace3-3c1e52e2fb4b"
+#define WEBCORE_GSTREAMER_EME_UTILITIES_CLEARKEY_KEY_SYSTEM "org.w3.clearkey"
+#if USE(OPENCDM)
+#define WEBCORE_GSTREAMER_EME_UTILITIES_PLAYREADY_UUID "9a04f079-9840-4286-ab92-e65be0885f95"
+#define WEBCORE_GSTREAMER_EME_UTILITIES_PLAYREADY_KEY_SYSTEM "com.microsoft.playready"
+#define WEBCORE_GSTREAMER_EME_UTILITIES_PLAYREADY_KEY_SYSTEM_YOUTUBE "com.youtube.playready"
+#define WEBCORE_GSTREAMER_EME_UTILITIES_WIDEVINE_UUID "edef8ba9-79d6-4ace-a3c8-27dcd51d21ed"
+#define WEBCORE_GSTREAMER_EME_UTILITIES_WIDEVINE_KEY_SYSTEM "com.widevine.alpha"
+#endif
+
+// NOTE: YouTube 2018 EME conformance tests expect this to be >=5s.
+const WTF::Seconds WEBCORE_GSTREAMER_EME_LICENSE_KEY_RESPONSE_TIMEOUT = WTF::Seconds(6);
 
 namespace WebCore {
 class InitData {
@@ -48,6 +59,9 @@ public:
         m_payload = mappedInitData->createSharedBuffer();
     }
 
+    InitData(RefPtr<SharedBuffer>&& initData)
+        : m_payload(WTFMove(initData)) { }
+
     void append(InitData&& initData)
     {
         // FIXME: There is some confusion here about how to detect the
@@ -64,7 +78,11 @@ public:
         m_payload->append(*initData.payload());
     }
 
+    size_t size() const { return m_payload->size(); }
+    const uint8_t* data() const { return reinterpret_cast<const uint8_t*>(m_payload->data()); }
+    bool isEmpty() const { return !size(); }
     const RefPtr<SharedBuffer> payload() const { return m_payload; }
+
     const String& systemId() const { return m_systemId; }
     String payloadContainerType() const
     {
@@ -109,28 +127,20 @@ private:
     Vector<String> m_availableSystems;
 };
 
+bool isClearKeyKeySystem(const String& keySystem);
 
-class GStreamerEMEUtilities {
+#if USE(OPENCDM)
+bool isPlayReadyKeySystem(const String& keySystem);
+bool isWidevineKeySystem(const String& keySystem);
+#endif
 
-public:
-    static constexpr char const* s_ClearKeyUUID = WEBCORE_GSTREAMER_EME_UTILITIES_CLEARKEY_UUID;
-    static constexpr char const* s_ClearKeyKeySystem = "org.w3.clearkey";
+const char* keySystemToUuid(const String& keySystem);
+const char* uuidToKeySystem(const String& uuid);
 
-    static bool isClearKeyKeySystem(const String& keySystem)
-    {
-        return equalIgnoringASCIICase(keySystem, s_ClearKeyKeySystem);
-    }
+#if (!defined(GST_DISABLE_GST_DEBUG))
+String initDataMD5(const InitData& initData);
+#endif
 
-    static const char* keySystemToUuid(const String& keySystem)
-    {
-        if (isClearKeyKeySystem(keySystem))
-            return s_ClearKeyUUID;
-
-        ASSERT_NOT_REACHED();
-        return { };
-    }
-};
-
-}
+} // namespace WebCore
 
 #endif // ENABLE(ENCRYPTED_MEDIA) && USE(GSTREAMER)

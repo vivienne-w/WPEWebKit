@@ -50,7 +50,11 @@ public:
 
     enum class ImplementationType {
         Mock,
+#if USE(OPENCDM)
+        OpenCDM,
+#else
         ClearKey,
+#endif
         FairPlayStreaming,
     };
     virtual ImplementationType implementationType() const = 0;
