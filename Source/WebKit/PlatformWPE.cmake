@@ -255,6 +255,7 @@ list(APPEND WebKit_INCLUDE_DIRECTORIES
     "${WEBKIT_DIR}/UIProcess/API/glib"
     "${WEBKIT_DIR}/UIProcess/API/wpe"
     "${WEBKIT_DIR}/UIProcess/Network/CustomProtocols/soup"
+    "${WEBKIT_DIR}/UIProcess/geoclue"
     "${WEBKIT_DIR}/UIProcess/gstreamer"
     "${WEBKIT_DIR}/UIProcess/linux"
     "${WEBKIT_DIR}/UIProcess/soup"

@@ -209,6 +209,8 @@ UIProcess/Automation/cairo/WebAutomationSessionCairo.cpp
 
 UIProcess/Automation/gtk/WebAutomationSessionGtk.cpp
 
+UIProcess/geoclue/GeoclueGeolocationProvider.cpp
+
 UIProcess/Launcher/glib/ProcessLauncherGLib.cpp @no-unify
 
 UIProcess/Network/CustomProtocols/LegacyCustomProtocolManagerProxy.cpp
