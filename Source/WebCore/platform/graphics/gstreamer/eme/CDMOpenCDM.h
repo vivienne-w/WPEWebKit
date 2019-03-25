@@ -36,6 +36,9 @@
 
 namespace WebCore {
 
+using ScopedOCDMAccessor = std::unique_ptr<OpenCDMAccessor, OpenCDMError(*)(OpenCDMAccessor*)>;
+using OCDMAccessorHandle = OpenCDMAccessor*;
+
 class CDMFactoryOpenCDM : public CDMFactory {
 public:
     static CDMFactoryOpenCDM& singleton();
@@ -47,8 +50,9 @@ public:
 
 private:
     friend class NeverDestroyed<CDMFactoryOpenCDM>;
-    CDMFactoryOpenCDM() = default;
-    media::OpenCdm m_openCDM;
+    CDMFactoryOpenCDM()
+        : m_openCDMAccessor(opencdm_create_system(), opencdm_destruct_system) { }
+    ScopedOCDMAccessor m_openCDMAccessor;
 };
 
 class CDMInstanceOpenCDM final : public CDMInstance, public CanMakeWeakPtr<CDMInstanceOpenCDM> {
@@ -60,7 +64,9 @@ private:
 
 
 public:
-    CDMInstanceOpenCDM(media::OpenCdm&, const String&);
+    static constexpr void* InvalidAccessorHandle = nullptr;
+
+    CDMInstanceOpenCDM(OCDMAccessorHandle, const String&);
     virtual ~CDMInstanceOpenCDM() = default;
 
     ImplementationType implementationType() const final { return ImplementationType::OpenCDM; }
@@ -88,7 +94,7 @@ private:
 
     String m_keySystem;
     const char* m_mimeType;
-    media::OpenCdm m_openCDM;
+    OCDMAccessorHandle m_openCDMAccessorHandle;
     // Protects against concurrent access to m_sessionsMap. In addition to the main thread
     // the GStreamer decryptor elements running in the streaming threads have a need to
     // lookup values in this map.
@@ -98,9 +104,9 @@ private:
 
 class CDMInstanceOpenCDMSession : public CDMInstanceSession, public CanMakeWeakPtr<CDMInstanceOpenCDMSession> {
 public:
-    CDMInstanceOpenCDMSession(CDMInstanceOpenCDM* cdmInstance, media::OpenCdm& openCDM)
+    CDMInstanceOpenCDMSession(CDMInstanceOpenCDM* cdmInstance, OCDMAccessorHandle ocdmAccessorHandle)
         : m_cdmInstance(cdmInstance)
-        , m_openCDM(openCDM)
+        , m_openCDMAccessorHandle(ocdmAccessorHandle)
     {
     }
 
@@ -118,7 +124,7 @@ public:
 
 private:
     CDMInstanceOpenCDM* m_cdmInstance;
-    media::OpenCdm m_openCDM;
+    OCDMAccessorHandle m_openCDMAccessorHandle;
 };
 
 } // namespace WebCore
