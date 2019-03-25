@@ -1,4 +1,4 @@
-/* GStreamer OpenCDM decryptor
+ /* GStreamer OpenCDM decryptor
  *
  * Copyright (C) 2016-2017 TATA ELXSI
  * Copyright (C) 2016-2017 Metrological
@@ -36,6 +36,12 @@
 
 namespace WebCore {
 
+struct OCDMAccessorDeleter {
+    OpenCDMError operator()(OpenCDMAccessor* ptr) const { return opencdm_destruct_system(ptr); }
+};
+
+using ScopedOCDMAccessor = std::unique_ptr<OpenCDMAccessor, OCDMAccessorDeleter>;
+
 class CDMFactoryOpenCDM : public CDMFactory {
 public:
     static CDMFactoryOpenCDM& singleton();
@@ -47,8 +53,9 @@ public:
 
 private:
     friend class NeverDestroyed<CDMFactoryOpenCDM>;
-    CDMFactoryOpenCDM() = default;
-    media::OpenCdm m_openCDM;
+    CDMFactoryOpenCDM()
+        : m_openCDMAccessor(opencdm_create_system()) { }
+    ScopedOCDMAccessor m_openCDMAccessor;
 };
 
 class CDMInstanceOpenCDM final : public CDMInstance, public CanMakeWeakPtr<CDMInstanceOpenCDM> {
@@ -60,7 +67,7 @@ private:
 
 
 public:
-    CDMInstanceOpenCDM(media::OpenCdm&, const String&);
+    CDMInstanceOpenCDM(OpenCDMAccessor&, const String&);
     virtual ~CDMInstanceOpenCDM() = default;
 
     ImplementationType implementationType() const final { return ImplementationType::OpenCDM; }
@@ -81,14 +88,14 @@ public:
     bool isSessionIdUsable(const String&) const;
     const char* mimeType() const { return m_mimeType; }
 
-    bool addSession(const String& sessionId, Session* session);
+    bool addSession(const String& sessionId, RefPtr<Session>&& session);
     bool removeSession(const String& sessionId);
     RefPtr<Session> lookupSession(const String& sessionId) const;
 private:
 
     String m_keySystem;
     const char* m_mimeType;
-    media::OpenCdm m_openCDM;
+    OpenCDMAccessor& m_openCDMAccessor;
     // Protects against concurrent access to m_sessionsMap. In addition to the main thread
     // the GStreamer decryptor elements running in the streaming threads have a need to
     // lookup values in this map.
@@ -98,9 +105,9 @@ private:
 
 class CDMInstanceOpenCDMSession : public CDMInstanceSession, public CanMakeWeakPtr<CDMInstanceOpenCDMSession> {
 public:
-    CDMInstanceOpenCDMSession(CDMInstanceOpenCDM* cdmInstance, media::OpenCdm& openCDM)
+    CDMInstanceOpenCDMSession(CDMInstanceOpenCDM* cdmInstance, OpenCDMAccessor& openCDMAccessor)
         : m_cdmInstance(cdmInstance)
-        , m_openCDM(openCDM)
+        , m_openCDMAccessor(openCDMAccessor)
     {
     }
 
@@ -118,7 +125,7 @@ public:
 
 private:
     CDMInstanceOpenCDM* m_cdmInstance;
-    media::OpenCdm m_openCDM;
+    OpenCDMAccessor& m_openCDMAccessor;
 };
 
 } // namespace WebCore
