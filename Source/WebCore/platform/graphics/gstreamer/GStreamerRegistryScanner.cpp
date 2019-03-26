@@ -180,6 +180,7 @@ void GStreamerRegistryScanner::initialize()
     auto h264DecoderAvailable = hasElementForMediaType(m_videoDecoderFactories, "video/x-h264, profile=(string){ constrained-baseline, baseline, high }", true);
     if (h264DecoderAvailable && (!m_isMediaSource || hasElementForMediaType(m_videoParserFactories, "video/x-h264"))) {
         m_mimeTypeSet.add(AtomicString("video/mp4"));
+        m_mimeTypeSet.add(AtomicString("video/x-h264"));
         m_mimeTypeSet.add(AtomicString("video/x-m4v"));
         m_codecMap.add(AtomicString("x-h264"), h264DecoderAvailable.isUsingHardware);
         m_codecMap.add(AtomicString("avc*"), h264DecoderAvailable.isUsingHardware);
