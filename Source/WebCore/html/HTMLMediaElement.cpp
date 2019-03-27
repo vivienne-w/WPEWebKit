@@ -4595,6 +4595,7 @@ void HTMLMediaElement::sourceWasRemoved(HTMLSourceElement& source)
 
 void HTMLMediaElement::mediaPlayerTimeChanged(MediaPlayer*)
 {
+    printf("### %s\n", __PRETTY_FUNCTION__); fflush(stdout);
     INFO_LOG(LOGIDENTIFIER);
 
 #if ENABLE(VIDEO_TRACK)
@@ -4641,6 +4642,7 @@ void HTMLMediaElement::mediaPlayerTimeChanged(MediaPlayer*)
             // Queue a task to fire a simple event named ended at the media element.
             if (!m_sentEndEvent) {
                 m_sentEndEvent = true;
+                printf("### %s: Sending ended event\n", __PRETTY_FUNCTION__); fflush(stdout);
                 scheduleEvent(eventNames().endedEvent);
                 if (!wasSeeking)
                     addBehaviorRestrictionsOnEndIfNecessary();

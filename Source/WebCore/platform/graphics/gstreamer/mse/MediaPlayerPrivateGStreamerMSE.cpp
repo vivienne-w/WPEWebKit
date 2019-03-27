@@ -1041,8 +1041,10 @@ MediaTime MediaPlayerPrivateGStreamerMSE::currentMediaTime() const
         position = m_mediaTimeDuration;
         m_cachedPosition = position;
         m_durationAtEOS = m_mediaTimeDuration;
+        printf("### %s: Detected end, notifying timeChanged()\n", __PRETTY_FUNCTION__); fflush(stdout);
         m_player->timeChanged();
     }
+    printf("### %s: %s\n", __PRETTY_FUNCTION__, position.toString().utf8().data()); fflush(stdout);
     return position;
 }
 
