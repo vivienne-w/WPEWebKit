@@ -128,6 +128,8 @@ static void webkit_media_opencdm_decrypt_class_init(WebKitOpenCDMDecryptClass* k
 static void webkit_media_opencdm_decrypt_init(WebKitOpenCDMDecrypt* self)
 {
     WebKitOpenCDMDecryptPrivate* priv = GST_WEBKIT_OPENCDM_DECRYPT_GET_PRIVATE(self);
+    priv->m_openCdmAccessor = nullptr;
+    priv->m_openCdm = nullptr;
     self->priv = priv;
     new (priv) WebKitOpenCDMDecryptPrivate();
     GST_TRACE_OBJECT(self, "created");
@@ -155,7 +157,8 @@ static SessionResult webKitMediaOpenCDMDecryptorResetSessionFromInitDataIfNeeded
         GST_DEBUG_OBJECT(self, "session %s is empty or unusable, resetting", session.utf8().data());
         priv->m_session = String();
         priv->m_openCdm = nullptr;
-        opencdm_destruct_system(priv->m_openCdmAccessor);
+        if (priv->m_openCdmAccessor)
+            opencdm_destruct_system(priv->m_openCdmAccessor);
         priv->m_openCdmAccessor = nullptr;
     } else if (session != priv->m_session) {
         priv->m_session = session;
