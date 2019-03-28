@@ -138,7 +138,7 @@ bool OCDMSessionCallbacksNotifier::tryNotify(OpenCDMSession* session, Notificati
         callOnMainThread([session, method, message, messageLength]() {
             OCDMSessionCallbacksNotifier::tryNotify(session, method, message, messageLength);
         });
-        return false;
+        return true;
     }
 
     OCDMSessionCallbacksNotifier& self = OCDMSessionCallbacksNotifier::singleton();
