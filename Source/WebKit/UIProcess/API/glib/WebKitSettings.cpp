@@ -171,7 +171,8 @@ enum {
     PROP_ALLOW_RUNNING_OF_INSECURE_CONTENT,
     PROP_ALLOW_DISPLAY_OF_INSECURE_CONTENT,
     PROP_JAVASCRIPT_CAN_CLOSE_WINDOW,
-    PROP_ENABLE_WEB_SECURITY
+    PROP_ENABLE_WEB_SECURITY,
+    PROP_ENABLE_NON_COMPOSITED_WEBGL
 #endif
 };
 
@@ -412,6 +413,9 @@ static void webKitSettingsSetProperty(GObject* object, guint propId, const GValu
     case PROP_ENABLE_WEB_SECURITY:
         webkit_settings_set_enable_web_security(settings, g_value_get_boolean(value));
         break;
+    case PROP_ENABLE_NON_COMPOSITED_WEBGL:
+        webkit_settings_set_enable_non_composited_webgl(settings, g_value_get_boolean(value));
+        break;
 #endif
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID(object, propId, paramSpec);
@@ -610,6 +614,9 @@ static void webKitSettingsGetProperty(GObject* object, guint propId, GValue* val
         break;
     case PROP_ENABLE_WEB_SECURITY:
         g_value_set_boolean(value, webkit_settings_get_enable_web_security(settings));
+        break;
+    case PROP_ENABLE_NON_COMPOSITED_WEBGL:
+        g_value_set_boolean(value, webkit_settings_get_enable_non_composited_webgl(settings));
         break;
 #endif
     default:
@@ -1579,6 +1586,20 @@ static void webkit_settings_class_init(WebKitSettingsClass* klass)
                                                          _("Enable web security"),
                                                          _("Whether to enable web security"),
                                                          TRUE,
+                                                         readWriteConstructParamFlags));
+
+    /**
+    * WebKitSettings:enable-non-composited-webgl:
+    *
+    * Enable or disable support for non composited WebGL. This feature allows improving
+    * the performance of WebGL-only pages by removing the composition stage.
+    */
+    g_object_class_install_property(gObjectClass,
+                                    PROP_ENABLE_NON_COMPOSITED_WEBGL,
+                                    g_param_spec_boolean("enable-non-composited-webgl",
+                                                         _("Enable non composited WebGL"),
+                                                         _("Whether non composited WebGL should be enabled"),
+                                                         FALSE,
                                                          readWriteConstructParamFlags));
 #endif
 }
@@ -3902,5 +3923,40 @@ void webkit_settings_set_enable_web_security(WebKitSettings* settings, gboolean 
 
     priv->preferences->setWebSecurityEnabled(enabled);
     g_object_notify(G_OBJECT(settings), "enable-web-security");
+}
+
+/**
+ * webkit_settings_get_enable_non_composited_webgl:
+ * @settings: a #WebKitSettings
+ *
+ * Get the #WebKitSettings:enable-non-composited-webgl property.
+ *
+ * Returns: %TRUE If non composited WebGL support is enabled or %FALSE otherwise.
+ */
+gboolean webkit_settings_get_enable_non_composited_webgl(WebKitSettings* settings)
+{
+    g_return_val_if_fail(WEBKIT_IS_SETTINGS(settings), FALSE);
+
+    return settings->priv->preferences->nonCompositedWebGLEnabled();
+}
+
+/**
+ * webkit_settings_set_enable_non_composited_webgl:
+ * @settings: a #WebKitSettings
+ * @enabled: Value to be set
+ *
+ * Set the #WebKitSettings:enable-non-composited-webgl property.
+ */
+void webkit_settings_set_enable_non_composited_webgl(WebKitSettings* settings, gboolean enabled)
+{
+    g_return_if_fail(WEBKIT_IS_SETTINGS(settings));
+
+    WebKitSettingsPrivate* priv = settings->priv;
+    bool currentValue = priv->preferences->nonCompositedWebGLEnabled();
+    if (currentValue == enabled)
+        return;
+
+    priv->preferences->setNonCompositedWebGLEnabled(enabled);
+    g_object_notify(G_OBJECT(settings), "enable-non-composited-webgl");
 }
 #endif // PLATFORM(WPE)

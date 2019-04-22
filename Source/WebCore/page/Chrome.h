@@ -94,6 +94,10 @@ public:
     FloatSize availableScreenSize() const override;
     FloatSize overrideScreenSize() const override;
 
+#if PLATFORM(WPE)
+    uint64_t nativeWindowID() const override;
+#endif
+
     void scrollRectIntoView(const IntRect&) const;
 
     void contentsSizeChanged(Frame&, const IntSize&) const;

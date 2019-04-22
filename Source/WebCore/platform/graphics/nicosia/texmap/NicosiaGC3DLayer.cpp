@@ -38,13 +38,17 @@
 #endif
 
 #include "GLContext.h"
+#include "HostWindow.h"
 
 namespace Nicosia {
 
 using namespace WebCore;
 
-GC3DLayer::GC3DLayer(GraphicsContext3D& context, GraphicsContext3D::RenderStyle renderStyle)
+static std::unique_ptr<GLContext> s_windowContext;
+
+GC3DLayer::GC3DLayer(GraphicsContext3D& context, GraphicsContext3D::RenderStyle renderStyle, const HostWindow* hostWindow)
     : m_context(context)
+    , m_renderStyle(renderStyle)
     , m_contentLayer(Nicosia::ContentLayer::create(Nicosia::ContentLayerTextureMapperImpl::createFactory(*this)))
 {
     switch (renderStyle) {
@@ -52,7 +56,8 @@ GC3DLayer::GC3DLayer(GraphicsContext3D& context, GraphicsContext3D::RenderStyle 
         m_glContext = GLContext::createOffscreenContext(&PlatformDisplay::sharedDisplayForCompositing());
         break;
     case GraphicsContext3D::RenderDirectlyToHostWindow:
-        ASSERT_NOT_REACHED();
+        if (!s_windowContext)
+            s_windowContext = GLContext::createContextForWindow(reinterpret_cast<GLNativeWindowType>(hostWindow->nativeWindowID()), &PlatformDisplay::sharedDisplayForCompositing());
         break;
     }
 }
@@ -62,20 +67,31 @@ GC3DLayer::~GC3DLayer()
     downcast<ContentLayerTextureMapperImpl>(m_contentLayer->impl()).invalidateClient();
 }
 
+GLContext* GC3DLayer::glContext()
+{
+    ASSERT((m_glContext && m_renderStyle == GraphicsContext3D::RenderOffscreen) || (s_windowContext && m_renderStyle == GraphicsContext3D::RenderDirectlyToHostWindow));
+    return m_renderStyle == GraphicsContext3D::RenderOffscreen ? m_glContext.get() : s_windowContext.get();
+}
+
 bool GC3DLayer::makeContextCurrent()
 {
-    ASSERT(m_glContext);
-    return m_glContext->makeContextCurrent();
+    ASSERT(glContext());
+    return glContext()->makeContextCurrent();
 }
 
 PlatformGraphicsContext3D GC3DLayer::platformContext()
 {
-    ASSERT(m_glContext);
-    return m_glContext->platformContext();
+    ASSERT(glContext());
+    return glContext()->platformContext();
 }
 
 void GC3DLayer::swapBuffersIfNeeded()
 {
+    if (m_renderStyle == GraphicsContext3D::RenderDirectlyToHostWindow) {
+        glContext()->swapBuffers();
+        return;
+    }
+
 #if USE(COORDINATED_GRAPHICS_THREADED)
     if (m_context.layerComposited())
         return;

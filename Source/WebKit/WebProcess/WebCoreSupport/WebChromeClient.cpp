@@ -1321,4 +1321,11 @@ void WebChromeClient::requestStorageAccess(String&& subFrameHost, String&& topFr
 }
 #endif
 
+#if PLATFORM(WPE)
+uint64_t WebChromeClient::nativeWindowID() const
+{
+    return m_page.drawingArea()->nativeWindowID();
+}
+#endif
+
 } // namespace WebKit

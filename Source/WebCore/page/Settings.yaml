@@ -234,6 +234,8 @@ forceSoftwareWebGLRendering:
   initial: false
 forceWebGLUsesLowPower:
   initial: false
+nonCompositedWebGLEnabled:
+  initial: false
 accelerated2dCanvasEnabled:
   initial: false
 loadDeferringEnabled:

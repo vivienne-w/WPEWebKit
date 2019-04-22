@@ -81,6 +81,10 @@ protected:
     void deviceOrPageScaleFactorChanged() override;
 #endif
 
+#if PLATFORM(WPE)
+    uint64_t nativeWindowID() const override;
+#endif
+
     // IPC message handlers.
     void updateBackingStoreState(uint64_t backingStoreStateID, bool respondImmediately, float deviceScaleFactor, const WebCore::IntSize&, const WebCore::IntSize& scrollOffset) override;
 

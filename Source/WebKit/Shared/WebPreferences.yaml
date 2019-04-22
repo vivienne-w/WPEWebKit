@@ -1566,3 +1566,8 @@ AllowScriptsToCloseWindows:
   type: bool
   defaultValue: false
   condition: PLATFORM(WPE)
+
+NonCompositedWebGLEnabled:
+  type: bool
+  defaultValue: false
+  condition: PLATFORM(WPE)

@@ -149,6 +149,10 @@ public:
     virtual void deviceOrPageScaleFactorChanged() = 0;
 #endif
 
+#if PLATFORM(WPE)
+    virtual uint64_t nativeWindowID() const = 0;
+#endif
+
 protected:
     DrawingArea(DrawingAreaType, WebPage&);
 

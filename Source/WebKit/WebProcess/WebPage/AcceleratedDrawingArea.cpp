@@ -147,6 +147,7 @@ void AcceleratedDrawingArea::updatePreferences(const WebPreferencesStore& store)
     bool forceCompositiongMode = store.getBoolValueForKey(WebPreferencesKey::forceCompositingModeKey());
     settings.setForceCompositingMode(forceCompositiongMode);
     settings.setAcceleratedCompositingForFixedPositionEnabled(forceCompositiongMode);
+    settings.setNonCompositedWebGLEnabled(store.getBoolValueForKey(WebPreferencesKey::nonCompositedWebGLEnabledKey()));
     if (!m_layerTreeHost)
         enterAcceleratedCompositingMode(nullptr);
 }
@@ -449,6 +450,13 @@ void AcceleratedDrawingArea::deviceOrPageScaleFactorChanged()
         m_layerTreeHost->deviceOrPageScaleFactorChanged();
     else if (m_previousLayerTreeHost)
         m_previousLayerTreeHost->deviceOrPageScaleFactorChanged();
+}
+#endif
+
+#if PLATFORM(WPE)
+uint64_t AcceleratedDrawingArea::nativeWindowID() const
+{
+    return m_layerTreeHost ? m_layerTreeHost->nativeWindowID() : 0;
 }
 #endif
 

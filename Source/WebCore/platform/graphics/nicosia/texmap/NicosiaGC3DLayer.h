@@ -36,13 +36,14 @@
 
 namespace WebCore {
 class GLContext;
+class HostWindow;
 }
 
 namespace Nicosia {
 
 class GC3DLayer : public ContentLayerTextureMapperImpl::Client {
 public:
-    GC3DLayer(WebCore::GraphicsContext3D&, WebCore::GraphicsContext3D::RenderStyle);
+    GC3DLayer(WebCore::GraphicsContext3D&, WebCore::GraphicsContext3D::RenderStyle, const WebCore::HostWindow*);
     virtual ~GC3DLayer();
 
     ContentLayer& contentLayer() const { return m_contentLayer; }
@@ -50,11 +51,12 @@ public:
     PlatformGraphicsContext3D platformContext();
 
     void swapBuffersIfNeeded() override;
+    WebCore::GLContext* glContext();
 
 private:
     WebCore::GraphicsContext3D& m_context;
     std::unique_ptr<WebCore::GLContext> m_glContext;
-
+    WebCore::GraphicsContext3D::RenderStyle m_renderStyle;
     Ref<ContentLayer> m_contentLayer;
 };
 

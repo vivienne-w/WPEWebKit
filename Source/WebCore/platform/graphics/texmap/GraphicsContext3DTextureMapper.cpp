@@ -68,10 +68,6 @@ static Deque<GraphicsContext3D*, MaxActiveContexts>& activeContexts()
 
 RefPtr<GraphicsContext3D> GraphicsContext3D::create(GraphicsContext3DAttributes attributes, HostWindow* hostWindow, GraphicsContext3D::RenderStyle renderStyle)
 {
-    // This implementation doesn't currently support rendering directly to the HostWindow.
-    if (renderStyle == RenderDirectlyToHostWindow)
-        return nullptr;
-
     static bool initialized = false;
     static bool success = true;
     if (!initialized) {
@@ -105,12 +101,13 @@ RefPtr<GraphicsContext3D> GraphicsContext3D::create(GraphicsContext3DAttributes 
     return context;
 }
 
-GraphicsContext3D::GraphicsContext3D(GraphicsContext3DAttributes attributes, HostWindow*, GraphicsContext3D::RenderStyle renderStyle, GraphicsContext3D* sharedContext)
+GraphicsContext3D::GraphicsContext3D(GraphicsContext3DAttributes attributes, HostWindow* hostWindow, GraphicsContext3D::RenderStyle renderStyle, GraphicsContext3D* sharedContext)
     : m_attrs(attributes)
+    , m_renderStyle(renderStyle)
 {
     ASSERT_UNUSED(sharedContext, !sharedContext);
 #if USE(NICOSIA)
-    m_nicosiaLayer = std::make_unique<Nicosia::GC3DLayer>(*this, renderStyle);
+    m_nicosiaLayer = std::make_unique<Nicosia::GC3DLayer>(*this, renderStyle, hostWindow);
 #else
     m_texmapLayer = std::make_unique<TextureMapperGC3DPlatformLayer>(*this, renderStyle);
 #endif
@@ -232,37 +229,37 @@ GraphicsContext3D::GraphicsContext3D(GraphicsContext3DAttributes attributes, Hos
 
 GraphicsContext3D::~GraphicsContext3D()
 {
-    makeContextCurrent();
-    if (m_texture)
-        ::glDeleteTextures(1, &m_texture);
+    if (m_renderStyle == RenderOffscreen) {
+        makeContextCurrent();
+        if (m_texture)
+            ::glDeleteTextures(1, &m_texture);
 #if USE(COORDINATED_GRAPHICS_THREADED)
-    if (m_compositorTexture)
-        ::glDeleteTextures(1, &m_compositorTexture);
+        if (m_compositorTexture)
+            ::glDeleteTextures(1, &m_compositorTexture);
 #endif
-
-    if (m_attrs.antialias) {
-        ::glDeleteRenderbuffers(1, &m_multisampleColorBuffer);
-        if (m_attrs.stencil || m_attrs.depth)
-            ::glDeleteRenderbuffers(1, &m_multisampleDepthStencilBuffer);
-        ::glDeleteFramebuffers(1, &m_multisampleFBO);
-    } else if (m_attrs.stencil || m_attrs.depth) {
+        if (m_attrs.antialias) {
+            ::glDeleteRenderbuffers(1, &m_multisampleColorBuffer);
+            if (m_attrs.stencil || m_attrs.depth)
+                ::glDeleteRenderbuffers(1, &m_multisampleDepthStencilBuffer);
+            ::glDeleteFramebuffers(1, &m_multisampleFBO);
+        } else if (m_attrs.stencil || m_attrs.depth) {
 #if USE(OPENGL_ES)
         if (m_depthBuffer)
             glDeleteRenderbuffers(1, &m_depthBuffer);
 
-        if (m_stencilBuffer)
-            glDeleteRenderbuffers(1, &m_stencilBuffer);
+            if (m_stencilBuffer)
+                glDeleteRenderbuffers(1, &m_stencilBuffer);
 #endif
-        if (m_depthStencilBuffer)
-            ::glDeleteRenderbuffers(1, &m_depthStencilBuffer);
-    }
-    ::glDeleteFramebuffers(1, &m_fbo);
+            if (m_depthStencilBuffer)
+                ::glDeleteRenderbuffers(1, &m_depthStencilBuffer);
+        }
+        ::glDeleteFramebuffers(1, &m_fbo);
 #if USE(COORDINATED_GRAPHICS_THREADED)
-    ::glDeleteTextures(1, &m_intermediateTexture);
+        ::glDeleteTextures(1, &m_intermediateTexture);
 #endif
-
-    if (m_vao)
-        deleteVertexArray(m_vao);
+        if (m_vao)
+            deleteVertexArray(m_vao);
+    }
 
     auto* activeContext = activeContexts().takeLast([this](auto* it) { return it == this; });
     ASSERT_UNUSED(activeContext, !!activeContext);

@@ -475,6 +475,13 @@ FloatSize Chrome::overrideScreenSize() const
     return m_client.overrideScreenSize();
 }
 
+#if PLATFORM(WPE)
+uint64_t Chrome::nativeWindowID() const
+{
+    return m_client.nativeWindowID();
+}
+#endif
+
 void Chrome::dispatchDisabledAdaptationsDidChange(const OptionSet<DisabledAdaptations>& disabledAdaptations) const
 {
     m_client.dispatchDisabledAdaptationsDidChange(disabledAdaptations);

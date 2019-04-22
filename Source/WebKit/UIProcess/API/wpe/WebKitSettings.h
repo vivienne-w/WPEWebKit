@@ -299,6 +299,13 @@ WEBKIT_API void
 webkit_settings_set_enable_webgl                               (WebKitSettings *settings,
                                                                 gboolean        enabled);
 
+WEBKIT_API gboolean
+webkit_settings_get_enable_non_composited_webgl                (WebKitSettings *settings);
+
+WEBKIT_API void
+webkit_settings_set_enable_non_composited_webgl                (WebKitSettings *settings,
+                                                                gboolean        enabled);
+
 WEBKIT_API void
 webkit_settings_set_allow_modal_dialogs                        (WebKitSettings *settings,
                                                                 gboolean        allowed);

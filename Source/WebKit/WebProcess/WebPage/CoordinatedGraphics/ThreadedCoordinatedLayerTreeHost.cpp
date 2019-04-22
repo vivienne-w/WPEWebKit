@@ -35,6 +35,7 @@
 #include "WebPage.h"
 #include <WebCore/Frame.h>
 #include <WebCore/FrameView.h>
+#include <WebCore/Settings.h>
 
 namespace WebKit {
 using namespace WebCore;
@@ -77,7 +78,7 @@ ThreadedCoordinatedLayerTreeHost::ThreadedCoordinatedLayerTreeHost(WebPage& webP
         if (m_surface->shouldPaintMirrored())
             paintFlags |= TextureMapper::PaintingMirrored;
 
-        m_compositor = ThreadedCompositor::create(m_compositorClient, m_compositorClient, compositingDisplayID, scaledSize, scaleFactor, ThreadedCompositor::ShouldDoFrameSync::Yes, paintFlags);
+        m_compositor = ThreadedCompositor::create(m_compositorClient, m_compositorClient, compositingDisplayID, scaledSize, scaleFactor, ThreadedCompositor::ShouldDoFrameSync::Yes, paintFlags, webPage.corePage()->settings().nonCompositedWebGLEnabled());
         m_layerTreeContext.contextID = m_surface->surfaceID();
     } else
         m_compositor = ThreadedCompositor::create(m_compositorClient, m_compositorClient, compositingDisplayID, scaledSize, scaleFactor);
@@ -292,6 +293,13 @@ void ThreadedCoordinatedLayerTreeHost::setIsDiscardable(bool discardable)
 RefPtr<WebCore::DisplayRefreshMonitor> ThreadedCoordinatedLayerTreeHost::createDisplayRefreshMonitor(PlatformDisplayID displayID)
 {
     return m_compositor->displayRefreshMonitor(displayID);
+}
+#endif
+
+#if PLATFORM(WPE)
+uint64_t ThreadedCoordinatedLayerTreeHost::nativeWindowID() const
+{
+    return m_surface->window();
 }
 #endif
 

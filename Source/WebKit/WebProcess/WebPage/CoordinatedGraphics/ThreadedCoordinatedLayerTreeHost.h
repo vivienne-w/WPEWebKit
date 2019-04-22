@@ -129,6 +129,10 @@ private:
     RefPtr<WebCore::DisplayRefreshMonitor> createDisplayRefreshMonitor(WebCore::PlatformDisplayID) override;
 #endif
 
+#if PLATFORM(WPE)
+    uint64_t nativeWindowID() const override;
+#endif
+
     // AcceleratedSurface::Client
     void frameComplete() override;
 

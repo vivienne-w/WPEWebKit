@@ -104,6 +104,10 @@ public:
 
     virtual void setViewOverlayRootLayer(WebCore::GraphicsLayer* viewOverlayRootLayer) { m_viewOverlayRootLayer = viewOverlayRootLayer; }
 
+#if PLATFORM(WPE)
+    virtual uint64_t nativeWindowID() const { return 0; }
+#endif
+
 protected:
     explicit LayerTreeHost(WebPage&);
 

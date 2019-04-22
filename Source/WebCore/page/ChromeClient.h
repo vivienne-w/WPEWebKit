@@ -497,6 +497,10 @@ public:
     virtual void didCreateEditableImage(GraphicsLayer::EmbeddedViewID) { }
     virtual void didDestroyEditableImage(GraphicsLayer::EmbeddedViewID) { }
 
+#if PLATFORM(WPE)
+    virtual uint64_t nativeWindowID() const { return 0; }
+#endif
+
 protected:
     virtual ~ChromeClient() = default;
 };
