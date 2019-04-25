@@ -35,6 +35,13 @@ public:
         return adoptRef(*new MainThreadNotifier());
     }
 
+    ~MainThreadNotifier()
+    {
+        ASSERT(!m_isValid.load());
+    }
+
+    bool isValid() const { return m_isValid.load(); }
+
     template<typename F>
     void notify(T notificationType, F&& callbackFunctor, bool preserveOrdering = false)
     {
@@ -54,6 +61,24 @@ public:
             if (removePendingNotification(notificationType))
                 callback();
         });
+    }
+
+    template<typename F>
+    void notifyAndWait(T notificationType, F&& callbackFunctor)
+    {
+        Lock mutex;
+        Condition condition;
+
+        notify(notificationType, [functor = WTFMove(callbackFunctor), &condition, &mutex] {
+            functor();
+            LockHolder holder(mutex);
+            condition.notifyOne();
+        });
+
+        if (!isMainThread()) {
+            LockHolder holder(mutex);
+            condition.wait(mutex);
+        }
     }
 
     void cancelPendingNotifications(unsigned mask = 0)
