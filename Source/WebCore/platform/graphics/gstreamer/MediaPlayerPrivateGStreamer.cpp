@@ -1249,9 +1249,21 @@ void MediaPlayerPrivateGStreamer::handleMessage(GstMessage* message)
             break;
         updateStates();
 
-        // Construct a filename for the graphviz dot file output.
         GstState newState;
         gst_message_parse_state_changed(message, &currentState, &newState, nullptr);
+
+#if USE(GSTREAMER_HOLEPUNCH)
+        // If we didn't create a video sink, store a reference to the created one.
+        if (currentState == GST_STATE_READY && newState == GST_STATE_PAUSED) {
+            if (!m_videoSink) {
+                g_object_get(m_pipeline.get(), "video-sink", &m_videoSink.outPtr(), nullptr);
+                if (m_videoSink)
+                    pushNextHolePunchBuffer();
+            }
+        }
+#endif
+
+        // Construct a filename for the graphviz dot file output.
         CString dotFileName = makeString(GST_OBJECT_NAME(m_pipeline.get()), '.',
             gst_element_state_get_name(currentState), '_', gst_element_state_get_name(newState)).utf8();
         GST_DEBUG_BIN_TO_DOT_FILE_WITH_TS(GST_BIN(m_pipeline.get()), GST_DEBUG_GRAPH_SHOW_ALL, dotFileName.data());
@@ -2512,9 +2524,11 @@ void MediaPlayerPrivateGStreamer::createGSTPlayBin(const gchar* playbinName, con
             GST_WARNING("The videoflip element is missing, video rotation support is now disabled. Please check your gst-plugins-good installation.");
     }
 
+#if !USE(GSTREAMER_HOLEPUNCH)
     GRefPtr<GstPad> videoSinkPad = adoptGRef(gst_element_get_static_pad(m_videoSink.get(), "sink"));
     if (videoSinkPad)
         g_signal_connect_swapped(videoSinkPad.get(), "notify::caps", G_CALLBACK(videoSinkCapsChangedCallback), this);
+#endif
 }
 
 void MediaPlayerPrivateGStreamer::simulateAudioInterruption()
