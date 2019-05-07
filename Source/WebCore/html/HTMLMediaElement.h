@@ -1195,6 +1195,8 @@ private:
 
     bool m_isPlayingToWirelessTarget { false };
     bool m_playingOnSecondScreen { false };
+
+    bool m_shouldUnpauseOnResume { false };
 };
 
 String convertEnumerationToString(HTMLMediaElement::AutoplayEventPlaybackState);

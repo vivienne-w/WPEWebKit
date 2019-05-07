@@ -839,13 +839,13 @@ void WebGLRenderingContextBase::addCompressedTextureFormat(GC3Denum format)
 
 void WebGLRenderingContextBase::addActivityStateChangeObserverIfNecessary()
 {
-    // We are only interested in visibility changes for contexts
-    // that are using the high-performance GPU.
-    if (!isHighPerformanceContext(m_context))
-        return;
-
     auto* canvas = htmlCanvas();
     if (!canvas)
+        return;
+
+    // We are only interested in visibility changes for contexts
+    // that are using the high-performance GPU.
+    if (!isHighPerformanceContext(m_context) && !canvas->document().frame()->settings().nonCompositedWebGLEnabled())
         return;
 
     auto* page = canvas->document().page();
@@ -6493,8 +6493,23 @@ void WebGLRenderingContextBase::activityStateDidChange(OptionSet<ActivityState::
         return;
 
     auto changed = oldActivityState ^ newActivityState;
-    if (changed & ActivityState::IsVisible)
-        m_context->setContextVisibility(newActivityState.contains(ActivityState::IsVisible));
+
+    if (isHighPerformanceContext(m_context)) {
+        if (changed & ActivityState::IsVisible)
+            m_context->setContextVisibility(newActivityState.contains(ActivityState::IsVisible));
+    }
+
+    if (htmlCanvas()->document().frame()->settings().nonCompositedWebGLEnabled()) {
+        if ((changed & ActivityState::IsInWindow) && !(newActivityState & ActivityState::IsInWindow)) {
+            if (m_scissorEnabled)
+                m_context->disable(GraphicsContext3D::SCISSOR_TEST);
+            m_context->clearColor(0, 0, 0, 0);
+            m_context->clear(GraphicsContext3D::COLOR_BUFFER_BIT);
+            downcast<Nicosia::ContentLayerTextureMapperImpl>(downcast<Nicosia::ContentLayer>(m_context->platformLayer())->impl()).swapBuffersIfNeeded();
+            if (m_scissorEnabled)
+                m_context->enable(GraphicsContext3D::SCISSOR_TEST);
+        }
+    }
 }
 
 void WebGLRenderingContextBase::setFailNextGPUStatusCheck()

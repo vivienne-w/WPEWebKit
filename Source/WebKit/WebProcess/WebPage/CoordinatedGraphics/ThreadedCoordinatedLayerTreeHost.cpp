@@ -204,6 +204,18 @@ void ThreadedCoordinatedLayerTreeHost::sizeDidChange(const IntSize& size)
     didChangeViewport();
 }
 
+void ThreadedCoordinatedLayerTreeHost::suspendToTransparent()
+{
+    CoordinatedLayerTreeHost::suspendToTransparent();
+    m_compositor->suspendToTransparent();
+}
+
+void ThreadedCoordinatedLayerTreeHost::resumeFromTransparent()
+{
+    CoordinatedLayerTreeHost::resumeFromTransparent();
+    m_compositor->resumeFromTransparent();
+}
+
 void ThreadedCoordinatedLayerTreeHost::didChangeViewportAttributes(ViewportAttributes&& attr)
 {
     m_viewportController.didChangeViewportAttributes(WTFMove(attr));

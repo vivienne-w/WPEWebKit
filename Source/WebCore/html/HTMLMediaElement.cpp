@@ -5747,6 +5747,13 @@ void HTMLMediaElement::suspend(ReasonForSuspension reason)
         m_mediaSession->addBehaviorRestriction(MediaElementSession::RequirePageConsentToResumeMedia);
         break;
     case ReasonForSuspension::PageWillBeSuspended:
+        if (!m_pausedInternal) {
+            m_shouldUnpauseOnResume = true;
+            setPausedInternal(true);
+        }
+        if (m_player)
+            m_player->platformSuspend();
+        break;
     case ReasonForSuspension::JavaScriptDebuggerPaused:
     case ReasonForSuspension::WillDeferLoading:
         // Do nothing, we don't pause media playback in these cases.
@@ -5763,6 +5770,13 @@ void HTMLMediaElement::resume()
     m_asyncEventQueue.resume();
 
     setShouldBufferData(true);
+
+    if (m_shouldUnpauseOnResume) {
+        m_shouldUnpauseOnResume = false;
+        setPausedInternal(false);
+    }
+    if (m_player)
+        m_player->platformResume();
 
     if (!m_mediaSession->pageAllowsPlaybackAfterResuming())
         document().addMediaCanStartListener(*this);

@@ -1100,9 +1100,15 @@ void MediaPlayerPrivateGStreamerBase::ensureGLVideoSinkContext()
 #endif // USE(GSTREAMER_GL)
 
 #if USE(GSTREAMER_HOLEPUNCH)
-static void setRectangleToVideoSink(GstElement* videoSink, const IntRect& rect)
+static void setRectangleToVideoSink(GstElement* videoSink, const IntRect& rect, bool changeSuspensionState)
 {
-    if (!videoSink)
+    static Lock mutex;
+    static bool isSuspended = false;
+
+    LockHolder holder(mutex);
+    isSuspended = changeSuspensionState ? !isSuspended : isSuspended;
+
+    if (!videoSink || (isSuspended && !changeSuspensionState))
         return;
 
 #if USE(WESTEROS_SINK) || USE(WPEWEBKIT_PLATFORM_BCM_NEXUS)
@@ -1118,7 +1124,7 @@ static void setRectangleToVideoSink(GstElement* videoSink, const IntRect& rect)
 class GStreamerHolePunchClient : public TextureMapperPlatformLayerBuffer::HolePunchClient {
 public:
     GStreamerHolePunchClient(GRefPtr<GstElement>&& videoSink) : m_videoSink(WTFMove(videoSink)) { };
-    void setVideoRectangle(const IntRect& rect) final { setRectangleToVideoSink(m_videoSink.get(), rect); }
+    void setVideoRectangle(const IntRect& rect) final { setRectangleToVideoSink(m_videoSink.get(), rect, false); }
 private:
     GRefPtr<GstElement> m_videoSink;
 };
@@ -1420,6 +1426,20 @@ MediaPlayer::SupportsType MediaPlayerPrivateGStreamerBase::extendedSupportsType(
 {
     UNUSED_PARAM(parameters);
     return result;
+}
+
+void MediaPlayerPrivateGStreamerBase::platformSuspend()
+{
+#if USE(GSTREAMER_HOLEPUNCH)
+    setRectangleToVideoSink(m_videoSink.get(), { }, true);
+#endif
+}
+
+void MediaPlayerPrivateGStreamerBase::platformResume()
+{
+#if USE(GSTREAMER_HOLEPUNCH)
+    setRectangleToVideoSink(m_videoSink.get(), { }, true);
+#endif
 }
 
 }

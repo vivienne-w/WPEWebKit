@@ -83,6 +83,8 @@ public:
 #endif
 
     void frameComplete();
+    void suspendToTransparent();
+    void resumeFromTransparent();
 
 private:
     ThreadedCompositor(Client&, ThreadedDisplayRefreshMonitor::Client&, WebCore::PlatformDisplayID, const WebCore::IntSize&, float scaleFactor, ShouldDoFrameSync, WebCore::TextureMapper::PaintFlags, bool);
@@ -115,6 +117,7 @@ private:
         float scaleFactor { 1 };
         bool needsResize { false };
         Vector<WebCore::CoordinatedGraphicsState> states;
+        bool suspendedToTransparent { false };
 
         bool clientRendersNextFrame { false };
         bool coordinateUpdateCompletionWithClient { false };

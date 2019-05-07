@@ -220,6 +220,7 @@ void ThreadedCompositor::renderLayerTree()
     WebCore::IntPoint scrollPosition;
     float scaleFactor;
     bool needsResize;
+    bool suspendedToTransparent;
 
     Vector<WebCore::CoordinatedGraphicsState> states;
 
@@ -229,6 +230,7 @@ void ThreadedCompositor::renderLayerTree()
         scrollPosition = m_attributes.scrollPosition;
         scaleFactor = m_attributes.scaleFactor;
         needsResize = m_attributes.needsResize;
+        suspendedToTransparent = m_attributes.suspendedToTransparent;
 
         states = WTFMove(m_attributes.states);
 
@@ -274,8 +276,10 @@ void ThreadedCompositor::renderLayerTree()
     glClearColor(0, 0, 0, 0);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    m_scene->applyStateChanges(states);
-    m_scene->paintToCurrentGLContext(viewportTransform, FloatRect { FloatPoint { }, viewportSize }, m_paintFlags);
+    if (!suspendedToTransparent) {
+        m_scene->applyStateChanges(states);
+        m_scene->paintToCurrentGLContext(viewportTransform, FloatRect { FloatPoint { }, viewportSize }, m_paintFlags);
+    }
 
     m_context->swapBuffers();
 
@@ -360,6 +364,20 @@ void ThreadedCompositor::frameComplete()
 {
     ASSERT(!RunLoop::isMain());
     sceneUpdateFinished();
+}
+
+void ThreadedCompositor::suspendToTransparent()
+{
+    LockHolder locker(m_attributes.lock);
+    m_attributes.suspendedToTransparent = true;
+    m_compositingRunLoop->scheduleUpdate();
+}
+
+void ThreadedCompositor::resumeFromTransparent()
+{
+    LockHolder locker(m_attributes.lock);
+    m_attributes.suspendedToTransparent = false;
+    m_compositingRunLoop->scheduleUpdate();
 }
 
 }

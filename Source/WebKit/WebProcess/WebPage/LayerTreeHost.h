@@ -75,6 +75,9 @@ public:
     virtual bool forceRepaintAsync(CallbackID) { return false; }
     virtual void sizeDidChange(const WebCore::IntSize& newSize) = 0;
 
+    virtual void suspendToTransparent() = 0;
+    virtual void resumeFromTransparent() = 0;
+
     virtual void pauseRendering();
     virtual void resumeRendering();
 

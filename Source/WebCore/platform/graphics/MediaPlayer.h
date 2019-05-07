@@ -578,6 +578,8 @@ public:
 
     bool shouldIgnoreIntrinsicSize();
 
+    void platformSuspend();
+    void platformResume();
 private:
     MediaPlayer(MediaPlayerClient&);
 

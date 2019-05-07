@@ -335,6 +335,30 @@ void AcceleratedDrawingArea::resumePainting()
     m_webPage.corePage()->resumeScriptedAnimations();
 }
 
+void AcceleratedDrawingArea::handleIsInWindowChanged()
+{
+    // At this point WebPage has already set the IsInWindow flag to its corePage, so we can get the value
+    // from there (here we only know which flags have changed).
+    // The call to suspendToTransparent() on the layerTreeHost will schedule a redraw from the ThreadedCompositor
+    // and it will paint an empty content.
+
+    if (!m_webPage.corePage()->isInWindow()) {
+        if (m_layerTreeHost)
+            m_layerTreeHost->suspendToTransparent();
+
+        m_webPage.corePage()->suspendActiveDOMObjectsAndAnimations();
+        m_webPage.corePage()->suspendScriptedAnimations();
+        return;
+    }
+
+    if (m_layerTreeHost)
+        m_layerTreeHost->resumeFromTransparent();
+
+    setNeedsDisplay();
+    m_webPage.corePage()->resumeActiveDOMObjectsAndAnimations();
+    m_webPage.corePage()->resumeScriptedAnimations();
+}
+
 void AcceleratedDrawingArea::enterAcceleratedCompositingMode(GraphicsLayer* graphicsLayer)
 {
     m_discardPreviousLayerTreeHostTimer.stop();
@@ -462,6 +486,9 @@ uint64_t AcceleratedDrawingArea::nativeWindowID() const
 
 void AcceleratedDrawingArea::activityStateDidChange(OptionSet<ActivityState::Flag> changed, ActivityStateChangeID, const Vector<CallbackID>&)
 {
+    if (changed & ActivityState::IsInWindow)
+        handleIsInWindowChanged();
+
     if (changed & ActivityState::IsVisible) {
         if (m_webPage.isVisible())
             resumePainting();

@@ -169,6 +169,9 @@ public:
 
     virtual bool handleSyncMessage(GstMessage*);
 
+    void platformSuspend() final;
+    void platformResume() final;
+
 protected:
     MediaPlayerPrivateGStreamerBase(MediaPlayer*);
     virtual GstElement* createVideoSink();

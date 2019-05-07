@@ -54,6 +54,9 @@ protected:
     bool forceRepaintAsync(CallbackID) override;
     void sizeDidChange(const WebCore::IntSize& newSize) override;
 
+    void suspendToTransparent() override { };
+    void resumeFromTransparent() override { };
+
     void deviceOrPageScaleFactorChanged() override;
 
     void setVisibleContentsRect(const WebCore::FloatRect&);
