@@ -391,14 +391,90 @@ MediaTime MediaPlayerPrivateGStreamer::playbackPosition() const
         }
     }
 #elif PLATFORM(BCM_NEXUS)
-    // Implement getting pts time from broadcom decoder directly for seek functionality.
-    // In some cases one stream (audio or video) is shorter than the other and its position doesn't
-    // increase anymore. We need to query both decoders (if available) and choose the highest position.
-    GstClockTime videoPosition = GST_CLOCK_TIME_NONE;
-    GstClockTime audioPosition = GST_CLOCK_TIME_NONE;
+    if (isMediaSource()) {
+        // Implement getting pts time from broadcom decoder directly for seek functionality.
+        // In some cases one stream (audio or video) is shorter than the other and its position doesn't
+        // increase anymore. We need to query both decoders (if available) and choose the highest position.
+        GstClockTime videoPosition = GST_CLOCK_TIME_NONE;
+        GstClockTime audioPosition = GST_CLOCK_TIME_NONE;
 
-    if (!m_audioDecoder) {
+        if (!m_audioDecoder) {
 
+            if (!m_videoDecoder) {
+                GstElement *videoDecoder = nullptr;
+                if (!(m_videoDecoder)) {
+                    findDecoder(m_pipeline.get(), &videoDecoder, "brcmvideodecoder");
+                }
+                if (!videoDecoder) {
+                    m_lastQuery = now;
+                    return MediaTime::zeroTime();
+                }
+                m_videoDecoder = videoDecoder;
+            }
+
+            if (gst_element_query(m_videoDecoder, query)) {
+                gst_query_parse_position(query, 0, (gint64*)&videoPosition);
+            }
+
+
+            if (videoPosition == GST_CLOCK_TIME_NONE)
+                videoPosition = 0;
+
+
+            if (!(m_seeking || m_paused)) {
+                if (m_cachedPosition.isValid() && videoPosition != 0 ) {
+                    if ((static_cast<GstClockTime>(videoPosition) > toGstClockTime(m_cachedPosition)) || m_cachedPosition == MediaTime::zeroTime()) {
+                        // Always video position.
+                        position = videoPosition;
+                    } else if ((static_cast<GstClockTime>(videoPosition) == toGstClockTime(m_cachedPosition)) &&
+                        ((m_lastQuery > -1 && (now - m_lastQuery) < 2))) { // TODO: 2 seconds for decision, are there any other ways to switch audio position?
+                        // If the reported position is same for 2 seconds, try audio position.
+                        gst_query_unref(query);
+                        return m_cachedPosition;
+                    } else if (m_cachedPosition == m_seekTime) {
+                        // When seeking is not completed, report video position.
+                        if (videoPosition > 0)
+                            position = videoPosition;
+                    } else {
+                        GST_INFO("Switch to audio position.");
+                        GstElement *audioDecoder = nullptr;
+                        if (!(m_audioDecoder)) {
+                            findDecoder(m_pipeline.get(), &audioDecoder, "brcmaudiodecoder");
+                        }
+                        if (!audioDecoder) {
+                            m_lastQuery = now;
+                            gst_query_unref(query);
+                            return m_cachedPosition;
+                        }
+                        m_audioDecoder = audioDecoder;
+                        g_object_set(m_audioDecoder, "use-audio-position", true, nullptr);
+                        if (gst_element_query(m_audioDecoder, query))
+                            gst_query_parse_position(query, 0, (gint64*)&audioPosition);
+
+                        if (audioPosition == GST_CLOCK_TIME_NONE)
+                            audioPosition = 0;
+
+                        position = audioPosition;
+                    }
+                }
+            } else {
+                // Report cached position in case of paused or seeking.
+                position = toGstClockTime(m_cachedPosition);
+            }
+
+        } else {
+            if (gst_element_query(m_audioDecoder, query)) {
+                gst_query_parse_position(query, 0, (gint64*)&audioPosition);
+            }
+
+            if (audioPosition == GST_CLOCK_TIME_NONE)
+                audioPosition = 0;
+            position = audioPosition;
+        }
+
+        GST_TRACE("videoPosition: %" GST_TIME_FORMAT ", audioPosition: %" GST_TIME_FORMAT, GST_TIME_ARGS(videoPosition), GST_TIME_ARGS(audioPosition));
+    } else {
+        // Regular non-MSE player
         if (!m_videoDecoder) {
             GstElement *videoDecoder = nullptr;
             if (!(m_videoDecoder)) {
@@ -411,67 +487,8 @@ MediaTime MediaPlayerPrivateGStreamer::playbackPosition() const
             m_videoDecoder = videoDecoder;
         }
 
-        if (gst_element_query(m_videoDecoder, query)) {
-            gst_query_parse_position(query, 0, (gint64*)&videoPosition);
-        }
-
-
-        if (videoPosition == GST_CLOCK_TIME_NONE)
-            videoPosition = 0;
-
-
-        if (!(m_seeking || m_paused)) {
-            if (m_cachedPosition.isValid() && videoPosition != 0 ) {
-                if ((static_cast<GstClockTime>(videoPosition) > toGstClockTime(m_cachedPosition)) || m_cachedPosition == MediaTime::zeroTime()) {
-                    // Always video position.
-                    position = videoPosition;
-                } else if ((static_cast<GstClockTime>(videoPosition) == toGstClockTime(m_cachedPosition)) &&
-                    ((m_lastQuery > -1 && (now - m_lastQuery) < 2))) { // TODO: 2 seconds for decision, are there any other ways to switch audio position?
-                    // If the reported position is same for 2 seconds, try audio position.
-                    gst_query_unref(query);
-                    return m_cachedPosition;
-                } else if (m_cachedPosition == m_seekTime) {
-                    // When seeking is not completed, report video position.
-                    if (videoPosition > 0)
-                        position = videoPosition;
-                } else {
-                    GST_INFO("Switch to audio position.");
-                    GstElement *audioDecoder = nullptr;
-                    if (!(m_audioDecoder)) {
-                        findDecoder(m_pipeline.get(), &audioDecoder, "brcmaudiodecoder");
-                    }
-                    if (!audioDecoder) {
-                        m_lastQuery = now;
-                        gst_query_unref(query);
-                        return m_cachedPosition;
-                    }
-                    m_audioDecoder = audioDecoder;
-                    g_object_set(m_audioDecoder, "use-audio-position", true, nullptr);
-                    if (gst_element_query(m_audioDecoder, query))
-                        gst_query_parse_position(query, 0, (gint64*)&audioPosition);
-
-                    if (audioPosition == GST_CLOCK_TIME_NONE)
-                        audioPosition = 0;
-
-                    position = audioPosition;
-                }
-            }
-        } else {
-            // Report cached position in case of paused or seeking.
-            position = toGstClockTime(m_cachedPosition);
-        }
-
-    } else {
-        if (gst_element_query(m_audioDecoder, query)) {
-            gst_query_parse_position(query, 0, (gint64*)&audioPosition);
-        }
-
-        if (audioPosition == GST_CLOCK_TIME_NONE)
-            audioPosition = 0;
-        position = audioPosition;
+        positionElement = m_videoDecoder;
     }
-
-    GST_TRACE("videoPosition: %" GST_TIME_FORMAT ", audioPosition: %" GST_TIME_FORMAT, GST_TIME_ARGS(videoPosition), GST_TIME_ARGS(audioPosition));
 #else
     positionElement = m_pipeline.get();
 #endif
