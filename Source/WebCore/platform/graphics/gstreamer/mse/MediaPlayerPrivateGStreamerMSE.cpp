@@ -626,7 +626,7 @@ void MediaPlayerPrivateGStreamerMSE::updateStates()
             ASSERT_NOT_REACHED();
             break;
         }
-#if PLATFORM(BROADCOM)
+#if PLATFORM(BCM_NEXUS)
         // this code path needs a proper review in case it can be generalized to all platforms.
         bool buffering = !isTimeBuffered(currentMediaTime()) && !playbackPipelineHasFutureData();
 #else
@@ -639,16 +639,13 @@ void MediaPlayerPrivateGStreamerMSE::updateStates()
                 notifyPlayerOfMute();
                 m_volumeAndMuteInitialized = true;
             }
-
 #if PLATFORM(BCM_NEXUS)
-            if (!isTimeBuffered(currentMediaTime()) && !playbackPipelineHasFutureData()) {
+            if (buffering) {
                 m_readyState = MediaPlayer::HaveMetadata;
-            }
-            else
+                GST_DEBUG("[Buffering] set readystate to HaveMetadata");
+            } else
 #endif
-            if (!isTimeBuffered(currentMediaTime()) && !playbackPipelineHasFutureData()) {
-                m_readyState = MediaPlayer::HaveMetadata;
-            } else if (!seeking() && !buffering && !m_paused && m_playbackRate) {
+            if (!seeking() && !buffering && !m_paused && m_playbackRate) {
                 GST_DEBUG("[Buffering] Restarting playback.");
                 changePipelineState(GST_STATE_PLAYING);
             }

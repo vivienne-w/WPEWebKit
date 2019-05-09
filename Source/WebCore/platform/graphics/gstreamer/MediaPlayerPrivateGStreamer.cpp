@@ -160,6 +160,10 @@ MediaPlayerPrivateGStreamer::MediaPlayerPrivateGStreamer(MediaPlayer* player)
     , m_totalBytes(0)
     , m_preservesPitch(false)
     , m_lastQuery(-1)
+#if PLATFORM(BCM_NEXUS)
+    , m_videoDecoder(nullptr)
+    , m_audioDecoder(nullptr)
+#endif
 {
 #if USE(GLIB)
     m_readyTimerHandler.setPriority(G_PRIORITY_DEFAULT_IDLE);
@@ -312,11 +316,11 @@ void MediaPlayerPrivateGStreamer::commitLoad()
 }
 
 #if PLATFORM(BCM_NEXUS)
-// utility function for bcm nexus seek functionality
-static void findDecoders(GstElement *element, GstElement **videoDecoder, GstElement **audioDecoder)
+// Find a decoder based on plugin name.
+static void findDecoder(GstElement *element, GstElement **decoder, const CString &search)
 {
-    if (!(videoDecoder || audioDecoder))
-        return;
+    if (!decoder)
+         return;
 
     if (GST_IS_BIN(element)) {
         GstIterator* it = gst_bin_iterate_elements(GST_BIN(element));
@@ -327,8 +331,8 @@ static void findDecoders(GstElement *element, GstElement **videoDecoder, GstElem
                 case GST_ITERATOR_OK:
                 {
                     GstElement *next = GST_ELEMENT(g_value_get_object(&item));
-                    findDecoders(next, videoDecoder, audioDecoder);
-                    done = (!((videoDecoder && !*videoDecoder) || (audioDecoder && !*audioDecoder)));
+                    findDecoder(next, decoder, search);
+                    done = (!(decoder && !*decoder));
                     g_value_reset (&item);
                     break;
                 }
@@ -343,10 +347,9 @@ static void findDecoders(GstElement *element, GstElement **videoDecoder, GstElem
         }
         g_value_unset (&item);
         gst_iterator_free(it);
-    } else if (videoDecoder && (GST_IS_VIDEO_DECODER(element) || g_str_has_suffix(G_OBJECT_TYPE_NAME(G_OBJECT(element)), "VideoDecoder")))
-        *videoDecoder = element;
-    else if (audioDecoder && (GST_IS_AUDIO_DECODER(element) || g_str_has_suffix(G_OBJECT_TYPE_NAME(G_OBJECT(element)), "AudioDecoder")))
-        *audioDecoder = element;
+    } else if (decoder && (g_strstr_len(gst_element_get_name(element), search.length(), search.data()))) {
+        *decoder = element;
+    }
     return;
 }
 #endif
@@ -373,7 +376,6 @@ MediaTime MediaPlayerPrivateGStreamer::playbackPosition() const
     if (m_lastQuery > -1 && ((now - m_lastQuery) < 0.01) && m_cachedPosition.isValid())
         return m_cachedPosition;
 
-    m_lastQuery = now;
 
     // Position is only available if no async state change is going on and the state is either paused or playing.
     gint64 position = GST_CLOCK_TIME_NONE;
@@ -392,32 +394,84 @@ MediaTime MediaPlayerPrivateGStreamer::playbackPosition() const
     // Implement getting pts time from broadcom decoder directly for seek functionality.
     // In some cases one stream (audio or video) is shorter than the other and its position doesn't
     // increase anymore. We need to query both decoders (if available) and choose the highest position.
-    GstElement* videoDecoder = nullptr;
-    GstElement* audioDecoder = nullptr;
     GstClockTime videoPosition = GST_CLOCK_TIME_NONE;
     GstClockTime audioPosition = GST_CLOCK_TIME_NONE;
 
-    findDecoders(m_pipeline.get(), &videoDecoder, &audioDecoder);
+    if (!m_audioDecoder) {
 
-    GST_TRACE("videoDecoder: %s, audioDecoder: %s", videoDecoder ? GST_ELEMENT_NAME(videoDecoder) : "null", audioDecoder ? GST_ELEMENT_NAME(audioDecoder) : "null");
+        if (!m_videoDecoder) {
+            GstElement *videoDecoder = nullptr;
+            if (!(m_videoDecoder)) {
+                findDecoder(m_pipeline.get(), &videoDecoder, "brcmvideodecoder");
+            }
+            if (!videoDecoder) {
+                m_lastQuery = now;
+                return MediaTime::zeroTime();
+            }
+            m_videoDecoder = videoDecoder;
+        }
 
-    if (!(videoDecoder || audioDecoder))
-        return MediaTime::zeroTime();
-    if (videoDecoder && gst_element_query(videoDecoder, query))
-        gst_query_parse_position(query, 0, (gint64*)&videoPosition);
-    if (audioDecoder) {
-        g_object_set(audioDecoder, "use-audio-position", true, nullptr);
-        if (gst_element_query(audioDecoder, query))
+        if (gst_element_query(m_videoDecoder, query)) {
+            gst_query_parse_position(query, 0, (gint64*)&videoPosition);
+        }
+
+
+        if (videoPosition == GST_CLOCK_TIME_NONE)
+            videoPosition = 0;
+
+
+        if (!(m_seeking || m_paused)) {
+            if (m_cachedPosition.isValid() && videoPosition != 0 ) {
+                if ((static_cast<GstClockTime>(videoPosition) > toGstClockTime(m_cachedPosition)) || m_cachedPosition == MediaTime::zeroTime()) {
+                    // Always video position.
+                    position = videoPosition;
+                } else if ((static_cast<GstClockTime>(videoPosition) == toGstClockTime(m_cachedPosition)) &&
+                    ((m_lastQuery > -1 && (now - m_lastQuery) < 2))) { // TODO: 2 seconds for decision, are there any other ways to switch audio position?
+                    // If the reported position is same for 2 seconds, try audio position.
+                    gst_query_unref(query);
+                    return m_cachedPosition;
+                } else if (m_cachedPosition == m_seekTime) {
+                    // When seeking is not completed, report video position.
+                    if (videoPosition > 0)
+                        position = videoPosition;
+                } else {
+                    GST_INFO("Switch to audio position.");
+                    GstElement *audioDecoder = nullptr;
+                    if (!(m_audioDecoder)) {
+                        findDecoder(m_pipeline.get(), &audioDecoder, "brcmaudiodecoder");
+                    }
+                    if (!audioDecoder) {
+                        m_lastQuery = now;
+                        gst_query_unref(query);
+                        return m_cachedPosition;
+                    }
+                    m_audioDecoder = audioDecoder;
+                    g_object_set(m_audioDecoder, "use-audio-position", true, nullptr);
+                    if (gst_element_query(m_audioDecoder, query))
+                        gst_query_parse_position(query, 0, (gint64*)&audioPosition);
+
+                    if (audioPosition == GST_CLOCK_TIME_NONE)
+                        audioPosition = 0;
+
+                    position = audioPosition;
+                }
+            }
+        } else {
+            // Report cached position in case of paused or seeking.
+            position = toGstClockTime(m_cachedPosition);
+        }
+
+    } else {
+        if (gst_element_query(m_audioDecoder, query)) {
             gst_query_parse_position(query, 0, (gint64*)&audioPosition);
+        }
+
+        if (audioPosition == GST_CLOCK_TIME_NONE)
+            audioPosition = 0;
+        position = audioPosition;
     }
-    if (videoPosition == GST_CLOCK_TIME_NONE)
-        videoPosition = 0;
-    if (audioPosition == GST_CLOCK_TIME_NONE)
-        audioPosition = 0;
 
     GST_TRACE("videoPosition: %" GST_TIME_FORMAT ", audioPosition: %" GST_TIME_FORMAT, GST_TIME_ARGS(videoPosition), GST_TIME_ARGS(audioPosition));
-
-    position = max(videoPosition, audioPosition);
 #else
     positionElement = m_pipeline.get();
 #endif
@@ -435,6 +489,7 @@ MediaTime MediaPlayerPrivateGStreamer::playbackPosition() const
         playbackPosition = m_seekTime;
 
     m_cachedPosition = playbackPosition;
+    m_lastQuery = now;
     return playbackPosition;
 }
 

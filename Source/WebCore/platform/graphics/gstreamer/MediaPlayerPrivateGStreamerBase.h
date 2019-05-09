@@ -240,6 +240,9 @@ protected:
     GRefPtr<GstElement> m_pipeline;
     GRefPtr<GstStreamVolume> m_volumeElement;
     GRefPtr<GstElement> m_videoSink;
+#if PLATFORM(BCM_NEXUS)
+    mutable GstElement *m_videoBcmSink;
+#endif
     GRefPtr<GstElement> m_fpsSink;
     MediaPlayer::ReadyState m_readyState;
     mutable MediaPlayer::NetworkState m_networkState;
