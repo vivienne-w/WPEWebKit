@@ -272,6 +272,9 @@ MediaPlayerPrivateGStreamerBase::MediaPlayerPrivateGStreamerBase(MediaPlayer* pl
     : m_notifier(MainThreadNotifier<MainThreadNotification>::create())
     , m_player(player)
     , m_fpsSink(nullptr)
+#if PLATFORM(BCM_NEXUS)
+    , m_videoBcmSink(nullptr)
+#endif
     , m_readyState(MediaPlayer::HaveNothing)
     , m_networkState(MediaPlayer::Empty)
     , m_isEndReached(false)
@@ -1274,10 +1277,14 @@ unsigned MediaPlayerPrivateGStreamerBase::decodedFrameCount() const
         GST_DEBUG("frames decoded: %llu",  decodedFrames);
     }
 #if PLATFORM(BCM_NEXUS)
-    GstElement* videoSink = nullptr;
-    videoSink = findVideoSink(m_pipeline.get());
-    if (videoSink) {
-        g_object_get(videoSink, "frames-rendered", &decodedFrames, nullptr);
+
+    if (!m_videoBcmSink) {
+        GstElement* videoSink = nullptr;
+        videoSink = findVideoSink(m_pipeline.get());
+        if (videoSink)
+            m_videoBcmSink = videoSink;
+    } else {
+        g_object_get(m_videoBcmSink, "frames-rendered", &decodedFrames, nullptr);
         GST_DEBUG("frames decoded: %llu",  decodedFrames);
     }
 #endif
@@ -1291,10 +1298,13 @@ unsigned MediaPlayerPrivateGStreamerBase::droppedFrameCount() const
         g_object_get(m_fpsSink.get(), "frames-dropped", &framesDropped, nullptr);
 
 #if PLATFORM(BCM_NEXUS)
-    GstElement* videoSink = nullptr;
-    videoSink = findVideoSink(m_pipeline.get());
-    if (videoSink) {
-        g_object_get(videoSink, "frames-dropped", &framesDropped, nullptr);
+    if (!m_videoBcmSink) {
+        GstElement* videoSink = nullptr;
+        videoSink = findVideoSink(m_pipeline.get());
+        if (videoSink)
+            m_videoBcmSink = videoSink;
+    } else {
+        g_object_get(m_videoBcmSink, "frames-dropped", &framesDropped, nullptr);
         GST_DEBUG("frames dropped: %llu",  framesDropped);
     }
 #endif

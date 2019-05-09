@@ -196,7 +196,10 @@ protected:
     GRefPtr<GstElement> m_source;
     bool m_volumeAndMuteInitialized;
     MediaTime m_previousDuration;
-
+#if PLATFORM(BCM_NEXUS)
+    mutable GstElement *m_audioDecoder;
+    mutable GstElement *m_videoDecoder;
+#endif
     static GstSeekFlags hardwareDependantSeekFlags();
     void readyTimerFired();
 
