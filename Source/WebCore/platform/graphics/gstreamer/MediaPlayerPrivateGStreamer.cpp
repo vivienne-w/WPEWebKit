@@ -421,7 +421,7 @@ MediaTime MediaPlayerPrivateGStreamer::playbackPosition() const
                 videoPosition = 0;
 
 
-            if (!(m_seeking || m_paused)) {
+            if (!m_seeking) {
                 if (m_cachedPosition.isValid() && videoPosition != 0 ) {
                     if ((static_cast<GstClockTime>(videoPosition) > toGstClockTime(m_cachedPosition)) || m_cachedPosition == MediaTime::zeroTime()) {
                         // Always video position.
