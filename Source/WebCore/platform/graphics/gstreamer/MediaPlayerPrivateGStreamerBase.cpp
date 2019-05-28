@@ -610,6 +610,7 @@ MediaPlayer::NetworkState MediaPlayerPrivateGStreamerBase::networkState() const
 
 MediaPlayer::ReadyState MediaPlayerPrivateGStreamerBase::readyState() const
 {
+    printf("### %s: m_readyState = %d\n", __PRETTY_FUNCTION__, static_cast<int>(m_readyState)); fflush(stdout);
     return m_readyState;
 }
 
