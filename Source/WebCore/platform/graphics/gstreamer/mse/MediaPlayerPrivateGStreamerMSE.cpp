@@ -475,6 +475,10 @@ void MediaPlayerPrivateGStreamerMSE::setReadyState(MediaPlayer::ReadyState ready
         GST_DEBUG("[Seek] Reporting load state changed to trigger seek continuation");
         loadStateChanged();
     }
+
+    // The loadStateChanged() call above might have changed the readyState, but we know better.
+    m_readyState = readyState;
+
     m_player->readyStateChanged();
 
     GstState pipelineState;
