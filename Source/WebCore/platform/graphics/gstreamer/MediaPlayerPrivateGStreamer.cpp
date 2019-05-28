@@ -407,10 +407,8 @@ MediaTime MediaPlayerPrivateGStreamer::playbackPosition() const
                 }
                 if (!videoDecoder) {
                     m_lastQuery = now;
-                    GST_TRACE("No video decoder, returning zero");
                     return MediaTime::zeroTime();
                 }
-                GST_TRACE("Found video decoder for the first time");
                 m_videoDecoder = videoDecoder;
             }
 
@@ -427,22 +425,16 @@ MediaTime MediaPlayerPrivateGStreamer::playbackPosition() const
                 if (m_cachedPosition.isValid() && videoPosition != 0 ) {
                     if ((static_cast<GstClockTime>(videoPosition) > toGstClockTime(m_cachedPosition)) || m_cachedPosition == MediaTime::zeroTime()) {
                         // Always video position.
-                        GST_TRACE("(A)");
                         position = videoPosition;
                     } else if ((static_cast<GstClockTime>(videoPosition) == toGstClockTime(m_cachedPosition)) &&
                         ((m_lastQuery > -1 && (now - m_lastQuery) < 2))) { // TODO: 2 seconds for decision, are there any other ways to switch audio position?
                         // If the reported position is same for 2 seconds, try audio position.
                         gst_query_unref(query);
-                        GST_TRACE("(B)");
                         return m_cachedPosition;
                     } else if (m_cachedPosition == m_seekTime) {
                         // When seeking is not completed, report video position.
-                        if (videoPosition > 0) {
+                        if (videoPosition > 0)
                             position = videoPosition;
-                            GST_TRACE("(C)");
-                        } else {
-                            GST_TRACE("(D)");
-                        }
                     } else {
                         GST_INFO("Switch to audio position.");
                         GstElement *audioDecoder = nullptr;
@@ -452,10 +444,8 @@ MediaTime MediaPlayerPrivateGStreamer::playbackPosition() const
                         if (!audioDecoder) {
                             m_lastQuery = now;
                             gst_query_unref(query);
-                            GST_TRACE("(E)");
                             return m_cachedPosition;
                         }
-                        GST_TRACE("Found audio decoder for the first time");
                         m_audioDecoder = audioDecoder;
                         g_object_set(m_audioDecoder, "use-audio-position", true, nullptr);
                         if (gst_element_query(m_audioDecoder, query))
@@ -464,12 +454,10 @@ MediaTime MediaPlayerPrivateGStreamer::playbackPosition() const
                         if (audioPosition == GST_CLOCK_TIME_NONE)
                             audioPosition = 0;
 
-                        GST_TRACE("(F)");
                         position = audioPosition;
                     }
                 }
             } else {
-                GST_TRACE("(G) m_seeking: %s, m_paused: %s", m_seeking ? "true" : "false", m_paused ? "true" : "false");
                 // Report cached position in case of paused or seeking.
                 position = toGstClockTime(m_cachedPosition);
             }
@@ -482,7 +470,6 @@ MediaTime MediaPlayerPrivateGStreamer::playbackPosition() const
             if (audioPosition == GST_CLOCK_TIME_NONE)
                 audioPosition = 0;
             position = audioPosition;
-            GST_TRACE("(H)");
         }
 
         GST_TRACE("videoPosition: %" GST_TIME_FORMAT ", audioPosition: %" GST_TIME_FORMAT, GST_TIME_ARGS(videoPosition), GST_TIME_ARGS(audioPosition));
@@ -505,10 +492,8 @@ MediaTime MediaPlayerPrivateGStreamer::playbackPosition() const
 #else
     positionElement = m_pipeline.get();
 #endif
-    if (positionElement && gst_element_query(positionElement, query)) {
+    if (positionElement && gst_element_query(positionElement, query))
         gst_query_parse_position(query, 0, &position);
-        GST_TRACE("Asking position to %s", GST_ELEMENT_NAME(positionElement));
-    }
     gst_query_unref(query);
 
     GST_DEBUG("Position %" GST_TIME_FORMAT, GST_TIME_ARGS(position));
@@ -2409,13 +2394,13 @@ void MediaPlayerPrivateGStreamer::createGSTPlayBin()
 #else
     unsigned flagText = 0x0;
 #endif
-
+    
     unsigned flagAudio = getGstPlayFlag("audio");
     unsigned flagVideo = getGstPlayFlag("video");
-
-#if ENABLE(NATIVE_VIDEO)
+    
+#if ENABLE(NATIVE_VIDEO)    
     unsigned flagNativeVideo = getGstPlayFlag("native-video");
-#else
+#else    
     unsigned flagNativeVideo = 0x0;
 #endif
 
@@ -2424,7 +2409,7 @@ void MediaPlayerPrivateGStreamer::createGSTPlayBin()
 #else
     unsigned flagNativeAudio = 0x0;
 #endif
-
+    
     g_object_set(m_pipeline.get(), "flags", flagText | flagAudio | flagVideo | flagNativeVideo | flagNativeAudio, nullptr);
 
     GRefPtr<GstBus> bus = adoptGRef(gst_pipeline_get_bus(GST_PIPELINE(m_pipeline.get())));
@@ -2494,12 +2479,12 @@ void MediaPlayerPrivateGStreamer::createGSTPlayBin()
 #if PLATFORM(QCOM_DB)
     m_videoSink = gst_element_factory_make( "db410csink", "optimized vsink");
     g_object_set(m_pipeline.get(), "video-sink", m_videoSink.get(), nullptr);
-#endif
+#endif    
 
 #if PLATFORM(BCM_NEXUS)
     m_videoSink = gst_element_factory_make( "brcmvideosink", "brcmvideosink");
     g_object_set(m_pipeline.get(), "video-sink", m_videoSink.get(), nullptr);
-
+    
     GValue window_set = {0, };
     static char str[40];
     snprintf(str, 40, "%d,%d,%d,%d", 0,0, 1280, 720);

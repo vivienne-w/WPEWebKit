@@ -452,7 +452,6 @@ bool MediaPlayerPrivateGStreamerMSE::seeking() const
 // FIXME: MediaPlayerPrivateGStreamer manages the ReadyState on its own. We shouldn't change it manually.
 void MediaPlayerPrivateGStreamerMSE::setReadyState(MediaPlayer::ReadyState readyState)
 {
-    printf("%s: %d\n", __PRETTY_FUNCTION__, static_cast<int>(readyState)); fflush(stdout);
     if (readyState == m_readyState)
         return;
 
@@ -476,7 +475,6 @@ void MediaPlayerPrivateGStreamerMSE::setReadyState(MediaPlayer::ReadyState ready
         GST_DEBUG("[Seek] Reporting load state changed to trigger seek continuation");
         loadStateChanged();
     }
-    printf("### %s: Reporting readyStateChanged() to player. m_readyState = %s\n", __PRETTY_FUNCTION__, dumpReadyState(m_readyState)); fflush(stdout);
 
     // The loadStateChanged() call above might have changed the readyState, but we know better.
     m_readyState = readyState;

@@ -2346,10 +2346,7 @@ void HTMLMediaElement::mediaPlayerReadyStateChanged(MediaPlayer*)
 {
     beginProcessingMediaPlayerCallback();
 
-    auto readyState = m_player->readyState();
-    printf("### %s: player readyState %d --> %d\n", __PRETTY_FUNCTION__, static_cast<int>(m_readyState), static_cast<int>(readyState)); fflush(stdout);
-
-    setReadyState(readyState);
+    setReadyState(m_player->readyState());
 
     endProcessingMediaPlayerCallback();
 }
@@ -2381,8 +2378,6 @@ void HTMLMediaElement::dispatchPlayPauseEventsIfNeedsQuirks()
 
 void HTMLMediaElement::setReadyState(MediaPlayer::ReadyState state)
 {
-    printf("%s: %d\n", __PRETTY_FUNCTION__, static_cast<int>(state)); fflush(stdout);
-
     // Set "wasPotentiallyPlaying" BEFORE updating m_readyState, potentiallyPlaying() uses it
     bool wasPotentiallyPlaying = potentiallyPlaying();
 
@@ -2482,7 +2477,6 @@ void HTMLMediaElement::setReadyState(MediaPlayer::ReadyState state)
 
     bool isPotentiallyPlaying = potentiallyPlaying();
     if (m_readyState == HAVE_FUTURE_DATA && oldState <= HAVE_CURRENT_DATA && tracksAreReady) {
-        printf("%s: canPlay (A)\n", __PRETTY_FUNCTION__); fflush(stdout);
         scheduleEvent(eventNames().canplayEvent);
         if (isPotentiallyPlaying)
             scheduleNotifyAboutPlaying();
@@ -2490,12 +2484,9 @@ void HTMLMediaElement::setReadyState(MediaPlayer::ReadyState state)
     }
 
     if (m_readyState == HAVE_ENOUGH_DATA && oldState < HAVE_ENOUGH_DATA && tracksAreReady) {
-        if (oldState <= HAVE_CURRENT_DATA) {
-            printf("%s: canPlay (B)\n", __PRETTY_FUNCTION__); fflush(stdout);
+        if (oldState <= HAVE_CURRENT_DATA)
             scheduleEvent(eventNames().canplayEvent);
-        }
 
-        printf("%s: canPlayThrough\n", __PRETTY_FUNCTION__); fflush(stdout);
         scheduleEvent(eventNames().canplaythroughEvent);
 
         if (isPotentiallyPlaying && oldState <= HAVE_CURRENT_DATA)

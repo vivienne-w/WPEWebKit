@@ -2161,21 +2161,15 @@ void SourceBuffer::updateBufferedFromTrackBuffers()
 
 bool SourceBuffer::canPlayThroughRange(PlatformTimeRanges& ranges)
 {
-    printf("### %s\n", __PRETTY_FUNCTION__); fflush(stdout);
-
-    if (isRemoved()) {
-        printf("### %s: Removed, returning false\n", __PRETTY_FUNCTION__); fflush(stdout);
+    if (isRemoved())
         return false;
-    }
 
     monitorBufferingRate();
 
     // Assuming no fluctuations in the buffering rate, loading 1 second per second or greater
     // means indefinite playback. This could be improved by taking jitter into account.
-    if (m_averageBufferRate > 1) {
-        printf("### %s: m_averageBufferRate > 1, returning true\n", __PRETTY_FUNCTION__); fflush(stdout);
+    if (m_averageBufferRate > 1)
         return true;
-    }
 
     // Add up all the time yet to be buffered.
     MediaTime currentTime = m_source->currentTime();
@@ -2185,21 +2179,10 @@ bool SourceBuffer::canPlayThroughRange(PlatformTimeRanges& ranges)
     unbufferedRanges.invert();
     unbufferedRanges.intersectWith(PlatformTimeRanges(currentTime, std::max(currentTime, duration)));
     MediaTime unbufferedTime = unbufferedRanges.totalDuration();
-    if (!unbufferedTime.isValid()) {
-        printf("### %s: unbufferedTime invalid, returning true\n", __PRETTY_FUNCTION__); fflush(stdout);
+    if (!unbufferedTime.isValid())
         return true;
-    }
 
     MediaTime timeRemaining = duration - currentTime;
-
-    // ### KEEP DEBUGGING HERE
-    printf("### %s: currentTime: %s, duration: %s, timeRemaining: %s, unbufferedTime: %s, m_averageBufferRate: %f\n", __PRETTY_FUNCTION__,
-           currentTime.toString().utf8().data(),
-           duration.toString().utf8().data(),
-           timeRemaining.toString().utf8().data(),
-           unbufferedTime.toString().utf8().data(),
-           m_averageBufferRate); fflush(stdout);
-
     return unbufferedTime.toDouble() / m_averageBufferRate < timeRemaining.toDouble();
 }
 

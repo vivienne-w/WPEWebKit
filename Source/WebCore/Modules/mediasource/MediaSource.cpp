@@ -398,15 +398,11 @@ void MediaSource::monitorSourceBuffers()
     // Note, the behavior if activeSourceBuffers is empty is undefined.
     if (!m_activeSourceBuffers) {
         m_private->setReadyState(MediaPlayer::HaveNothing);
-        printf("### %s: HaveNothing\n", __PRETTY_FUNCTION__); fflush(stdout);
-
         return;
     }
 
     // ↳ If the the HTMLMediaElement.readyState attribute equals HAVE_NOTHING:
     if (mediaElement()->readyState() == HTMLMediaElement::HAVE_NOTHING) {
-        printf("### %s: HaveNothing\n", __PRETTY_FUNCTION__); fflush(stdout);
-
         // 1. Abort these steps.
         return;
     }
@@ -418,50 +414,19 @@ void MediaSource::monitorSourceBuffers()
         // named loadedmetadata at the media element.
         m_private->setReadyState(MediaPlayer::HaveMetadata);
 
-        printf("### %s: HaveMetadata\n", __PRETTY_FUNCTION__); fflush(stdout);
-
         // 3. Abort these steps.
-        printf("### %s: Doesn't have current time\n", __PRETTY_FUNCTION__); fflush(stdout);
         return;
     }
-
-    printf("### %s: Has current time (%s)\n", __PRETTY_FUNCTION__, currentTime().toString().utf8().data()); fflush(stdout);
 
     // ↳ If HTMLMediaElement.buffered contains a TimeRange that includes the current
     //  playback position and enough data to ensure uninterrupted playback:
     auto ranges = buffered();
-
-    {
-        String s;
-        for (Vector<RefPtr<SourceBuffer> >::iterator i = m_activeSourceBuffers->begin(); i != m_activeSourceBuffers->end(); ++i) {
-            SourceBuffer& sb = **i;
-            VideoTrack* vt = sb.videoTracks().lastItem();
-            if (vt)
-                s.append(vt->id());
-            AudioTrack* at = sb.audioTracks().lastItem();
-            if (at)
-                s.append(at->id());
-            s.append(" ");
-        }
-        printf("### %s: SourceBuffers: %s\n", __PRETTY_FUNCTION__, s.utf8().data()); fflush(stdout);
-    }
-
     if (std::all_of(m_activeSourceBuffers->begin(), m_activeSourceBuffers->end(), [&](auto& sourceBuffer) {
-        bool result = sourceBuffer->canPlayThroughRange(*ranges);
-        String sbId;
-        VideoTrack* vt = sourceBuffer->videoTracks().lastItem();
-        if (vt)
-            sbId.append(vt->id());
-        AudioTrack* at = sourceBuffer->audioTracks().lastItem();
-        if (at)
-            sbId.append(at->id());
-        printf("### %s: %s can play through range? %s\n", __PRETTY_FUNCTION__, sbId.utf8().data(), result ? "true" : "false"); fflush(stdout);
-        return result; //sourceBuffer->canPlayThroughRange(*ranges);
+        return sourceBuffer->canPlayThroughRange(*ranges);
     })) {
         // 1. Set the HTMLMediaElement.readyState attribute to HAVE_ENOUGH_DATA.
         // 2. Queue a task to fire a simple event named canplaythrough at the media element.
         // 3. Playback may resume at this point if it was previously suspended by a transition to HAVE_CURRENT_DATA.
-        printf("### %s: HaveEnoughData\n", __PRETTY_FUNCTION__); fflush(stdout);
         m_private->setReadyState(MediaPlayer::HaveEnoughData);
 
         if (m_pendingSeekTime.isValid())
@@ -494,7 +459,6 @@ void MediaSource::monitorSourceBuffers()
     // event named loadeddata at the media element.
     // 3. Playback is suspended at this point since the media element doesn't have enough data to
     // advance the media timeline.
-    printf("### %s: HaveCurrentData\n", __PRETTY_FUNCTION__); fflush(stdout);
     m_private->setReadyState(MediaPlayer::HaveCurrentData);
 
     if (m_pendingSeekTime.isValid())
