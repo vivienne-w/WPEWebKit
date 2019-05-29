@@ -504,6 +504,8 @@ MediaTime MediaPlayerPrivateGStreamer::playbackPosition() const
         playbackPosition = MediaTime(gstreamerPosition, GST_SECOND);
     else if (m_canFallBackToLastFinishedSeekPosition)
         playbackPosition = m_seekTime;
+    else if (m_cachedPosition.isValid())
+        playbackPosition = m_cachedPosition;
 
     m_cachedPosition = playbackPosition;
     m_lastQuery = now;
