@@ -28,6 +28,7 @@
 #if ENABLE(RESIZE_OBSERVER)
 
 #include "ActiveDOMObject.h"
+#include "GCReachableRef.h"
 #include "ResizeObservation.h"
 #include "ResizeObserverCallback.h"
 #include <wtf/RefCounted.h>
@@ -81,6 +82,7 @@ private:
     Vector<Ref<ResizeObservation>> m_observations;
 
     Vector<Ref<ResizeObservation>> m_activeObservations;
+    Vector<GCReachableRef<Element>> m_pendingTargets;
     bool m_hasSkippedObservations { false };
 };
 

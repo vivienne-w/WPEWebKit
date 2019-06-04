@@ -23,14 +23,17 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-// https://wicg.github.io/ResizeObserver/
+#include "config.h"
+#include "JSResizeObserverEntry.h"
 
-[
-    Conditional=RESIZE_OBSERVER,
-    ImplementationLacksVTable,
-    EnabledBySetting=ResizeObserver,
-    JSCustomMarkFunction
-] interface ResizeObserverEntry {
-    readonly attribute Element target;
-    readonly attribute DOMRectReadOnly contentRect;
-};
+#include "JSNodeCustom.h"
+
+namespace WebCore {
+
+void JSResizeObserverEntry::visitAdditionalChildren(JSC::SlotVisitor& visitor)
+{
+    visitor.addOpaqueRoot(root(wrapped().target()));
+    visitor.addOpaqueRoot(wrapped().contentRect());
+}
+
+}
