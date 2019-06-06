@@ -84,6 +84,9 @@ using namespace std;
 
 namespace WebCore {
 
+// Less than 2MB can cause audio stuttering on live MPEG2TS streams.
+static const size_t LIVE_QUEUE_PREBUFFERING = 2 * 1024 * 1024;
+
 static void busMessageCallback(GstBus*, GstMessage* message, MediaPlayerPrivateGStreamer* player)
 {
     player->handleMessage(message);
@@ -221,6 +224,14 @@ MediaPlayerPrivateGStreamer::~MediaPlayerPrivateGStreamer()
         gst_bus_remove_signal_watch(bus.get());
         gst_bus_set_sync_handler(bus.get(), nullptr, nullptr, nullptr);
         g_signal_handlers_disconnect_matched(m_pipeline.get(), G_SIGNAL_MATCH_DATA, 0, 0, nullptr, nullptr, this);
+    }
+
+    if (m_queueProbeId && m_queue) {
+        GRefPtr<GstPad> sinkPad = adoptGRef(gst_element_get_static_pad(m_queue, "sink"));
+        gst_pad_remove_probe(sinkPad.get(), m_queueProbeId);
+        m_queueProbeId = 0;
+        m_queue = nullptr;
+        m_totalThroughQueue = 0;
     }
 }
 
@@ -1198,6 +1209,36 @@ void MediaPlayerPrivateGStreamer::handleMessage(GstMessage* message)
             updateVideoRectangle();
 #endif
 
+        if (GST_MESSAGE_SRC(message) && GST_IS_OBJECT(GST_MESSAGE_SRC(message))
+                 && !g_strcmp0(G_OBJECT_CLASS_NAME(G_OBJECT_GET_CLASS(G_OBJECT(GST_MESSAGE_SRC(message)))), "GstQueue2")) {
+            if (currentState <= GST_STATE_READY && newState >= GST_STATE_PAUSED) {
+                m_queue = GST_ELEMENT(GST_MESSAGE_SRC(message));
+                GRefPtr<GstPad> sinkPad = adoptGRef(gst_element_get_static_pad(m_queue, "sink"));
+                m_totalThroughQueue = 0;
+                m_queueProbeId = gst_pad_add_probe(sinkPad.get(), GST_PAD_PROBE_TYPE_BUFFER,
+                    [](GstPad *, GstPadProbeInfo *info, gpointer userData) {
+                        size_t &totalThroughQueue = *static_cast<size_t*>(userData);
+                        totalThroughQueue += gst_buffer_get_size(GST_BUFFER(info->data));
+                        return GST_PAD_PROBE_OK;
+                    }, &m_totalThroughQueue, nullptr);
+            }
+            if (currentState >= GST_STATE_PAUSED && newState <= GST_STATE_READY && m_queueProbeId) {
+                // We don't usually get this state change because at this point the player private
+                // destructor has stopped listening to the bus messages (no state changes
+                // notification), but we're well behaved anyway. Anyway, the pad will clean all its
+                // probes when it's disposed.
+                GRefPtr<GstPad> sinkPad = adoptGRef(gst_element_get_static_pad(GST_ELEMENT(GST_MESSAGE_SRC(message)), "sink"));
+                gst_pad_remove_probe(sinkPad.get(), m_queueProbeId);
+                m_queueProbeId = 0;
+                m_queue = nullptr;
+                m_totalThroughQueue = 0;
+            }
+
+            // Reset total each time we go to PAUSED, so we force prebuffering again.
+            if (currentState == GST_STATE_PLAYING && newState == GST_STATE_PAUSED)
+                m_totalThroughQueue = 0;
+        }
+
         if (!messageSourceIsPlaybin || m_delayingLoad)
             break;
         updateStates();
@@ -1322,6 +1363,11 @@ void MediaPlayerPrivateGStreamer::handleMessage(GstMessage* message)
     return;
 }
 
+bool MediaPlayerPrivateGStreamer::isBufferingComplete() {
+    // We want very low latency on live streams.
+    return (m_bufferingPercentage == 100 || (isLiveStream() && m_totalThroughQueue >= LIVE_QUEUE_PREBUFFERING));
+}
+
 void MediaPlayerPrivateGStreamer::processBufferingStats(GstMessage* message)
 {
     m_buffering = true;
@@ -1329,7 +1375,7 @@ void MediaPlayerPrivateGStreamer::processBufferingStats(GstMessage* message)
 
     GST_DEBUG("[Buffering] Buffering: %d%%.", m_bufferingPercentage);
 
-    if (m_bufferingPercentage == 100)
+    if (isBufferingComplete())
         updateStates();
 }
 
@@ -1801,7 +1847,7 @@ void MediaPlayerPrivateGStreamer::updateStates()
         case GST_STATE_PAUSED:
         case GST_STATE_PLAYING:
             if (m_buffering) {
-                if (m_bufferingPercentage == 100) {
+                if (isBufferingComplete()) {
                     GST_DEBUG("[Buffering] Complete.");
                     m_buffering = false;
                     m_readyState = MediaPlayer::HaveEnoughData;

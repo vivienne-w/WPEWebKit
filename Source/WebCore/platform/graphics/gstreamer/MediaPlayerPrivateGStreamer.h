@@ -155,6 +155,7 @@ private:
     void mediaLocationChanged(GstMessage*);
 
     virtual void setDownloadBuffering();
+    bool isBufferingComplete();
     void processBufferingStats(GstMessage*);
 #if ENABLE(VIDEO_TRACK) && USE(GSTREAMER_MPEGTS)
     void processMpegTsSection(GstMpegtsSection*);
@@ -251,6 +252,9 @@ private:
     URL m_url;
     bool m_preservesPitch;
     mutable double m_lastQuery;
+    gulong m_queueProbeId = 0;
+    GstElement* m_queue = nullptr;
+    size_t m_totalThroughQueue = 0;
 #if ENABLE(WEB_AUDIO)
     std::unique_ptr<AudioSourceProviderGStreamer> m_audioSourceProvider;
 #endif
