@@ -43,6 +43,67 @@ GST_DEBUG_CATEGORY_EXTERN(webkit_media_player_debug);
 
 namespace WebCore {
 
+namespace {
+
+constexpr int kElementHints = 3;
+const char* kElementTypeNameHints[static_cast<int>(ElementType::ELEMENT_COUNT)][kElementHints];
+constexpr int kMediaHints = 3;
+const char* kMediaTypeNameHints[static_cast<int>(MediaType::MEDIA_COUNT)][kMediaHints];
+
+bool matchesHints(const gchar* value, ElementType type, MediaType media)
+{
+    const char* const* elementHints = kElementTypeNameHints[static_cast<int>(type)];
+    const char* const* mediaHints = kMediaTypeNameHints[static_cast<int>(media)];
+    enum {
+        NO_MATCH = 0,
+        TYPE_MATCHES = 1,
+        MEDIA_MATCHES = 2,
+        ALL_MATCHES = TYPE_MATCHES | MEDIA_MATCHES
+    };
+
+    int matches = NO_MATCH;
+    while (*elementHints) {
+        if (strcasestr(value, *elementHints)) {
+            matches |= TYPE_MATCHES;
+            break;
+        }
+        ++elementHints;
+    }
+
+    if (matches != NO_MATCH) {
+        while (*mediaHints) {
+            if (strcasestr(value, *mediaHints)) {
+                matches |= MEDIA_MATCHES;
+                break;
+            }
+            ++mediaHints;
+        }
+    }
+
+    return matches == ALL_MATCHES;
+}
+
+bool matchesType(GstElement* element, ElementType type, MediaType media)
+{
+    bool result = false;
+    GstElementClass* klass = GST_ELEMENT_CLASS(G_OBJECT_GET_CLASS(element));
+    if (type == ElementType::SINK) {
+        if (media == MediaType::VIDEO)
+            result = GST_IS_VIDEO_SINK(element) || GST_IS_VIDEO_SINK_CLASS(klass);
+        else
+            result = GST_IS_AUDIO_SINK(element) || GST_IS_AUDIO_SINK_CLASS(klass);
+    } else {
+        if (media == MediaType::VIDEO)
+            result = GST_IS_VIDEO_DECODER(element) || GST_IS_VIDEO_DECODER_CLASS(klass);
+        else
+            result = GST_IS_AUDIO_DECODER(element) || GST_IS_AUDIO_DECODER_CLASS(klass);
+    }
+
+    return result;
+}
+
+}  // namespace
+
 const char* webkitGstMapInfoQuarkString = "webkit-gst-map-info";
 
 GstPad* webkitGstGhostPadFromStaticTemplate(GstStaticPadTemplate* staticPadTemplate, const gchar* name, GstPad* target)
@@ -368,6 +429,72 @@ void connectSimpleBusMessageCallback(GstElement* pipeline)
     GRefPtr<GstBus> bus = adoptGRef(gst_pipeline_get_bus(GST_PIPELINE(pipeline)));
     gst_bus_add_signal_watch_full(bus.get(), RunLoopSourcePriority::RunLoopDispatcher);
     g_signal_connect(bus.get(), "message", G_CALLBACK(simpleBusMessageCallback), pipeline);
+}
+
+GstElement* findElement(GstElement* element, ElementType type, MediaType media)
+{
+    GstElement *re = nullptr;
+    if (GST_IS_BIN(element)) {
+        GstIterator* it = gst_bin_iterate_elements(GST_BIN(element));
+        GValue item = G_VALUE_INIT;
+        bool done = false;
+        while(!done) {
+            switch (gst_iterator_next(it, &item)) {
+                case GST_ITERATOR_OK:
+                {
+                    GstElement *next = GST_ELEMENT(g_value_get_object(&item));
+                    done = (re = findElement(next, type, media)) != nullptr;
+                    g_value_reset (&item);
+                    break;
+                }
+                case GST_ITERATOR_RESYNC:
+                    gst_iterator_resync (it);
+                    break;
+                case GST_ITERATOR_ERROR:
+                case GST_ITERATOR_DONE:
+                    done = true;
+                    break;
+            }
+        }
+        g_value_unset (&item);
+        gst_iterator_free(it);
+    } else {
+        if (matchesType(element, type, media))
+            re = element;
+
+        if (!re) {
+            GstElementClass* klass = GST_ELEMENT_CLASS(G_OBJECT_GET_CLASS(element));
+            const gchar* classification = gst_element_class_get_metadata(klass, GST_ELEMENT_METADATA_KLASS);
+            if (classification && matchesHints(classification, type, media))
+                re = element;
+        }
+
+        if (!re) {
+            gchar* name = gst_element_get_name(element);
+            if (name && matchesHints(name, type, media))
+                re = element;
+            g_free(name);
+        }
+    }
+    return re;
+}
+
+GstElement* getElement(GstElement* element, ElementType type, MediaType media)
+{
+    GstElement* found = nullptr;
+    if (GST_IS_PIPELINE(element)) {
+        if (type == ElementType::SINK) {
+            if (media == MediaType::AUDIO)
+               g_object_get(element, "audio-sink", &found, nullptr);
+           else
+               g_object_get(element, "video-sink", &found, nullptr);
+       }
+    }
+
+    if (!found)
+        found = findElement(element, type, media);
+
+    return found;
 }
 
 }
