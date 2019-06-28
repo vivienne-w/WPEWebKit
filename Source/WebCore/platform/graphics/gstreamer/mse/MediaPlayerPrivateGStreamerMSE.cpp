@@ -518,6 +518,7 @@ void MediaPlayerPrivateGStreamerMSE::updateStates()
     GstState state, pending;
 
     GstStateChangeReturn getStateResult = gst_element_get_state(m_pipeline.get(), &state, &pending, 250 * GST_NSECOND);
+    const bool mseBuffering = !isTimeBuffered(currentMediaTime());
 
     bool shouldUpdatePlaybackState = false;
     switch (getStateResult) {
@@ -551,6 +552,16 @@ void MediaPlayerPrivateGStreamerMSE::updateStates()
                 updateReadyStateForSeekTarget();
                 // FIXME: Should we manage NetworkState too?
                 GST_DEBUG("m_readyState=%s", dumpReadyState(m_readyState));
+            } else if (mseBuffering) {
+                // The HAVE_CURRENT_DATA indicates that the data for immediate current playback position
+                // is in place but the playback might not be able to move forward smoothly. Buffering in non-mse
+                // sense is something like this because it triggers when there's still some data in the buffer
+                // but a low watermark was hit. However in MSE case when the data for the current position is not
+                // there in the buffer it's rather HAVE_META_DATA which means "No media data is available for
+                // the immediate current playback position."
+                m_readyState = MediaPlayer::ReadyState::HaveMetadata;
+                GST_DEBUG("m_readyState=%s", dumpReadyState(m_readyState));
+                m_networkState = MediaPlayer::NetworkState::Loading;
             } else {
                 if (m_readyState < MediaPlayer::ReadyState::HaveFutureData)
                     m_readyState = MediaPlayer::ReadyState::HaveFutureData;
@@ -575,7 +586,7 @@ void MediaPlayerPrivateGStreamerMSE::updateStates()
                 m_areVolumeAndMuteInitialized = true;
             }
 
-            if (!seeking() && !m_isPaused && m_playbackRate) {
+            if (!seeking() && !m_isPaused && m_playbackRate && !mseBuffering) {
                 GST_DEBUG("[Buffering] Restarting playback.");
                 changePipelineState(GST_STATE_PLAYING);
             }
