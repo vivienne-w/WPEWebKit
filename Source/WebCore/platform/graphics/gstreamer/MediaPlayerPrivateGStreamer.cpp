@@ -41,6 +41,7 @@
 #include <glib.h>
 #include <gst/gst.h>
 #include <gst/pbutils/missing-plugins.h>
+#include <gst/audio/gstaudiodecoder.h>
 #include <gst/video/gstvideodecoder.h>
 #include <limits>
 #include <wtf/CurrentTime.h>
@@ -311,8 +312,10 @@ void MediaPlayerPrivateGStreamer::commitLoad()
 }
 
 #if PLATFORM(BCM_NEXUS)
+using Comparator = bool (*)(GstElement*);
+
 // utility function for bcm nexus seek functionality
-static GstElement* findVideoDecoder(GstElement *element)
+static GstElement* findDecoder(GstElement *element, Comparator cmp)
 {
     GstElement* re = nullptr;
     if (GST_IS_BIN(element)) {
@@ -324,7 +327,7 @@ static GstElement* findVideoDecoder(GstElement *element)
                 case GST_ITERATOR_OK:
                 {
                     GstElement *next = GST_ELEMENT(g_value_get_object(&item));
-                    done = (re = findVideoDecoder(next));
+                    done = (re = findDecoder(next, cmp));
                     g_value_reset (&item);
                     break;
                 }
@@ -339,7 +342,7 @@ static GstElement* findVideoDecoder(GstElement *element)
         }
         g_value_unset (&item);
         gst_iterator_free(it);
-    } else if (GST_IS_VIDEO_DECODER(element) || g_str_has_suffix(G_OBJECT_TYPE_NAME(G_OBJECT(element)), "VideoDecoder"))
+    } else if (cmp(element))
         re = element;
     return re;
 }
@@ -384,7 +387,9 @@ MediaTime MediaPlayerPrivateGStreamer::playbackPosition() const
     }
 #elif PLATFORM(BCM_NEXUS)
     // implement getting pts time from broadcom decoder directly for seek functionality
-    positionElement = findVideoDecoder(m_pipeline.get());
+    positionElement = !m_hasVideo ?
+                findDecoder(m_pipeline.get(), [](GstElement* element) { return GST_IS_AUDIO_DECODER(element) || g_str_has_suffix(G_OBJECT_TYPE_NAME(G_OBJECT(element)), "AudioDecoder"); } ) :
+                findDecoder(m_pipeline.get(), [](GstElement* element) { return GST_IS_VIDEO_DECODER(element) || g_str_has_suffix(G_OBJECT_TYPE_NAME(G_OBJECT(element)), "VideoDecoder"); } );
 #else
     positionElement = m_pipeline.get();
 #endif
@@ -392,7 +397,7 @@ MediaTime MediaPlayerPrivateGStreamer::playbackPosition() const
         gst_query_parse_position(query, 0, &position);
     gst_query_unref(query);
 
-    GST_DEBUG("Position %" GST_TIME_FORMAT, GST_TIME_ARGS(position));
+    GST_INFO("Position %" GST_TIME_FORMAT, GST_TIME_ARGS(position));
 
     MediaTime playbackPosition = MediaTime::zeroTime();
     GstClockTime gstreamerPosition = static_cast<GstClockTime>(position);
