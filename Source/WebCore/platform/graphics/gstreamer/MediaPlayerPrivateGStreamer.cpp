@@ -164,7 +164,7 @@ MediaPlayerPrivateGStreamer::MediaPlayerPrivateGStreamer(MediaPlayer* player)
     , m_hasVideo(false)
     , m_hasAudio(false)
     , m_readyTimerHandler(RunLoop::main(), this, &MediaPlayerPrivateGStreamer::readyTimerFired)
-    , m_totalBytes(0)
+    , m_totalBytes(-1)
     , m_preservesPitch(false)
 {
 #if USE(GLIB)
@@ -1772,12 +1772,12 @@ bool MediaPlayerPrivateGStreamer::didLoadingProgress() const
     return didLoadingProgress;
 }
 
-unsigned long long MediaPlayerPrivateGStreamer::totalBytes() const
+long long MediaPlayerPrivateGStreamer::determineTotalBytes() const
 {
     if (m_errorOccured)
         return 0;
 
-    if (m_totalBytes)
+    if (m_totalBytes != -1)
         return m_totalBytes;
 
     if (!m_source)
@@ -1787,11 +1787,11 @@ unsigned long long MediaPlayerPrivateGStreamer::totalBytes() const
         return 0;
 
     GstFormat fmt = GST_FORMAT_BYTES;
-    gint64 length = 0;
+    gint64 length = -1;
     if (gst_element_query_duration(m_source.get(), fmt, &length)) {
-        GST_INFO("totalBytes %" G_GINT64_FORMAT, length);
         m_totalBytes = static_cast<unsigned long long>(length);
-        m_isStreaming = !length;
+        GST_INFO("totalBytes %" G_GINT64_FORMAT, m_totalBytes);
+        m_isStreaming = length >= 0 ? length == 0 : false;
         return m_totalBytes;
     }
 
@@ -1824,10 +1824,16 @@ unsigned long long MediaPlayerPrivateGStreamer::totalBytes() const
 
     gst_iterator_free(iter);
 
-    GST_INFO("totalBytes %" G_GINT64_FORMAT, length);
     m_totalBytes = static_cast<unsigned long long>(length);
-    m_isStreaming = !length;
+    GST_INFO("totalBytes %" G_GINT64_FORMAT, m_totalBytes);
+    m_isStreaming = length >= 0 ? length == 0 : false;
     return m_totalBytes;
+}
+
+unsigned long long MediaPlayerPrivateGStreamer::totalBytes() const
+{
+    determineTotalBytes();
+    return m_totalBytes >= 0 ? static_cast<unsigned long long>(m_totalBytes) : 0;
 }
 
 void MediaPlayerPrivateGStreamer::sourceSetupCallback(MediaPlayerPrivateGStreamer* player, GstElement* sourceElement)
@@ -2525,7 +2531,10 @@ void MediaPlayerPrivateGStreamer::setDownloadBuffering()
     if (flags & flagDownload && m_readyState > MediaPlayer::HaveNothing && !m_resetPipeline && !isLiveStream())
         return;
 
-    bool shouldDownload = !isLiveStream() && m_preload == MediaPlayer::Auto && !isMediaDiskCacheDisabled();
+    // determineTotalBytes() is equivalent to isLiveStream() once this is determined or makes sure isLiveStream()
+    // checked later base its decision on updted data.
+    const bool downloadProhibited = determineTotalBytes() != -1 && isLiveStream();
+    bool shouldDownload = !downloadProhibited && m_preload == MediaPlayer::Auto && !isMediaDiskCacheDisabled();
     if (shouldDownload) {
         GST_INFO("Enabling on-disk buffering");
         g_object_set(m_pipeline.get(), "flags", flags | flagDownload, nullptr);

@@ -105,6 +105,7 @@ public:
     MediaTime maxMediaTimeSeekable() const override;
     bool didLoadingProgress() const override;
     unsigned long long totalBytes() const override;
+    long long determineTotalBytes() const;
     MediaTime maxTimeLoaded() const override;
 
     bool hasSingleSecurityOrigin() const override;
@@ -255,7 +256,7 @@ private:
     bool m_hasVideo;
     bool m_hasAudio;
     RunLoop::Timer<MediaPlayerPrivateGStreamer> m_readyTimerHandler;
-    mutable unsigned long long m_totalBytes;
+    mutable long long m_totalBytes;
     URL m_url;
     bool m_preservesPitch;
     mutable std::optional<Seconds> m_lastQueryTime;
