@@ -2263,6 +2263,11 @@ void RenderLayerBacking::contentChanged(ContentChangeType changeType)
         return;
     }
 
+    if (changeType == VideoChanged) {
+        compositor().scheduleCompositingLayerUpdate();
+        return;
+    }
+
     if ((changeType == BackgroundImageChanged) && canDirectlyCompositeBackgroundBackgroundImage(renderer().style()))
         updateGeometry();
 
