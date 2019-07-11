@@ -486,11 +486,10 @@ MediaTime MediaPlayerPrivateGStreamer::playbackPosition() const
         GST_TRACE("videoPosition: %" GST_TIME_FORMAT ", audioPosition: %" GST_TIME_FORMAT, GST_TIME_ARGS(videoPosition), GST_TIME_ARGS(audioPosition));
     } else {
         // Regular non-MSE player
-        if (!m_videoDecoder) {
+        if (!m_videoDecoder || !GST_IS_ELEMENT(m_videoDecoder)) {
             GstElement *videoDecoder = nullptr;
-            if (!(m_videoDecoder)) {
-                findDecoder(m_pipeline.get(), &videoDecoder, "brcmvideodecoder");
-            }
+            findDecoder(m_pipeline.get(), &videoDecoder, "brcmvideodecoder");
+
             if (!videoDecoder) {
                 m_lastQuery = now;
                 return MediaTime::zeroTime();
