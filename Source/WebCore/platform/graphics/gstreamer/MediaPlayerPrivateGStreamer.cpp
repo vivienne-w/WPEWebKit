@@ -1011,6 +1011,44 @@ std::unique_ptr<PlatformTimeRanges> MediaPlayerPrivateGStreamer::buffered() cons
     return timeRanges;
 }
 
+static int findHLSQueueCompareFunc(const GValue* item)
+{
+    GstElement* element = GST_ELEMENT(g_value_get_object(item));
+    if (g_str_has_prefix(GST_ELEMENT_NAME(element), "queue")) {
+        GstElement* parent = GST_ELEMENT(GST_ELEMENT_PARENT(element));
+        if (!GST_IS_OBJECT(parent))
+            return 1;
+
+        if (g_str_has_prefix(GST_ELEMENT_NAME(GST_ELEMENT_PARENT(parent)), "hlsdemux"))
+            return 0;
+    }
+
+    return 1;
+}
+
+static bool findHLSQueue(GstElement* playbin, GValue* item)
+{
+    GstIterator* binIterator = gst_bin_iterate_recurse(GST_BIN(playbin));
+    bool foundHLSQueue = gst_iterator_find_custom(binIterator, reinterpret_cast<GCompareFunc>(findHLSQueueCompareFunc), item, nullptr);
+    gst_iterator_free(binIterator);
+    return foundHLSQueue;
+}
+
+static bool isHLSProgressing(GstElement* playbin, GstQuery* query)
+{
+    GValue item = { };
+    bool foundHLSQueue = findHLSQueue(playbin, &item);
+
+    if (!foundHLSQueue)
+        return false;
+
+    GstElement* queueElement = GST_ELEMENT(g_value_get_object(&item));
+    bool queryResult = gst_element_query(queueElement, query);
+    g_value_unset(&item);
+
+    return queryResult;
+}
+
 void MediaPlayerPrivateGStreamer::handleMessage(GstMessage* message)
 {
     GUniqueOutPtr<GError> err;
@@ -1108,10 +1146,20 @@ void MediaPlayerPrivateGStreamer::handleMessage(GstMessage* message)
         GST_INFO("Playbin changed %s --> %s", gst_element_state_get_name(currentState), gst_element_state_get_name(newState));
         break;
     }
-    case GST_MESSAGE_BUFFERING:
+    case GST_MESSAGE_BUFFERING: {
         GST_DEBUG("Message %s received from element %s", GST_MESSAGE_TYPE_NAME(message), GST_MESSAGE_SRC_NAME(message));
+        const bool buffering = m_buffering;
         processBufferingStats(message);
+        if (!buffering && m_buffering && GST_STATE(m_pipeline.get()) == GST_STATE_PLAYING) {
+            GValue item = { };
+            bool foundHLSQueue = findHLSQueue(m_pipeline.get(), &item);
+            if (foundHLSQueue) {
+                GST_WARNING("HLS: Pausing for buffering work-around");
+                changePipelineState(GST_STATE_PAUSED);
+            }
+        }
         break;
+    }
     case GST_MESSAGE_DURATION_CHANGED:
         // Duration in MSE is managed by MediaSource, SourceBuffer and AppendPipeline.
         // FIXME: Gstreamer upstream issue getting the MP3 duration, workaround applied by getting the duration from mpegaudioparse.
@@ -1332,38 +1380,6 @@ void MediaPlayerPrivateGStreamer::processTableOfContentsEntry(GstTocEntry* entry
 }
 #endif
 
-static int findHLSQueue(const GValue* item)
-{
-    GstElement* element = GST_ELEMENT(g_value_get_object(item));
-    if (g_str_has_prefix(GST_ELEMENT_NAME(element), "queue")) {
-        GstElement* parent = GST_ELEMENT(GST_ELEMENT_PARENT(element));
-        if (!GST_IS_OBJECT(parent))
-            return 1;
-
-        if (g_str_has_prefix(GST_ELEMENT_NAME(GST_ELEMENT_PARENT(parent)), "hlsdemux"))
-            return 0;
-    }
-
-    return 1;
-}
-
-static bool isHLSProgressing(GstElement* playbin, GstQuery* query)
-{
-    GValue item = { };
-    GstIterator* binIterator = gst_bin_iterate_recurse(GST_BIN(playbin));
-    bool foundHLSQueue = gst_iterator_find_custom(binIterator, reinterpret_cast<GCompareFunc>(findHLSQueue), &item, nullptr);
-    gst_iterator_free(binIterator);
-
-    if (!foundHLSQueue)
-        return false;
-
-    GstElement* queueElement = GST_ELEMENT(g_value_get_object(&item));
-    bool queryResult = gst_element_query(queueElement, query);
-    g_value_unset(&item);
-
-    return queryResult;
-}
-
 void MediaPlayerPrivateGStreamer::fillTimerFired()
 {
     GstQuery* query = gst_query_new_buffering(GST_FORMAT_PERCENT);
@@ -1520,6 +1536,25 @@ void MediaPlayerPrivateGStreamer::sourceChangedCallback(MediaPlayerPrivateGStrea
     player->sourceChanged();
 }
 
+void MediaPlayerPrivateGStreamer::uriDecodeBinDeepElementAddedCallback(GstBin* bin, GstElement* element, MediaPlayerPrivateGStreamer*) {
+    if (g_strcmp0(G_OBJECT_CLASS_NAME(G_OBJECT_GET_CLASS(G_OBJECT(element))), "GstDecodeBin"))
+        return;
+    GValue item = { };
+    bool foundHLSQueue = findHLSQueue(GST_ELEMENT(bin), &item);
+    if (foundHLSQueue) {
+        gboolean useBuffering = FALSE;
+        g_object_get(element, "use-buffering", &useBuffering, nullptr);
+        if (useBuffering) {
+            guint maxSizeBytes = 0;
+            guint64 maxSizeTime = 0;
+            g_object_get(element, "max-size-bytes", &maxSizeBytes, nullptr);
+            g_object_get(element, "max-size-time", &maxSizeTime, nullptr);
+            g_object_set(element, "max-size-bytes", maxSizeBytes * 2, nullptr);
+            g_object_set(element, "max-size-time", maxSizeTime * 2, nullptr);
+        }
+    }
+}
+
 void MediaPlayerPrivateGStreamer::uriDecodeBinElementAddedCallback(GstBin* bin, GstElement* element, MediaPlayerPrivateGStreamer* player)
 {
     if (g_strcmp0(G_OBJECT_CLASS_NAME(G_OBJECT_GET_CLASS(G_OBJECT(element))), "GstDownloadBuffer"))
@@ -1582,8 +1617,10 @@ void MediaPlayerPrivateGStreamer::purgeOldDownloadFiles(const char* downloadFile
 
 void MediaPlayerPrivateGStreamer::sourceChanged()
 {
-    if (WEBKIT_IS_WEB_SRC(m_source.get()) && GST_OBJECT_PARENT(m_source.get()))
+    if (WEBKIT_IS_WEB_SRC(m_source.get()) && GST_OBJECT_PARENT(m_source.get())) {
         g_signal_handlers_disconnect_by_func(GST_ELEMENT_PARENT(m_source.get()), reinterpret_cast<gpointer>(uriDecodeBinElementAddedCallback), this);
+        g_signal_handlers_disconnect_by_func(GST_ELEMENT_PARENT(m_source.get()), reinterpret_cast<gpointer>(uriDecodeBinDeepElementAddedCallback), this);
+    }
 
     m_source.clear();
     g_object_get(m_pipeline.get(), "source", &m_source.outPtr(), nullptr);
@@ -1592,6 +1629,7 @@ void MediaPlayerPrivateGStreamer::sourceChanged()
     if (WEBKIT_IS_WEB_SRC(m_source.get())) {
         webKitWebSrcSetMediaPlayer(WEBKIT_WEB_SRC(m_source.get()), m_player);
         g_signal_connect(GST_ELEMENT_PARENT(m_source.get()), "element-added", G_CALLBACK(uriDecodeBinElementAddedCallback), this);
+        g_signal_connect(GST_ELEMENT_PARENT(m_source.get()), "deep-element-added", G_CALLBACK(uriDecodeBinDeepElementAddedCallback), this);
     }
 #else
     // TODO: set HTTP headers on source element here.
