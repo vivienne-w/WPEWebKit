@@ -269,7 +269,7 @@ Ref<CDMInstanceOpenCDM::Session> CDMInstanceOpenCDM::Session::create(OpenCDMAcce
     return adoptRef(*new Session(source, keySystem, type, WTFMove(initData), licenseType, WTFMove(customData)));
 }
 
-void CDMInstanceOpenCDM::Session::openCDMNotification(OpenCDMSession* ocdmSession, void* userData, Notification method, const uint8_t message[], uint16_t messageLength)
+void CDMInstanceOpenCDM::Session::openCDMNotification(OpenCDMSession*, void* userData, Notification method, const uint8_t message[], uint16_t messageLength)
 {
     Session* session = reinterpret_cast<Session*>(userData);
     RefPtr<WebCore::SharedBuffer> sharedBuffer = WebCore::SharedBuffer::create(message, messageLength);
@@ -348,7 +348,7 @@ void CDMInstanceOpenCDM::Session::keyUpdatedCallback(RefPtr<SharedBuffer>&& buff
     m_sessionChangedCallbacks.clear();
 }
 
-void CDMInstanceOpenCDM::Session::messageReceivedCallback(RefPtr<SharedBuffer>&& message)
+void CDMInstanceOpenCDM::Session::messageReceivedCallback(RefPtr<SharedBuffer>&&)
 {
 }
 
