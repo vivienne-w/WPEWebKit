@@ -195,7 +195,7 @@ void MediaKeySession::generateRequest(const AtomicString& initDataType, const Bu
         }
 
         LOG(EME, "EME - request license from CDM implementation");
-        m_instance->requestLicense(m_sessionType, initDataType, WTFMove(initData), WTFMove(customData), [this, weakThis = m_weakPtrFactory.createWeakPtr(*this), promise = WTFMove(promise)] (Ref<SharedBuffer>&& message, const String& sessionId, bool needsIndividualization, CDMInstance::SuccessValue succeeded) mutable {
+        m_instance->requestLicense(m_sessionType, initDataType, sanitizedInitData.releaseNonNull(), WTFMove(customData), [this, weakThis = m_weakPtrFactory.createWeakPtr(*this), promise = WTFMove(promise)] (Ref<SharedBuffer>&& message, const String& sessionId, bool needsIndividualization, CDMInstance::SuccessValue succeeded) mutable {
             if (!weakThis)
                 return;
 
