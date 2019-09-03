@@ -81,11 +81,14 @@ MediaKeySession::MediaKeySession(ScriptExecutionContext& context, WeakPtr<MediaK
     // 3.8. Let the use distinctive identifier value be this object's use distinctive identifier value.
     // 3.9. Let the cdm implementation value be this object's cdm implementation.
     // 3.10. Let the cdm instance value be this object's cdm instance.
+
+    m_instance->setClient(*this);
 }
 
 MediaKeySession::~MediaKeySession()
 {
     m_keyStatuses->detachSession();
+    m_instance->clearClient();
 }
 
 const String& MediaKeySession::sessionId() const
