@@ -102,7 +102,7 @@ public:
     void update(const uint8_t*, unsigned, SessionChangedCallback&&);
     void load(SessionChangedCallback&&);
     void remove(SessionChangedCallback&&);
-    bool close() { return !opencdm_session_close(m_session.get()); }
+    bool close() { return m_session.get() ? !opencdm_session_close(m_session.get()) : true; }
     OCDMKeyStatus status(const SharedBuffer& keyId) const
     {
         return m_session ? opencdm_session_status(m_session.get(), reinterpret_cast<const uint8_t*>(keyId.data()), keyId.size()) : StatusPending;
@@ -360,6 +360,7 @@ CDMInstanceOpenCDM::Session::Session(CDMInstanceOpenCDM* parent, OpenCDMAccessor
 
 CDMInstanceOpenCDM::Session::~Session()
 {
+    close();
     Session::m_validSessions.remove(this);
 }
 
