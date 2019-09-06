@@ -396,7 +396,9 @@ static void webkitMediaCommonEncryptionDecryptProcessProtectionEvents(WebKitMedi
 
         GST_TRACE_OBJECT(self, "handling protection event %u for %s", GST_EVENT_SEQNUM(event.get()), eventKeySystemUUID);
 
-        if (isCDMInstanceAvailable && g_strcmp0(eventKeySystemUUID, WebCore::GStreamerEMEUtilities::keySystemToUuid(priv->m_cdmInstance->keySystem()))) {
+        bool isUnspecified = !g_strcmp0(eventKeySystemUUID, WebCore::GStreamerEMEUtilities::s_UnspecifiedUUID);
+        bool isSameSystem = !g_strcmp0(eventKeySystemUUID, WebCore::GStreamerEMEUtilities::keySystemToUuid(priv->m_cdmInstance->keySystem()));
+        if (isCDMInstanceAvailable && !isSameSystem && !isUnspecified) {
             GST_TRACE_OBJECT(self, "protection event for a different key system");
             continue;
         }
@@ -423,7 +425,7 @@ static void webkitMediaCommonEncryptionDecryptProcessProtectionEvents(WebKitMedi
             GST_DEBUG_OBJECT(self, "init data of size %u", mappedBuffer.size());
             GST_TRACE_OBJECT(self, "init data MD5 %s", WebCore::GStreamerEMEUtilities::initDataMD5(initData).utf8().data());
             GST_MEMDUMP_OBJECT(self, "init data", mappedBuffer.data(), mappedBuffer.size());
-            priv->m_initDatas.set(eventKeySystemUUID, initData);
+            priv->m_initDatas.set(WebCore::GStreamerEMEUtilities::keySystemToUuid(priv->m_cdmInstance->keySystem()), initData);
             GST_MEMDUMP_OBJECT(self, "key ID", reinterpret_cast<const uint8_t*>(kid->data()), kid->size());
             priv->m_keyIds.set(initData, kid.copyRef());
 
