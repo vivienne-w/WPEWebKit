@@ -1,3 +1,85 @@
+2019-09-09  Caio Lima  <ticaiolima@gmail.com>
+
+        Tail calls are broken on ARM_THUMB2 and MIPS
+        https://bugs.webkit.org/show_bug.cgi?id=197797
+
+        Reviewed by NOBODY (OOPS!).
+
+        JSC's stack alignment is 16 bytes for every supported architecture.
+        However, this is not preserved by function's prologue on ARMv7 and MIPS,
+        because frame pointer and `lr` are pushed into stack during this operation,
+        resulting in a frame that is not aligned.
+        This is a problem when we are calculating top of the stack on some
+        cases of tail calls, because it considers that frames are stack-aligned.
+        Such disaligment may corrupt stack values when a tail call happens
+        inside a getter execution.
+        Let's consider the situation below with the following script:
+
+        ```
+        let o = {
+            get x() {
+                return tail_call();
+            }
+        }
+
+        let foo = (o) => {
+            ...
+            return o.x == o.y;
+        }
+        ```
+
+        Also, lets suppose that we compiled `foo` into DFG and we generated IC
+        code for `o.x` and `o.y`. The register `r1` is assigned to `o`.
+        Since the IC code of `o.x` is a getter case, this code will spill `r1`
+        to the stack to proper setup the JS call and restore
+        its value when the getter returns from execution (see third line of stack below).
+        The getter IC code allocates 32 bytes to call the JS getter, and during the
+        getter's prologue, `lr` and `cfr` are pushed to the stack, ending up
+        with a new frame pointed by `cfr1`. During tail call preparation, we
+        then calculate the top of stack using the following operations:
+
+        ```
+        muli SlotSize, argc # Slot size is 8
+        # StackAlignment = 16
+        # CallFrameHeaderSize = 32
+        addi StackAlignment - 1 + CallFrameHeaderSize, argcInBytes
+        andi ~StackAlignmentMask, argcInBytes
+
+        move cfr, newCFR
+        addp argcInBytes, newCFR
+        ```
+
+        Considering `argc = 1` in the operation above, the result is then `argcInBytes = 48`.
+        Adding 48 bytes to `newCFR` will make the top of the stack off by 8 bytes,
+        since current stack frame is 40 bytes (32 from caller allocation + 4 of `lr`
+        + 4 of `cfr`).
+        In the end, when we start the copy
+        operation of the stack, the address where `r1` is spilled will be
+        cloberred, generating unexpected results.
+
+        +----------------+ <-- Stack of program execution. Each cell is 4 bytes.
+        |      ...       |
+        +----------------+ <-- newCFR (where the calculation of top of stack will result)
+        |      ...       |
+        +----------------+
+        |      r1        |
+        +----------------+ <-- Start of stack allocated to call getter
+        |      ...       | |
+        +----------------+ | 32 bytes
+        |      ...       | |
+        +----------------+ <-- End of stack allocated to call getter
+        |      lr        |
+        +----------------+
+        |      cfr       |
+        +----------------+ <-- cfr1
+
+        This patch is adding 8 bytes on MIPS and ARMv7 when allocatting stack space for
+        generated IC code for accessor cases. This way, we guarantee that tail
+        call's stack reusage won't clobber values on stack.
+
+        * bytecode/AccessCase.cpp:
+        (JSC::AccessCase::generateImpl):
+
 2018-06-13  Keith Miller  <keith_miller@apple.com>
 
         AutomaticThread should have a way to provide a thread name

@@ -655,7 +655,15 @@ void AccessCase::generateImpl(AccessGenerationState& state)
                 CCallHelpers::Zero, loadedValueGPR);
 
             unsigned numberOfRegsForCall = CallFrame::headerSizeInRegisters + numberOfParameters;
+#if CPU(ARM_THUMB2) || CPU(MIPS)
+            // For ARMv7 and MIPS architectures, we need 8 extra bytes to
+            // guarantee that stack size have enough space to be reused by a
+            // tail call. Since sizeof(CallerFrameAndPC) == 8 for those architectures,
+            // we only need to calculate `numberOfBytesForCall = numberOfRegsForCall * sizeof(Register)`.
+            unsigned numberOfBytesForCall = numberOfRegsForCall * sizeof(Register);
+#else
             unsigned numberOfBytesForCall = numberOfRegsForCall * sizeof(Register) - sizeof(CallerFrameAndPC);
+#endif
 
             unsigned alignedNumberOfBytesForCall =
             WTF::roundUpToMultipleOf(stackAlignmentBytes(), numberOfBytesForCall);
