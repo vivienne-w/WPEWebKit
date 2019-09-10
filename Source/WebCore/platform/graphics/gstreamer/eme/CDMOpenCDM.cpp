@@ -61,7 +61,7 @@ public:
     virtual ~CDMPrivateOpenCDM() = default;
 
 public:
-    bool supportsInitDataType(const AtomicString& initDataType) const final { return equalLettersIgnoringASCIICase(initDataType, "cenc"); }
+    bool supportsInitDataType(const AtomicString& initDataType) const final { return equalLettersIgnoringASCIICase(initDataType, "cenc") || equalLettersIgnoringASCIICase(initDataType, "webm"); }
     bool supportsConfiguration(const MediaKeySystemConfiguration& config) const final;
     bool supportsConfigurationWithRestrictions(const MediaKeySystemConfiguration& config, const MediaKeysRestrictions&) const final { return supportsConfiguration(config); }
     bool supportsSessionTypeWithConfiguration(MediaKeySessionType&, const MediaKeySystemConfiguration& config) const final { return supportsConfiguration(config); }
@@ -73,7 +73,7 @@ public:
     void loadAndInitialize() final { }
     bool supportsServerCertificates() const final { return true; }
     bool supportsSessions() const final { return true; }
-    bool supportsInitData(const AtomicString& initDataType, const SharedBuffer&) const final { return equalLettersIgnoringASCIICase(initDataType, "cenc"); }
+    bool supportsInitData(const AtomicString& initDataType, const SharedBuffer&) const final { return supportsInitDataType(initDataType); }
     RefPtr<SharedBuffer> sanitizeResponse(const SharedBuffer& response) const final { return response.copy(); }
     std::optional<String> sanitizeSessionId(const String& sessionId) const final { return sessionId; }
 
@@ -269,7 +269,7 @@ Ref<CDMInstanceOpenCDM::Session> CDMInstanceOpenCDM::Session::create(OpenCDMAcce
     return adoptRef(*new Session(source, keySystem, type, WTFMove(initData), licenseType, WTFMove(customData)));
 }
 
-void CDMInstanceOpenCDM::Session::openCDMNotification(OpenCDMSession* ocdmSession, void* userData, Notification method, const uint8_t message[], uint16_t messageLength)
+void CDMInstanceOpenCDM::Session::openCDMNotification(OpenCDMSession*, void* userData, Notification method, const uint8_t message[], uint16_t messageLength)
 {
     Session* session = reinterpret_cast<Session*>(userData);
     RefPtr<WebCore::SharedBuffer> sharedBuffer = WebCore::SharedBuffer::create(message, messageLength);
@@ -348,7 +348,7 @@ void CDMInstanceOpenCDM::Session::keyUpdatedCallback(RefPtr<SharedBuffer>&& buff
     m_sessionChangedCallbacks.clear();
 }
 
-void CDMInstanceOpenCDM::Session::messageReceivedCallback(RefPtr<SharedBuffer>&& message)
+void CDMInstanceOpenCDM::Session::messageReceivedCallback(RefPtr<SharedBuffer>&&)
 {
 }
 
