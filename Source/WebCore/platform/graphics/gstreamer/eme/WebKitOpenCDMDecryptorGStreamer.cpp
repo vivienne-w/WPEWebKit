@@ -39,7 +39,6 @@ using WebCore::GstMappedBuffer;
 
 struct _WebKitOpenCDMDecryptPrivate {
     String m_session;
-    WebCore::ScopedOCDMAccessor m_openCdmAccessor;
     WebCore::ScopedSession m_openCdm;
     Lock m_mutex;
 };
@@ -83,17 +82,16 @@ static void addKeySystemToSinkPadCaps(GRefPtr<GstCaps>& caps, const char* uuid)
 
 static GRefPtr<GstCaps> createSinkPadTemplateCaps()
 {
-    WebCore::ScopedOCDMAccessor openCDMAccessor { opencdm_create_system() };
     std::string emptyString;
     GRefPtr<GstCaps> caps = adoptGRef(gst_caps_new_empty());
 
-    if (!opencdm_is_type_supported(openCDMAccessor.get(), WebCore::GStreamerEMEUtilities::s_ClearKeyKeySystem, emptyString.c_str()))
+    if (!opencdm_is_type_supported(WebCore::GStreamerEMEUtilities::s_ClearKeyKeySystem, emptyString.c_str()))
         addKeySystemToSinkPadCaps(caps, WEBCORE_GSTREAMER_EME_UTILITIES_CLEARKEY_UUID);
 
-    if (!opencdm_is_type_supported(openCDMAccessor.get(), WebCore::GStreamerEMEUtilities::s_PlayReadyKeySystems[0], emptyString.c_str()))
+    if (!opencdm_is_type_supported(WebCore::GStreamerEMEUtilities::s_PlayReadyKeySystems[0], emptyString.c_str()))
         addKeySystemToSinkPadCaps(caps, WEBCORE_GSTREAMER_EME_UTILITIES_PLAYREADY_UUID);
 
-    if (!opencdm_is_type_supported(openCDMAccessor.get(), WebCore::GStreamerEMEUtilities::s_WidevineKeySystem, emptyString.c_str()))
+    if (!opencdm_is_type_supported(WebCore::GStreamerEMEUtilities::s_WidevineKeySystem, emptyString.c_str()))
         addKeySystemToSinkPadCaps(caps, WEBCORE_GSTREAMER_EME_UTILITIES_WIDEVINE_UUID);
 
     return caps;
@@ -129,7 +127,6 @@ static void webkit_media_opencdm_decrypt_class_init(WebKitOpenCDMDecryptClass* k
 static void webkit_media_opencdm_decrypt_init(WebKitOpenCDMDecrypt* self)
 {
     WebKitOpenCDMDecryptPrivate* priv = GST_WEBKIT_OPENCDM_DECRYPT_GET_PRIVATE(self);
-    priv->m_openCdmAccessor = nullptr;
     priv->m_openCdm = nullptr;
     self->priv = priv;
     new (priv) WebKitOpenCDMDecryptPrivate();
@@ -158,11 +155,9 @@ static SessionResult webKitMediaOpenCDMDecryptorResetSessionFromInitDataIfNeeded
         GST_DEBUG_OBJECT(self, "session %s is empty or unusable, resetting", session.utf8().data());
         priv->m_session = String();
         priv->m_openCdm = nullptr;
-        priv->m_openCdmAccessor = nullptr;
     } else if (session != priv->m_session) {
         priv->m_session = session;
         priv->m_openCdm = nullptr;
-        priv->m_openCdmAccessor.reset(opencdm_create_system());
         GST_DEBUG_OBJECT(self, "new session %s is usable", session.utf8().data());
         returnValue = NewSession;
     } else {
@@ -196,7 +191,7 @@ static bool webKitMediaOpenCDMDecryptorDecrypt(WebKitMediaCommonEncryptionDecryp
     }
 
     if (!priv->m_openCdm) {
-        priv->m_openCdm.reset(opencdm_get_session(priv->m_openCdmAccessor.get(), mappedKeyID.data(), mappedKeyID.size(), WEBCORE_GSTREAMER_EME_LICENSE_KEY_RESPONSE_TIMEOUT.millisecondsAs<uint32_t>()));
+        priv->m_openCdm.reset(opencdm_get_session(mappedKeyID.data(), mappedKeyID.size(), WEBCORE_GSTREAMER_EME_LICENSE_KEY_RESPONSE_TIMEOUT.millisecondsAs<uint32_t>()));
         if (!priv->m_openCdm) {
             GST_ERROR_OBJECT(self, "session is empty or unusable");
             return false;

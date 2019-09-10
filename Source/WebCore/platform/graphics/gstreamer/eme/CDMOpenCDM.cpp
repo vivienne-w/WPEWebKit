@@ -55,7 +55,6 @@ private:
 public:
     CDMPrivateOpenCDM(const String& keySystem)
         : m_openCDMKeySystem(keySystem)
-        , m_openCDMAccessor(opencdm_create_system())
     {
     }
     virtual ~CDMPrivateOpenCDM() = default;
@@ -69,7 +68,7 @@ public:
     MediaKeysRequirement distinctiveIdentifiersRequirement(const MediaKeySystemConfiguration&, const MediaKeysRestrictions&) const final { return MediaKeysRequirement::Optional; }
     MediaKeysRequirement persistentStateRequirement(const MediaKeySystemConfiguration&, const MediaKeysRestrictions&) const final { return MediaKeysRequirement::Optional; }
     bool distinctiveIdentifiersAreUniquePerOriginAndClearable(const MediaKeySystemConfiguration&) const final { return false; }
-    RefPtr<CDMInstance> createInstance() final { return adoptRef(new CDMInstanceOpenCDM(*m_openCDMAccessor, m_openCDMKeySystem)); }
+    RefPtr<CDMInstance> createInstance() final { return adoptRef(new CDMInstanceOpenCDM(m_openCDMKeySystem)); }
     void loadAndInitialize() final { }
     bool supportsServerCertificates() const final { return true; }
     bool supportsSessions() const final { return true; }
@@ -81,7 +80,6 @@ private:
     String m_openCDMKeySystem;
     // This owns OCDM Accessor and passes a bare pointer further because it's owned by CDMInstance
     // which lives as long as any MediaKeySession lives.
-    ScopedOCDMAccessor m_openCDMAccessor;
 };
 
 class CDMInstanceOpenCDM::Session : public ThreadSafeRefCounted<CDMInstanceOpenCDM::Session> {
@@ -91,7 +89,7 @@ public:
     using KeyUpdatedCallback = Function<void(Session*, OCDMKeyStatus, RefPtr<SharedBuffer>&&)>;
     using SessionChangedCallback = Function<void(Session*, bool success, RefPtr<SharedBuffer>&&)>;
 
-    static Ref<Session> create(OpenCDMAccessor&, const String&, const char*, Ref<WebCore::SharedBuffer>&&, LicenseType, Ref<WebCore::SharedBuffer>&&);
+    static Ref<Session> create(OpenCDMSystem*, const char*, Ref<WebCore::SharedBuffer>&&, LicenseType, Ref<WebCore::SharedBuffer>&&);
     ~Session();
 
     bool isValid() const { return m_session.get() && m_message && !m_message->isEmpty(); }
@@ -119,7 +117,7 @@ public:
 
 private:
     Session() = delete;
-    Session(OpenCDMAccessor&, const String&, const char*, Ref<WebCore::SharedBuffer>&&, LicenseType, Ref<WebCore::SharedBuffer>&&);
+    Session(OpenCDMSystem *, const char*, Ref<WebCore::SharedBuffer>&&, LicenseType, Ref<WebCore::SharedBuffer>&&);
     void challengeGeneratedCallback(RefPtr<SharedBuffer>&&);
     void keyUpdatedCallback(RefPtr<SharedBuffer>&& = nullptr);
     void messageReceivedCallback(RefPtr<SharedBuffer>&&);
@@ -148,10 +146,10 @@ HashSet<CDMInstanceOpenCDM::Session*> CDMInstanceOpenCDM::Session::m_validSessio
 bool CDMPrivateOpenCDM::supportsConfiguration(const MediaKeySystemConfiguration& config) const
 {
     for (auto& audioCapability : config.audioCapabilities)
-        if (opencdm_is_type_supported(m_openCDMAccessor.get(), m_openCDMKeySystem.utf8().data(), audioCapability.contentType.utf8().data()))
+        if (opencdm_is_type_supported(m_openCDMKeySystem.utf8().data(), audioCapability.contentType.utf8().data()))
             return false;
     for (auto& videoCapability : config.videoCapabilities)
-        if (opencdm_is_type_supported(m_openCDMAccessor.get(), m_openCDMKeySystem.utf8().data(), videoCapability.contentType.utf8().data()))
+        if (opencdm_is_type_supported(m_openCDMKeySystem.utf8().data(), videoCapability.contentType.utf8().data()))
             return false;
     return true;
 }
@@ -171,7 +169,7 @@ bool CDMFactoryOpenCDM::supportsKeySystem(const String& keySystem)
 {
     std::string emptyString;
 
-    return !opencdm_is_type_supported(m_openCDMAccessor.get(), keySystem.utf8().data(), emptyString.c_str());
+    return !opencdm_is_type_supported(keySystem.utf8().data(), emptyString.c_str());
 }
 
 static LicenseType openCDMLicenseType(CDMInstance::LicenseType licenseType)
@@ -264,9 +262,9 @@ static RefPtr<SharedBuffer> parseResponseMessage(const SharedBuffer& buffer)
     return SharedBuffer::create(message.characters8() + offset, message.sizeInBytes() - offset);
 }
 
-Ref<CDMInstanceOpenCDM::Session> CDMInstanceOpenCDM::Session::create(OpenCDMAccessor& source, const String& keySystem, const char* type, Ref<WebCore::SharedBuffer>&& initData, LicenseType licenseType, Ref<WebCore::SharedBuffer>&& customData)
+Ref<CDMInstanceOpenCDM::Session> CDMInstanceOpenCDM::Session::create(OpenCDMSystem* system, const char* type, Ref<WebCore::SharedBuffer>&& initData, LicenseType licenseType, Ref<WebCore::SharedBuffer>&& customData)
 {
-    return adoptRef(*new Session(source, keySystem, type, WTFMove(initData), licenseType, WTFMove(customData)));
+    return adoptRef(*new Session(system, type, WTFMove(initData), licenseType, WTFMove(customData)));
 }
 
 void CDMInstanceOpenCDM::Session::openCDMNotification(OpenCDMSession* ocdmSession, void* userData, Notification method, const uint8_t message[], uint16_t messageLength)
@@ -288,7 +286,7 @@ void CDMInstanceOpenCDM::Session::openCDMNotification(OpenCDMSession* ocdmSessio
     (session->*method)(WTFMove(sharedBuffer));
 }
 
-CDMInstanceOpenCDM::Session::Session(OpenCDMAccessor& source, const String& keySystem, const char* mimeType, Ref<WebCore::SharedBuffer>&& initData, LicenseType licenseType, Ref<WebCore::SharedBuffer>&& customData)
+CDMInstanceOpenCDM::Session::Session(OpenCDMSystem* openCDMSystem, const char* mimeType, Ref<WebCore::SharedBuffer>&& initData, LicenseType licenseType, Ref<WebCore::SharedBuffer>&& customData)
     : m_initData(WTFMove(initData))
 {
     OpenCDMSession* session = nullptr;
@@ -302,7 +300,7 @@ CDMInstanceOpenCDM::Session::Session(OpenCDMAccessor& source, const String& keyS
         Session::openCDMNotification(session, userData, &Session::messageReceivedCallback, reinterpret_cast<const uint8_t*>(message), strlen(message));
     };
 
-    opencdm_construct_session(&source, keySystem.utf8().data(), openCDMLicenseType(licenseType), mimeType, reinterpret_cast<const uint8_t*>(m_initData->data()), m_initData->size(),
+    opencdm_construct_session(openCDMSystem, openCDMLicenseType(licenseType), mimeType, reinterpret_cast<const uint8_t*>(m_initData->data()), m_initData->size(),
         !customData->isEmpty() ? reinterpret_cast<const uint8_t*>(customData->data()) : nullptr, customData->size(), &m_openCDMSessionCallbacks, this, &session);
     if (!session) {
         GST_ERROR("Could not create session");
@@ -383,17 +381,17 @@ void CDMInstanceOpenCDM::Session::remove(SessionChangedCallback&& callback)
         removeFailure();
 }
 
-CDMInstanceOpenCDM::CDMInstanceOpenCDM(OpenCDMAccessor& accessor, const String& keySystem)
+CDMInstanceOpenCDM::CDMInstanceOpenCDM(const String& keySystem)
     : m_keySystem(keySystem)
+    , m_system(opencdm_create_system(keySystem.utf8().data()))
     , m_mimeType("video/x-h264")
-    , m_openCDMAccessor(accessor)
 {
     MediaPlayerPrivateGStreamerBase::ensureWebKitGStreamerElements();
 }
 
 CDMInstance::SuccessValue CDMInstanceOpenCDM::setServerCertificate(Ref<SharedBuffer>&& certificate)
 {
-    return !opencdm_system_set_server_certificate(&m_openCDMAccessor, m_keySystem.utf8().data(), reinterpret_cast<unsigned char*>(const_cast<char*>(certificate->data())), certificate->size())
+    return !opencdm_system_set_server_certificate(m_system, reinterpret_cast<unsigned char*>(const_cast<char*>(certificate->data())), certificate->size())
         ? WebCore::CDMInstance::SuccessValue::Succeeded
         : WebCore::CDMInstance::SuccessValue::Failed;
 }
@@ -441,7 +439,7 @@ void CDMInstanceOpenCDM::requestLicense(LicenseType licenseType, const AtomicStr
         return;
     }
 
-    Ref<Session> newSession = Session::create(m_openCDMAccessor, m_keySystem, m_mimeType, WTFMove(rawInitData), licenseType, WTFMove(rawCustomData));
+    Ref<Session> newSession = Session::create(m_system, m_mimeType, WTFMove(rawInitData), licenseType, WTFMove(rawCustomData));
     String sessionId = newSession->id();
     if (sessionId.isEmpty()) {
         generateChallenge(newSession.ptr());
