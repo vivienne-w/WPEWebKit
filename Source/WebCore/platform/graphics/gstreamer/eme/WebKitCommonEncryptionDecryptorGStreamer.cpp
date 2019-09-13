@@ -209,19 +209,13 @@ static GstFlowReturn webkitMediaCommonEncryptionDecryptTransformInPlace(GstBaseT
     WebKitMediaCommonEncryptionDecrypt* self = WEBKIT_MEDIA_CENC_DECRYPT(base);
     WebKitMediaCommonEncryptionDecryptPrivate* priv = WEBKIT_MEDIA_CENC_DECRYPT_GET_PRIVATE(self);
 
-    LockHolder locker(priv->m_mutex);
-
-    if (priv->m_isFlushing) {
-        GST_DEBUG_OBJECT(self, "flushing");
-        return GST_FLOW_FLUSHING;
-    }
-
     GstProtectionMeta* protectionMeta = reinterpret_cast<GstProtectionMeta*>(gst_buffer_get_protection_meta(buffer));
     if (!protectionMeta) {
         GST_TRACE_OBJECT(self, "buffer %p has no protection meta, assuming it's not encrypted", buffer);
         return GST_FLOW_OK;
     }
 
+    LockHolder locker(priv->m_mutex);
     const GValue* streamEncryptionEventsList = gst_structure_get_value(protectionMeta->info, "stream-encryption-events");
     if (streamEncryptionEventsList && GST_VALUE_HOLDS_LIST(streamEncryptionEventsList)) {
         unsigned streamEncryptionEventsListSize = gst_value_list_get_size(streamEncryptionEventsList);
@@ -262,14 +256,17 @@ static GstFlowReturn webkitMediaCommonEncryptionDecryptTransformInPlace(GstBaseT
             return GST_FLOW_NOT_SUPPORTED;
         }
         if (!priv->m_condition.waitFor(priv->m_mutex, WEBCORE_GSTREAMER_EME_LICENSE_KEY_RESPONSE_TIMEOUT, [priv] { return priv->m_isFlushing || priv->m_keyReceived; })) {
-            if (priv->m_isFlushing) {
-                GST_DEBUG_OBJECT(self, "flushing");
-                return GST_FLOW_FLUSHING;
-            } else {
+            if (!priv->m_keyReceived) {
                 GST_ERROR_OBJECT(self, "key not available");
                 return GST_FLOW_NOT_SUPPORTED;
             }
         }
+
+        if (priv->m_isFlushing) {
+            GST_DEBUG_OBJECT(self, "flushing");
+            return GST_FLOW_FLUSHING;
+        }
+
         GST_DEBUG_OBJECT(self, "key received, continuing");
     }
 
@@ -424,7 +421,7 @@ static void webkitMediaCommonEncryptionDecryptProcessProtectionEvents(WebKitMedi
             GST_DEBUG_OBJECT(self, "init data of size %u", mappedBuffer.size());
             GST_TRACE_OBJECT(self, "init data MD5 %s", WebCore::GStreamerEMEUtilities::initDataMD5(initData).utf8().data());
             GST_MEMDUMP_OBJECT(self, "init data", mappedBuffer.data(), mappedBuffer.size());
-            priv->m_initDatas.set(priv->m_cdmInstance->keySystem(), initData);
+            priv->m_initDatas.set(eventKeySystem, initData);
             GST_MEMDUMP_OBJECT(self, "key ID", reinterpret_cast<const uint8_t*>(kid->data()), kid->size());
             priv->m_keyIds.set(initData, kid.copyRef());
 
