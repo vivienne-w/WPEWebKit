@@ -27,6 +27,7 @@
 
 #include "CDMPrivate.h"
 #include "GenericTaskQueue.h"
+#include "GStreamerEMEUtilities.h"
 #include "MediaKeyMessageType.h"
 #include "MediaKeysRequirement.h"
 #include "MediaPlayerPrivateGStreamerBase.h"
@@ -132,6 +133,9 @@ public:
     }
 
     static void openCDMNotification(const OpenCDMSession*, void*, Notification, const char* name, const uint8_t[], uint16_t);
+    OpenCDMSession* ocdmSession() const { return m_session.get(); }
+    void decrypting(bool decrypt) { m_isDecrypting = decrypt; }
+    bool isDecrypting() const { return m_isDecrypting; }
 
 private:
     Session() = delete;
@@ -168,6 +172,7 @@ private:
     // warranted to be called on the main thread the Session lives on.
     static HashSet<Session*> m_validSessions;
     KeyStatusVector m_keyStatuses;
+    bool m_isDecrypting { false };
 };
 
 HashSet<CDMInstanceOpenCDM::Session*> CDMInstanceOpenCDM::Session::m_validSessions;
@@ -392,6 +397,7 @@ void CDMInstanceOpenCDM::Session::challengeGeneratedCallback(RefPtr<SharedBuffer
 void CDMInstanceOpenCDM::Session::keyUpdatedCallback(RefPtr<SharedBuffer>&& buffer)
 {
     GST_MEMDUMP("Updated key", reinterpret_cast<const guint8*>(buffer->data()), buffer->size());
+    GST_TRACE("Updated key: %s in %s (%p ocdmSession %p)", GStreamerEMEUtilities::keyIdMD5(*buffer).utf8().data(), id().utf8().data(), this, m_session.get());
     auto index = m_keyStatuses.findMatching([&buffer](const std::pair<Ref<SharedBuffer>, KeyStatus>& item) {
         return memmem(buffer->data(), buffer->size(), item.first->data(), item.first->size());
     });
@@ -485,7 +491,7 @@ void CDMInstanceOpenCDM::requestLicense(LicenseType licenseType, const AtomicStr
 {
     InitData initData = InitData(reinterpret_cast<const uint8_t*>(rawInitData->data()), rawInitData->size());
 
-    GST_TRACE("Going to request a new session id, init data size %u and MD5 %s", initData.sizeInBytes(), GStreamerEMEUtilities::initDataMD5(initData).utf8().data());
+    GST_LOG("Going to request a new session id, init data size %u and MD5 %s", initData.sizeInBytes(), GStreamerEMEUtilities::initDataMD5(initData).utf8().data());
     GST_MEMDUMP("init data", initData.characters8(), initData.sizeInBytes());
     auto generateChallenge = [this, callback = WTFMove(callback)](Session* session) {
         auto sessionId = session->id();
@@ -515,13 +521,12 @@ void CDMInstanceOpenCDM::requestLicense(LicenseType licenseType, const AtomicStr
     GST_DEBUG("Created session with id %s", sessionId.utf8().data());
     newSession->generateChallenge(WTFMove(generateChallenge));
 
-    if (!addSession(sessionId, WTFMove(newSession)))
-        GST_WARNING("Failed to add session %s, the session might already exist, or the allocation failed", sessionId.utf8().data());
+    addSession(WTFMove(newSession));
 }
 
 void CDMInstanceOpenCDM::updateLicense(const String& sessionId, LicenseType, const SharedBuffer& response, LicenseUpdateCallback callback)
 {
-    GST_TRACE("Updating session %s", sessionId.utf8().data());
+    GST_LOG("Updating session %s", sessionId.utf8().data());
     auto session = lookupSession(sessionId);
     if (!session) {
         GST_WARNING("cannot update the session %s cause we can't find it", sessionId.utf8().data());
@@ -630,6 +635,7 @@ void CDMInstanceOpenCDM::removeSessionData(const String& sessionId, LicenseType,
 
 void CDMInstanceOpenCDM::closeSession(const String& sessionId, CloseSessionCallback callback)
 {
+    GST_LOG("Closing session %s", sessionId.utf8().data());
     auto session = lookupSession(sessionId);
     if (!session) {
         GST_WARNING("cannot close non-existing session %s", sessionId.utf8().data());
@@ -646,59 +652,83 @@ void CDMInstanceOpenCDM::closeSession(const String& sessionId, CloseSessionCallb
     callback();
 }
 
-String CDMInstanceOpenCDM::sessionIdByKeyId(const SharedBuffer& keyId) const
+OpenCDMSession* CDMInstanceOpenCDM::acquireSessionWithUsableKeyForDecrypt(const SharedBuffer& keyId) const
 {
-    LockHolder locker(m_sessionMapMutex);
+    LockHolder locker(m_sessionsMutex);
 
     GST_MEMDUMP("kid", reinterpret_cast<const uint8_t*>(keyId.data()), keyId.size());
-    if (!m_sessionsMap.size() || !keyId.data()) {
+    GST_LOG("key: %s", GStreamerEMEUtilities::keyIdMD5(keyId).utf8().data());
+    if (!m_sessions.size() || !keyId.data()) {
         GST_WARNING("no sessions");
-        return { };
+        return nullptr;
     }
 
-    String result;
-
-    for (const auto& pair : m_sessionsMap) {
-        const String& sessionId = pair.key;
-        const RefPtr<Session>& session = pair.value;
-        if (session->containsKeyId(keyId)) {
-            result = sessionId;
-            break;
+    RefPtr<Session> candidate = nullptr;
+    Vector<RefPtr<Session>> used;
+    Vector<RefPtr<Session>> free;
+    for (size_t i = 0; i < m_sessions.size(); ++i) {
+        if (m_sessions[i]->isDecrypting()) {
+            used.append(m_sessions[i]);
+        } else {
+            free.append(m_sessions[i]);
         }
     }
 
-    if (result.isEmpty())
+    if (free.isEmpty()) {
+        for (size_t i = 0; i < used.size(); ++i) {
+            if (used[i]->containsKeyId(keyId)) {
+                candidate = used[i];
+                GST_LOG("No free session. Using %s (%p ocdSession:%p)", candidate->id().utf8().data(), candidate.get(), candidate->ocdmSession());
+                break;
+            }
+        }
+    } else {
+        for (size_t i = 0; i < free.size(); ++i) {
+            if (free[i]->containsKeyId(keyId)) {
+                candidate = free[i];
+                GST_LOG("Found free session %s (%p ocdmSession: %p)", candidate->id().utf8().data(), candidate.get(), candidate->ocdmSession());
+                break;
+            }
+        }
+    }
+
+    if (!candidate)
         GST_WARNING("Unknown session, nothing will be returned");
-    else
-        GST_DEBUG("Found session for initdata: %s", result.utf8().data());
+    else {
+        candidate->decrypting(true);
+        GST_DEBUG("Found session for keyid: %s", candidate->id().utf8().data());
+    }
 
-    return result;
+    return candidate ? candidate->ocdmSession() : nullptr;
 }
 
-bool CDMInstanceOpenCDM::isKeyIdInSessionUsable(const SharedBuffer& keyId, const String& sessionId) const
+void CDMInstanceOpenCDM::releaseSessionFromDecrypt(OpenCDMSession* ocdmSession) const
 {
-    auto session = lookupSession(sessionId);
-    return session && session->status(keyId) == Usable;
-}
-
-bool CDMInstanceOpenCDM::addSession(const String& sessionId, RefPtr<Session>&& session)
-{
-    LockHolder locker(m_sessionMapMutex);
+    auto id = String::fromUTF8(opencdm_session_id(ocdmSession));
+    GST_LOG("%s (%p)", id.utf8().data(), ocdmSession);
+    auto session = lookupSession(id);
     ASSERT(session);
-    return m_sessionsMap.set(sessionId, session).isNewEntry;
+    session->decrypting(false);
+}
+
+void CDMInstanceOpenCDM::addSession(RefPtr<Session>&& session)
+{
+    LockHolder locker(m_sessionsMutex);
+    ASSERT(session);
+    m_sessions.append(session);
 }
 
 bool CDMInstanceOpenCDM::removeSession(const String& sessionId)
 {
-    LockHolder locker(m_sessionMapMutex);
-    return m_sessionsMap.remove(sessionId);
+    LockHolder locker(m_sessionsMutex);
+    return m_sessions.removeFirstMatching([&sessionId](const RefPtr<Session>& session) { return session->id() == sessionId; });
 }
 
 RefPtr<CDMInstanceOpenCDM::Session> CDMInstanceOpenCDM::lookupSession(const String& sessionId) const
 {
-    LockHolder locker(m_sessionMapMutex);
-    auto session = m_sessionsMap.find(sessionId);
-    return session == m_sessionsMap.end() ? nullptr : session->value;
+    LockHolder locker(m_sessionsMutex);
+    auto sessionIndex = m_sessions.findMatching([&sessionId](const RefPtr<Session>& session) { return session->id() == sessionId; });
+    return sessionIndex == notFound ? nullptr : m_sessions[sessionIndex];
 }
 
 } // namespace WebCore

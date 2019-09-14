@@ -41,6 +41,7 @@ const WTF::Seconds WEBCORE_GSTREAMER_EME_LICENSE_KEY_RESPONSE_TIMEOUT = WTF::Sec
 namespace WebCore {
 
 using InitData = String;
+class SharedBuffer;
 
 class GStreamerEMEUtilities {
 
@@ -134,6 +135,7 @@ public:
 
 #if (!defined(GST_DISABLE_GST_DEBUG))
     static String initDataMD5(const InitData&);
+    static String keyIdMD5(const WebCore::SharedBuffer&);
 #endif
 };
 

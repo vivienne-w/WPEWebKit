@@ -98,23 +98,23 @@ public:
     void setClient(CDMInstanceClient& client) override { m_client = &client; }
     void clearClient() override { m_client = nullptr; }
 
-    String sessionIdByKeyId(const SharedBuffer&) const;
-    bool isKeyIdInSessionUsable(const SharedBuffer&, const String&) const;
+    OpenCDMSession* acquireSessionWithUsableKeyForDecrypt(const SharedBuffer&) const;
+    void releaseSessionFromDecrypt(OpenCDMSession*) const;
 
     CDMInstanceClient* client() const { return m_client; }
 
 private:
-    bool addSession(const String& sessionId, RefPtr<Session>&& session);
-    bool removeSession(const String& sessionId);
-    RefPtr<Session> lookupSession(const String& sessionId) const;
+    void addSession(RefPtr<Session>&&);
+    bool removeSession(const String&);
+    RefPtr<Session> lookupSession(const String&) const;
 
     String m_keySystem;
     OpenCDMAccessor& m_openCDMAccessor;
-    // Protects against concurrent access to m_sessionsMap. In addition to the main thread
+    // Protects against concurrent access to m_sessions. In addition to the main thread
     // the GStreamer decryptor elements running in the streaming threads have a need to
     // lookup values in this map.
-    mutable Lock m_sessionMapMutex;
-    HashMap<String, RefPtr<Session>> m_sessionsMap;
+    mutable Lock m_sessionsMutex;
+    Vector<RefPtr<Session>> m_sessions;
     CDMInstanceClient* m_client { nullptr };
     KeyStatusVector m_keyStatuses;
     RefPtr<SharedBuffer> m_message;

@@ -83,8 +83,8 @@ static void webkit_media_common_encryption_decrypt_class_init(WebKitMediaCommonE
 
     klass->setupCipher = [](WebKitMediaCommonEncryptionDecrypt*, GstBuffer*) { return true; };
     klass->releaseCipher = [](WebKitMediaCommonEncryptionDecrypt*) { };
-    klass->handleKeyId = [](WebKitMediaCommonEncryptionDecrypt*, const WebCore::SharedBuffer&) { return true; };
-    klass->attemptToDecryptWithLocalInstance = [](WebKitMediaCommonEncryptionDecrypt*, const WebCore::SharedBuffer&) { return false; };
+    klass->handleKeyId = [](WebKitMediaCommonEncryptionDecrypt*, Ref<WebCore::SharedBuffer>&&) { return true; };
+    klass->attemptToDecryptWithLocalInstance = [](WebKitMediaCommonEncryptionDecrypt*, Ref<WebCore::SharedBuffer>&&) { return false; };
 
     g_type_class_add_private(klass, sizeof(WebKitMediaCommonEncryptionDecryptPrivate));
 }
@@ -422,9 +422,10 @@ static void webkitMediaCommonEncryptionDecryptProcessProtectionEvents(WebKitMedi
 
             initData = WebCore::InitData(mappedBuffer.data(), mappedBuffer.size());
             GST_DEBUG_OBJECT(self, "init data of size %u", mappedBuffer.size());
-            GST_TRACE_OBJECT(self, "init data MD5 %s", WebCore::GStreamerEMEUtilities::initDataMD5(initData).utf8().data());
+            GST_LOG_OBJECT(self, "init data MD5 %s", WebCore::GStreamerEMEUtilities::initDataMD5(initData).utf8().data());
             GST_MEMDUMP_OBJECT(self, "init data", mappedBuffer.data(), mappedBuffer.size());
             priv->m_initDatas.set(eventKeySystem, initData);
+            GST_LOG_OBJECT(self, "key ID MD5: %s", WebCore::GStreamerEMEUtilities::keyIdMD5(kid).utf8().data());
             GST_MEMDUMP_OBJECT(self, "key ID", reinterpret_cast<const uint8_t*>(kid->data()), kid->size());
             priv->m_keyIds.set(initData, kid.copyRef());
 
@@ -500,7 +501,10 @@ static gboolean webkitMediaCommonEncryptionDecryptSinkEventHandler(GstBaseTransf
             GST_DEBUG_OBJECT(self, "attempting to decrypt with local instance %p, key id %p", priv->m_cdmInstance.get(), keyId);
             if (keyId) {
                 GST_MEMDUMP_OBJECT(self, "key id", reinterpret_cast<const uint8_t*>(keyId->data()), keyId->size());
-                priv->m_keyReceived = klass->attemptToDecryptWithLocalInstance(self, *keyId);
+                GST_LOG_OBJECT(self, "init data MD5 %s", WebCore::GStreamerEMEUtilities::initDataMD5(initData).utf8().data());
+                GST_LOG_OBJECT(self, "key ID MD5: %s", WebCore::GStreamerEMEUtilities::keyIdMD5(*keyId).utf8().data());
+                Ref<WebCore::SharedBuffer> protectedKeyId(*keyId);
+                priv->m_keyReceived = klass->attemptToDecryptWithLocalInstance(self, WTFMove(protectedKeyId));
             }
             GST_DEBUG_OBJECT(self, "attempted to decrypt with local instance %p, key received %s", priv->m_cdmInstance.get(), WTF::boolForPrinting(priv->m_keyReceived));
             if (priv->m_keyReceived)

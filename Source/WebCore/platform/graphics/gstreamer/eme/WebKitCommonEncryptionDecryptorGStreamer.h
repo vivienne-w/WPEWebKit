@@ -63,8 +63,8 @@ struct _WebKitMediaCommonEncryptionDecryptClass {
     bool (*decrypt)(WebKitMediaCommonEncryptionDecrypt*, GstBuffer* keyIDBuffer, GstBuffer* ivBuffer, GstBuffer* buffer, unsigned subSamplesCount, GstBuffer* subSamplesBuffer);
     void (*releaseCipher)(WebKitMediaCommonEncryptionDecrypt*);
     void (*receivedProtectionEvent)(WebKitMediaCommonEncryptionDecrypt*, unsigned);
-    bool (*handleKeyId)(WebKitMediaCommonEncryptionDecrypt*, const WebCore::SharedBuffer&);
-    bool (*attemptToDecryptWithLocalInstance)(WebKitMediaCommonEncryptionDecrypt*, const WebCore::SharedBuffer&);
+    bool (*handleKeyId)(WebKitMediaCommonEncryptionDecrypt*, Ref<WebCore::SharedBuffer>&&);
+    bool (*attemptToDecryptWithLocalInstance)(WebKitMediaCommonEncryptionDecrypt*, Ref<WebCore::SharedBuffer>&&);
 };
 
 RefPtr<WebCore::CDMInstance> webKitMediaCommonEncryptionDecryptCDMInstance(WebKitMediaCommonEncryptionDecrypt*);

@@ -21,6 +21,7 @@
 
 #include "config.h"
 #include "GStreamerEMEUtilities.h"
+#include "SharedBuffer.h"
 
 #include <wtf/MD5.h>
 #include <wtf/text/Base64.h>
@@ -44,16 +45,33 @@ const char* GStreamerEMEUtilities::s_WidevineUUID = WEBCORE_GSTREAMER_EME_UTILIT
 const char* GStreamerEMEUtilities::s_WidevineKeySystem = "com.widevine.alpha";
 #endif
 
+
 #if (!defined(GST_DISABLE_GST_DEBUG))
-String GStreamerEMEUtilities::initDataMD5(const InitData& initData)
+
+namespace {
+
+String md5(const uint8_t* data, size_t length)
 {
     WTF::MD5 md5;
-    md5.addBytes(static_cast<const uint8_t*>(initData.characters8()), initData.length());
+    md5.addBytes(data, length);
 
     WTF::MD5::Digest digest;
     md5.checksum(digest);
 
     return WTF::base64URLEncode(&digest[0], WTF::MD5::hashSize);
+}
+
+}
+
+String GStreamerEMEUtilities::initDataMD5(const InitData& initData)
+{
+    return md5(static_cast<const uint8_t*>(initData.characters8()), initData.length());
+}
+
+
+String GStreamerEMEUtilities::keyIdMD5(const WebCore::SharedBuffer& kid)
+{
+    return md5(reinterpret_cast<const uint8_t*>(kid.data()), kid.size());
 }
 #endif
 
