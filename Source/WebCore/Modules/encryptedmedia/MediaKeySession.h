@@ -81,7 +81,7 @@ private:
     MediaKeySession(ScriptExecutionContext&, WeakPtr<MediaKeys>&&, MediaKeySessionType, bool useDistinctiveIdentifier, Ref<CDM>&&, Ref<CDMInstance>&&);
     void enqueueMessage(MediaKeyMessageType, const SharedBuffer&);
     void updateKeyStatuses(CDMInstance::KeyStatusVector&&) override;
-    void issueMessage(MessageType, Ref<SharedBuffer>&&) override;
+    void enqueueMessageWithTask(MessageType, Ref<SharedBuffer>&&) override;
     void updateExpiration(double);
     void sessionClosed();
 
