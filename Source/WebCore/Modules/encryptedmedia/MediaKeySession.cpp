@@ -628,7 +628,7 @@ void MediaKeySession::enqueueMessageWithTask(CDMInstanceClient::MessageType type
             break;
         }
 
-        enqueueMessage(messageType, WTFMove(message));
+        enqueueMessage(messageType, message.get());
     });
 }
 
