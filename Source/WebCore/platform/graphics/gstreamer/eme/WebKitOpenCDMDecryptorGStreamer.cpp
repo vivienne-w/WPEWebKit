@@ -186,7 +186,7 @@ static SessionResult webKitMediaOpenCDMDecryptorResetSessionFromKeyIdIfNeeded(We
         priv->m_keyIdInUse = WTFMove(keyId);
 
     SessionResult returnValue = InvalidSession;
-    OpenCDMSession* session = cdmInstanceOpenCDM.acquireSessionWithUsableKeyForDecrypt(keyId ? *keyId : *priv->m_keyIdInUse);
+    OpenCDMSession* session = cdmInstanceOpenCDM.acquireSessionWithUsableKeyForDecrypt(*priv->m_keyIdInUse);
     if (!session) {
         GST_DEBUG_OBJECT(self, "session is empty or unusable, resetting");
         priv->m_session = nullptr;
