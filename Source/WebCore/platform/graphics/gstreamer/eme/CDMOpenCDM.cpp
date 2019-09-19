@@ -134,8 +134,9 @@ public:
 
     static void openCDMNotification(const OpenCDMSession*, void*, Notification, const char* name, const uint8_t[], uint16_t);
     OpenCDMSession* ocdmSession() const { return m_session.get(); }
-    void decrypting(bool decrypt) { m_isDecrypting = decrypt; }
-    bool isDecrypting() const { return m_isDecrypting; }
+    void increaseDecrypting() { ++m_isDecrypting; }
+    void decreaseDecrypting() { --m_isDecrypting; ASSERT(m_isDecrypting >= 0); }
+    bool isDecrypting() const { return m_isDecrypting > 0; }
 
 private:
     Session() = delete;
@@ -172,7 +173,7 @@ private:
     // warranted to be called on the main thread the Session lives on.
     static HashSet<Session*> m_validSessions;
     KeyStatusVector m_keyStatuses;
-    bool m_isDecrypting { false };
+    int m_isDecrypting { 0 };
 };
 
 HashSet<CDMInstanceOpenCDM::Session*> CDMInstanceOpenCDM::Session::m_validSessions;
@@ -695,7 +696,7 @@ OpenCDMSession* CDMInstanceOpenCDM::acquireSessionWithUsableKeyForDecrypt(const 
     if (!candidate)
         GST_WARNING("Unknown session, nothing will be returned");
     else {
-        candidate->decrypting(true);
+        candidate->increaseDecrypting();
         GST_DEBUG("Found session for keyid: %s", candidate->id().utf8().data());
     }
 
@@ -708,7 +709,7 @@ void CDMInstanceOpenCDM::releaseSessionFromDecrypt(OpenCDMSession* ocdmSession) 
     GST_LOG("%s (%p)", id.utf8().data(), ocdmSession);
     auto session = lookupSession(id);
     ASSERT(session);
-    session->decrypting(false);
+    session->decreaseDecrypting();
 }
 
 void CDMInstanceOpenCDM::addSession(RefPtr<Session>&& session)
