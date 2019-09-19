@@ -68,8 +68,8 @@ struct _WebKitOpenCDMDecryptPrivate {
 
 static void webKitMediaOpenCDMDecryptorFinalize(GObject*);
 static bool webKitMediaOpenCDMDecryptorDecrypt(WebKitMediaCommonEncryptionDecrypt*, GstBuffer* keyIDBuffer, GstBuffer* iv, GstBuffer* sample, unsigned subSamplesCount, GstBuffer* subSamples);
-static bool webKitMediaOpenCDMDecryptorHandleKeyId(WebKitMediaCommonEncryptionDecrypt* self, Ref<WebCore::SharedBuffer>&&);
-static bool webKitMediaOpenCDMDecryptorAttemptToDecryptWithLocalInstance(WebKitMediaCommonEncryptionDecrypt* self, Ref<WebCore::SharedBuffer>&&);
+static bool webKitMediaOpenCDMDecryptorHandleKeyId(WebKitMediaCommonEncryptionDecrypt* self, RefPtr<WebCore::SharedBuffer>&&);
+static bool webKitMediaOpenCDMDecryptorAttemptToDecryptWithLocalInstance(WebKitMediaCommonEncryptionDecrypt* self);
 
 static const char* cencEncryptionMediaTypes[] = { "video/mp4", "audio/mp4", "video/x-h264", "audio/mpeg", nullptr };
 static const char* webmEncryptionMediaTypes[] = { "video/webm", "audio/webm", "video/x-vp9", nullptr };
@@ -170,23 +170,28 @@ static void webKitMediaOpenCDMDecryptorFinalize(GObject* object)
     GST_CALL_PARENT(G_OBJECT_CLASS, finalize, (object));
 }
 
-static SessionResult webKitMediaOpenCDMDecryptorResetSessionFromKeyIdIfNeeded(WebKitMediaCommonEncryptionDecrypt* self, Ref<WebCore::SharedBuffer>&& keyId)
+static SessionResult webKitMediaOpenCDMDecryptorResetSessionFromKeyIdIfNeeded(WebKitMediaCommonEncryptionDecrypt* self, RefPtr<WebCore::SharedBuffer>&& keyId)
 {
     WebKitOpenCDMDecryptPrivate* priv = GST_WEBKIT_OPENCDM_DECRYPT_GET_PRIVATE(WEBKIT_OPENCDM_DECRYPT(self));
+    if (!keyId && !priv->m_keyIdInUse) {
+        GST_DEBUG_OBJECT(self, "Key ID not known yet. Can't do the matching.");
+        return InvalidSession;
+    }
 
     RefPtr<WebCore::CDMInstance> cdmInstance = webKitMediaCommonEncryptionDecryptCDMInstance(self);
     ASSERT(cdmInstance && is<WebCore::CDMInstanceOpenCDM>(*cdmInstance));
     auto& cdmInstanceOpenCDM = downcast<WebCore::CDMInstanceOpenCDM>(*cdmInstance);
 
+    if (keyId)
+        priv->m_keyIdInUse = WTFMove(keyId);
+
     SessionResult returnValue = InvalidSession;
-    OpenCDMSession* session = cdmInstanceOpenCDM.acquireSessionWithUsableKeyForDecrypt(keyId);
+    OpenCDMSession* session = cdmInstanceOpenCDM.acquireSessionWithUsableKeyForDecrypt(keyId ? *keyId : *priv->m_keyIdInUse);
     if (!session) {
         GST_DEBUG_OBJECT(self, "session is empty or unusable, resetting");
-        priv->m_session.reset(new ScopedDecryptOCDMSession(session, cdmInstance.releaseNonNull()));
-        priv->m_keyIdInUse = WTFMove(keyId);
+        priv->m_session = nullptr;
     } else if (!priv->m_session || session != priv->m_session->session()) {
         priv->m_session.reset(new ScopedDecryptOCDMSession(session, cdmInstance.releaseNonNull()));
-        priv->m_keyIdInUse = WTFMove(keyId);
         GST_DEBUG_OBJECT(self, "new session %s is usable", opencdm_session_id(session));
         returnValue = NewSession;
     } else {
@@ -197,7 +202,7 @@ static SessionResult webKitMediaOpenCDMDecryptorResetSessionFromKeyIdIfNeeded(We
     return returnValue;
 }
 
-static bool webKitMediaOpenCDMDecryptorHandleKeyId(WebKitMediaCommonEncryptionDecrypt* self, Ref<WebCore::SharedBuffer>&& keyId)
+static bool webKitMediaOpenCDMDecryptorHandleKeyId(WebKitMediaCommonEncryptionDecrypt* self, RefPtr<WebCore::SharedBuffer>&& keyId)
 {
     WebKitOpenCDMDecryptPrivate* priv = GST_WEBKIT_OPENCDM_DECRYPT_GET_PRIVATE(self);
     LockHolder locker(priv->m_mutex);
@@ -207,12 +212,13 @@ static bool webKitMediaOpenCDMDecryptorHandleKeyId(WebKitMediaCommonEncryptionDe
     return false;
 }
 
-static bool webKitMediaOpenCDMDecryptorAttemptToDecryptWithLocalInstance(WebKitMediaCommonEncryptionDecrypt* self, Ref<WebCore::SharedBuffer>&& keyId)
+static bool webKitMediaOpenCDMDecryptorAttemptToDecryptWithLocalInstance(WebKitMediaCommonEncryptionDecrypt* self)
 {
     WebKitOpenCDMDecryptPrivate* priv = GST_WEBKIT_OPENCDM_DECRYPT_GET_PRIVATE(self);
     LockHolder locker(priv->m_mutex);
-    if (!priv->m_session || !priv->m_session->session() || !memmem(keyId->data(), keyId->size(), priv->m_keyIdInUse->data(), priv->m_keyIdInUse->size()))
-        return webKitMediaOpenCDMDecryptorResetSessionFromKeyIdIfNeeded(self, WTFMove(keyId)) != InvalidSession;
+    if (!priv->m_session || !priv->m_session->session()) {
+        return webKitMediaOpenCDMDecryptorResetSessionFromKeyIdIfNeeded(self, nullptr) != InvalidSession;
+    }
 
     return true;
 }
@@ -227,19 +233,14 @@ static bool webKitMediaOpenCDMDecryptorDecrypt(WebKitMediaCommonEncryptionDecryp
         return false;
     }
 
-    auto keyId = WebCore::SharedBuffer::create(mappedKeyID.data(), mappedKeyID.size());
-    auto keyIdMD5 = WebCore::GStreamerEMEUtilities::keyIdMD5(keyId);
-    LockHolder locker(priv->m_mutex);
-    if (!priv->m_session || !priv->m_session->session() || !memmem(keyId->data(), keyId->size(), priv->m_keyIdInUse->data(), priv->m_keyIdInUse->size()))
-        webKitMediaOpenCDMDecryptorResetSessionFromKeyIdIfNeeded(self, WTFMove(keyId));
-
     if (!priv->m_session || !priv->m_session->session()) {
         GST_ERROR_OBJECT(self, "session is empty or unusable");
         return false;
     }
 
     // Decrypt cipher.
-    GST_TRACE_OBJECT(self, "Decrypting with %s kid using %s (%p) session", keyIdMD5.utf8().data(), opencdm_session_id(priv->m_session->session()), priv->m_session->session());
+    auto keyId = WebCore::SharedBuffer::create(mappedKeyID.data(), mappedKeyID.size());
+    GST_TRACE_OBJECT(self, "Decrypting with %s kid using %s (%p) session", WebCore::GStreamerEMEUtilities::keyIdMD5(keyId).utf8().data(), opencdm_session_id(priv->m_session->session()), priv->m_session->session());
     if (int errorCode = opencdm_gstreamer_session_decrypt(priv->m_session->session(), buffer, subSamplesBuffer, subSampleCount, ivBuffer, keyIDBuffer, 0)) {
         GST_ERROR_OBJECT(self, "subsample decryption failed, error code %d", errorCode);
         return false;
