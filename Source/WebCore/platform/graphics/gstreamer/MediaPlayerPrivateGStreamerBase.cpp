@@ -1339,7 +1339,12 @@ void MediaPlayerPrivateGStreamerBase::handleProtectionStructure(const GstStructu
     }
 
     InitData initData(mappedInitData.data(), mappedInitData.size());
-    initializationDataEncountered(ASCIILiteral(!g_strcmp0(eventKeySystemUUID.get(), GST_PROTECTION_UNSPECIFIED_SYSTEM_ID) ? "webm" : "cenc"), initData);
+    const char* initDataType = "cenc";
+#if GST_CHECK_VERSION(1, 15, 0)
+    if (!g_strcmp0(eventKeySystemUUID.get(), GST_PROTECTION_UNSPECIFIED_SYSTEM_ID))
+        initDataType = "webm";
+#endif
+    initializationDataEncountered(ASCIILiteral(initDataType), initData);
 }
 
 void MediaPlayerPrivateGStreamerBase::handleProtectionEvents(const Vector<GstEvent*>& protectionEvents)
@@ -1350,13 +1355,16 @@ void MediaPlayerPrivateGStreamerBase::handleProtectionEvents(const Vector<GstEve
     ASSERT(isMainThread());
 
     InitData concatenatedInitDatas;
+#if GST_CHECK_VERSION(1, 15, 0)
     bool isSystemUUIDUnspecified = false;
+#endif
     for (auto* event : protectionEvents) {
         GstBuffer* buffer = nullptr;
         const char* eventKeySystemUUID = nullptr;
         gst_event_parse_protection(event, &eventKeySystemUUID, &buffer, nullptr);
+#if GST_CHECK_VERSION(1, 15, 0)
         isSystemUUIDUnspecified = !g_strcmp0(eventKeySystemUUID, GStreamerEMEUtilities::s_UnspecifiedUUID);
-
+#endif
         GST_TRACE("handling protection event %u for %s", GST_EVENT_SEQNUM(event), eventKeySystemUUID);
         if (m_cdmInstance && g_strcmp0(eventKeySystemUUID, GStreamerEMEUtilities::keySystemToUuid(m_cdmInstance->keySystem()))) {
             GST_TRACE("protection event for a different key system");
@@ -1374,8 +1382,14 @@ void MediaPlayerPrivateGStreamerBase::handleProtectionEvents(const Vector<GstEve
         GST_MEMDUMP("init data", mappedBuffer.data(), mappedBuffer.size());
     }
 
-    if (!concatenatedInitDatas.isEmpty())
-        initializationDataEncountered(ASCIILiteral(isSystemUUIDUnspecified ? "webm" : "cenc"), concatenatedInitDatas);
+    if (!concatenatedInitDatas.isEmpty()) {
+        const char* initDataType = "cenc";
+#if GST_CHECK_VERSION(1, 15, 0)
+        if (isSystemUUIDUnspecified)
+            initDataType = "webm";
+#endif
+        initializationDataEncountered(ASCIILiteral(initDataType), concatenatedInitDatas);
+    }
 }
 
 void MediaPlayerPrivateGStreamerBase::initializationDataEncountered(const String& initDataType, const InitData& initData)

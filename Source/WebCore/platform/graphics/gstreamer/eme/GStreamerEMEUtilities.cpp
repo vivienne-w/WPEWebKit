@@ -31,8 +31,10 @@ namespace WebCore {
 
 const char* GStreamerEMEUtilities::s_ClearKeyUUID = WEBCORE_GSTREAMER_EME_UTILITIES_CLEARKEY_UUID;
 const char* GStreamerEMEUtilities::s_ClearKeyKeySystem = "org.w3.clearkey";
+#if GST_CHECK_VERSION(1, 15, 0)
 const char* GStreamerEMEUtilities::s_UnspecifiedUUID = GST_PROTECTION_UNSPECIFIED_SYSTEM_ID;
 const char* GStreamerEMEUtilities::s_UnspecifiedKeySystem = "org.webkit.unspecifiedkeysystem";
+#endif
 
 #if USE(OPENCDM) || USE(PLAYREADY)
 const char* GStreamerEMEUtilities::s_PlayReadyUUID = WEBCORE_GSTREAMER_EME_UTILITIES_PLAYREADY_UUID;
