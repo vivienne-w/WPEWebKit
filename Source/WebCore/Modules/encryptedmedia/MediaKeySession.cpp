@@ -609,7 +609,7 @@ void MediaKeySession::enqueueMessage(MediaKeyMessageType messageType, const Shar
     m_eventQueue.enqueueEvent(WTFMove(messageEvent));
 }
 
-void MediaKeySession::issueMessage(CDMInstanceClient::MessageType type, Ref<SharedBuffer>&& message)
+void MediaKeySession::enqueueMessageWithTask(CDMInstanceClient::MessageType type, Ref<SharedBuffer>&& message)
 {
     m_taskQueue.enqueueTask([this, type, message = WTFMove(message)] () mutable {
         MediaKeyMessageType messageType;
@@ -628,7 +628,7 @@ void MediaKeySession::issueMessage(CDMInstanceClient::MessageType type, Ref<Shar
             break;
         }
 
-        enqueueMessage(messageType, WTFMove(message));
+        enqueueMessage(messageType, message.get());
     });
 }
 
