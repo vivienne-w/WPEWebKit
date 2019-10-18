@@ -349,47 +349,6 @@ void MediaPlayerPrivateGStreamer::commitLoad()
     updateStates();
 }
 
-#if PLATFORM(BCM_NEXUS)
-// utility function for bcm nexus seek functionality
-static void findDecoders(GstElement *element, GstElement **videoDecoder, GstElement **audioDecoder)
-{
-    if (!(videoDecoder || audioDecoder))
-        return;
-
-    if (GST_IS_BIN(element)) {
-        GstIterator* it = gst_bin_iterate_elements(GST_BIN(element));
-        GValue item = G_VALUE_INIT;
-        bool done = false;
-        while (!done) {
-            switch (gst_iterator_next(it, &item)) {
-                case GST_ITERATOR_OK:
-                {
-                    GstElement *next = GST_ELEMENT(g_value_get_object(&item));
-                    findDecoders(next, videoDecoder, audioDecoder);
-                    done = (!((videoDecoder && !*videoDecoder) || (audioDecoder && !*audioDecoder)));
-                    g_value_reset (&item);
-                    break;
-                }
-                case GST_ITERATOR_RESYNC:
-                    gst_iterator_resync (it);
-                    break;
-                case GST_ITERATOR_ERROR:
-                case GST_ITERATOR_DONE:
-                    done = true;
-                    break;
-            }
-        }
-        g_value_unset (&item);
-        gst_iterator_free(it);
-    } else if (videoDecoder && (GST_IS_VIDEO_DECODER(element) || g_str_has_suffix(G_OBJECT_TYPE_NAME(G_OBJECT(element)), "VideoDecoder")))
-        *videoDecoder = element;
-    else if (audioDecoder && (GST_IS_AUDIO_DECODER(element) || g_str_has_suffix(G_OBJECT_TYPE_NAME(G_OBJECT(element)), "AudioDecoder")))
-        *audioDecoder = element;
-    return;
-}
-#endif
-
-
 MediaTime MediaPlayerPrivateGStreamer::playbackPosition() const
 {
 
