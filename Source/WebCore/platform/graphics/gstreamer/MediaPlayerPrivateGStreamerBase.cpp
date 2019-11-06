@@ -77,6 +77,8 @@
 #define TEXTURE_COPIER_COLOR_CONVERT_FLAG VideoTextureCopierGStreamer::ColorConversion::ConvertARGBToRGBA
 #endif
 
+#define GST_GL_INPUT_CAPS_FORMAT "{ RGB16 }"
+
 #include <gst/app/gstappsink.h>
 
 #if USE(LIBEPOXY)
@@ -1162,11 +1164,13 @@ gboolean appSinkSinkQuery(GstPad* pad, GstObject* parent, GstQuery* query)
 
 GstElement* MediaPlayerPrivateGStreamerBase::createVideoSinkGL()
 {
+    printf("### %s\n", __PRETTY_FUNCTION__); fflush(stdout);
     if (!webkitGstCheckVersion(1, 8, 0))
         return nullptr;
 
     gboolean result = TRUE;
     GstElement* videoSink = gst_bin_new("webkitvideosinkbin");
+    GstElement* capsfilter = gst_element_factory_make("capsfilter", nullptr);
     GstElement* upload = gst_element_factory_make("glupload", nullptr);
     GstElement* colorconvert = gst_element_factory_make("glcolorconvert", nullptr);
     GstElement* appsink = createGLAppSink();
@@ -1186,14 +1190,17 @@ GstElement* MediaPlayerPrivateGStreamerBase::createVideoSinkGL()
         return nullptr;
     }
 
-    gst_bin_add_many(GST_BIN(videoSink), upload, colorconvert, appsink, nullptr);
+    gst_bin_add_many(GST_BIN(videoSink), capsfilter, upload, colorconvert, appsink, nullptr);
 
-    GRefPtr<GstCaps> caps = adoptGRef(gst_caps_from_string("video/x-raw(" GST_CAPS_FEATURE_MEMORY_GL_MEMORY "), format = (string) " GST_GL_CAPS_FORMAT));
+    GRefPtr<GstCaps> glMemoryCaps = adoptGRef(gst_caps_from_string("video/x-raw(" GST_CAPS_FEATURE_MEMORY_GL_MEMORY "), format = (string) " GST_GL_CAPS_FORMAT));
+    GRefPtr<GstCaps> inputCaps = adoptGRef(gst_caps_from_string("video/x-raw, format = (string) " GST_GL_INPUT_CAPS_FORMAT));
 
+    g_object_set(capsfilter, "caps", inputCaps.get(), nullptr);
+    result &= gst_element_link_pads(capsfilter, "src", upload, "sink");
     result &= gst_element_link_pads(upload, "src", colorconvert, "sink");
-    result &= gst_element_link_pads_filtered(colorconvert, "src", appsink, "sink", caps.get());
+    result &= gst_element_link_pads_filtered(colorconvert, "src", appsink, "sink", glMemoryCaps.get());
 
-    GRefPtr<GstPad> pad = adoptGRef(gst_element_get_static_pad(upload, "sink"));
+    GRefPtr<GstPad> pad = adoptGRef(gst_element_get_static_pad(capsfilter, "sink"));
     gst_element_add_pad(videoSink, gst_ghost_pad_new("sink", pad.get()));
 
     pad = adoptGRef(gst_element_get_static_pad(appsink, "sink"));
