@@ -862,7 +862,9 @@ const static HashSet<AtomicString>& codecSet()
             { VideoDecoder, "video/x-h264, stream-format=byte-stream", { "avc*"} },
             { VideoDecoder, "video/mpeg, mpegversion=(int){1,2}, systemstream=(boolean)false", { "mpeg" } },
             { VideoDecoder, "video/x-vp8", { "vp8", "x-vp8" } },
+#if !PLATFORM(RPI)
             { VideoDecoder, "video/x-vp9", { "vp9", "x-vp9" } },
+#endif
             { AudioDecoder, "audio/x-vorbis", { "vorbis", "x-vorbis" } },
             { AudioDecoder, "audio/x-opus", { "opus", "x-opus" } }
         } };
