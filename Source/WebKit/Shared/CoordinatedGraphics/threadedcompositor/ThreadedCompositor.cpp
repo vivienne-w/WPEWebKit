@@ -209,8 +209,23 @@ void ThreadedCompositor::renderNonCompositedWebGL()
 
 void ThreadedCompositor::renderLayerTree()
 {
+    static auto lastFrame = MonotonicTime::nan();
+
     if (m_nonCompositedWebGLEnabled) {
+        auto before = MonotonicTime::now();
         renderNonCompositedWebGL();
+        dataLogLn("NCrendering: ", (MonotonicTime::now() - before).milliseconds(), " ms");
+
+        if (!isnan(lastFrame)) {
+            auto now = MonotonicTime::now();
+            auto frame_time = now - lastFrame;
+            dataLog("Frame!", now - lastFrame);
+            dataLogIf(frame_time > Seconds(1.0 / 30.0), " ########## LONGFRAME!");
+            dataLogLn();
+            lastFrame = now;
+    } else {
+        lastFrame = MonotonicTime::now();
+    }
         return;
     }
 
