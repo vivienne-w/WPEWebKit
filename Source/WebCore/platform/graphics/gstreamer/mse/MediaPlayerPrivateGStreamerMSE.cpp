@@ -406,6 +406,8 @@ bool MediaPlayerPrivateGStreamerMSE::doSeek()
         return false;
     }
 
+    m_playbackRatePause = !m_playbackRate;
+
     // The samples will be enqueued in notifySeekNeedsData().
     GST_DEBUG("doSeek(): gst_element_seek() succeeded, returning true");
     return true;
