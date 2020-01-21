@@ -406,8 +406,6 @@ bool MediaPlayerPrivateGStreamerMSE::doSeek()
         return false;
     }
 
-    m_playbackRatePause = !m_playbackRate;
-
     // The samples will be enqueued in notifySeekNeedsData().
     GST_DEBUG("doSeek(): gst_element_seek() succeeded, returning true");
     return true;
@@ -451,6 +449,15 @@ void MediaPlayerPrivateGStreamerMSE::maybeFinishSeek()
 
 void MediaPlayerPrivateGStreamerMSE::updatePlaybackRate()
 {
+    if (m_playbackRatePause) {
+        GstState state;
+        GstState pending;
+
+        gst_element_get_state(m_pipeline.get(), &state, &pending, 0);
+        if (state != GST_STATE_PLAYING && pending != GST_STATE_PLAYING)
+            changePipelineState(GST_STATE_PLAYING);
+        m_playbackRatePause = false;
+    }
 }
 
 bool MediaPlayerPrivateGStreamerMSE::seeking() const
