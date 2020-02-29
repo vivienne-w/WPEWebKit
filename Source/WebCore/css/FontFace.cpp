@@ -29,6 +29,7 @@
 #include "CSSComputedStyleDeclaration.h"
 #include "CSSFontFaceSource.h"
 #include "CSSFontFeatureValue.h"
+#include "CSSFontSelector.h"
 #include "CSSFontStyleValue.h"
 #include "CSSParser.h"
 #include "CSSPrimitiveValueMappings.h"
@@ -56,6 +57,7 @@ static bool populateFontFaceWithArrayBuffer(CSSFontFace& fontFace, Ref<JSC::Arra
 ExceptionOr<Ref<FontFace>> FontFace::create(Document& document, const String& family, Source&& source, const Descriptors& descriptors)
 {
     auto result = adoptRef(*new FontFace(document.fontSelector()));
+    result->suspendIfNeeded();
 
     bool dataRequiresAsynchronousLoading = true;
 
@@ -120,19 +122,23 @@ ExceptionOr<Ref<FontFace>> FontFace::create(Document& document, const String& fa
 
 Ref<FontFace> FontFace::create(CSSFontFace& face)
 {
-    return adoptRef(*new FontFace(face));
+    auto fontFace = adoptRef(*new FontFace(face));
+    fontFace->suspendIfNeeded();
+    return fontFace;
 }
 
 FontFace::FontFace(CSSFontSelector& fontSelector)
-    : m_backing(CSSFontFace::create(&fontSelector, nullptr, this))
-    , m_loadedPromise(*this, &FontFace::loadedPromiseResolve)
+    : ActiveDOMObject(fontSelector.document())
+    , m_backing(CSSFontFace::create(&fontSelector, nullptr, this))
+    , m_loadedPromise(makeUniqueRef<LoadedPromise>(*this, &FontFace::loadedPromiseResolve))
 {
     m_backing->addClient(*this);
 }
 
 FontFace::FontFace(CSSFontFace& face)
-    : m_backing(face)
-    , m_loadedPromise(*this, &FontFace::loadedPromiseResolve)
+    : ActiveDOMObject(face.document())
+    , m_backing(face)
+    , m_loadedPromise(makeUniqueRef<LoadedPromise>(*this, &FontFace::loadedPromiseResolve))
 {
     m_backing->addClient(*this);
 }
@@ -433,24 +439,20 @@ void FontFace::fontStateChanged(CSSFontFace& face, CSSFontFace::Status, CSSFontF
     ASSERT_UNUSED(face, &face == m_backing.ptr());
     switch (newState) {
     case CSSFontFace::Status::Loading:
-        // We still need to resolve promises when loading completes, even if all references to use have fallen out of scope.
-        ref();
         break;
     case CSSFontFace::Status::TimedOut:
         break;
     case CSSFontFace::Status::Success:
         // FIXME: This check should not be needed, but because FontFace's are sometimes adopted after they have already
-        // gone through a load cycle, we can sometimes come back through here and try to resolve the promise again.  
-        if (!m_loadedPromise.isFulfilled())
-            m_loadedPromise.resolve(*this);
-        deref();
+        // gone through a load cycle, we can sometimes come back through here and try to resolve the promise again.
+        if (!m_loadedPromise->isFulfilled())
+            m_loadedPromise->resolve(*this);
         return;
     case CSSFontFace::Status::Failure:
         // FIXME: This check should not be needed, but because FontFace's are sometimes adopted after they have already
-        // gone through a load cycle, we can sometimes come back through here and try to resolve the promise again.  
-        if (!m_loadedPromise.isFulfilled())
-            m_loadedPromise.reject(Exception { NetworkError });
-        deref();
+        // gone through a load cycle, we can sometimes come back through here and try to resolve the promise again.
+        if (!m_loadedPromise->isFulfilled())
+            m_loadedPromise->reject(Exception { NetworkError });
         return;
     case CSSFontFace::Status::Pending:
         ASSERT_NOT_REACHED();
@@ -458,15 +460,39 @@ void FontFace::fontStateChanged(CSSFontFace& face, CSSFontFace::Status, CSSFontF
     }
 }
 
-auto FontFace::load() -> LoadedPromise&
+auto FontFace::loadForBindings() -> LoadedPromise&
 {
+    m_mayLoadedPromiseBeScriptObservable = true;
     m_backing->load();
-    return m_loadedPromise;
+    return m_loadedPromise.get();
+}
+
+auto FontFace::loadedForBindings() -> LoadedPromise&
+{
+    m_mayLoadedPromiseBeScriptObservable = true;
+    return m_loadedPromise.get();
 }
 
 FontFace& FontFace::loadedPromiseResolve()
 {
     return *this;
+}
+
+const char* FontFace::activeDOMObjectName() const
+{
+    return "FontFace";
+}
+
+bool FontFace::hasPendingActivity() const
+{
+    if (ActiveDOMObject::hasPendingActivity())
+        return true;
+    return !isContextStopped() && m_mayLoadedPromiseBeScriptObservable && !m_loadedPromise->isFulfilled();
+}
+
+bool FontFace::canSuspendForDocumentSuspension() const
+{
+    return !hasPendingActivity();
 }
 
 }

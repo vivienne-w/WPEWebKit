@@ -169,6 +169,8 @@ public:
     bool hasSVGFontFaceSource() const;
 #endif
 
+    Document* document() const;
+
 private:
     CSSFontFace(CSSFontSelector*, StyleRuleFontFace*, FontFace*, bool isLocalFallback);
 

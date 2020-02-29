@@ -1,3 +1,29 @@
+2020-02-28  Chris Dumez  <cdumez@apple.com>
+
+        Garbage collection prevents FontFace.loaded promise from getting resolved
+        https://bugs.webkit.org/show_bug.cgi?id=208382
+
+        Reviewed by Ryosuke Niwa.
+
+        Make sure the FontFace JS wrapper stays alive long enough to resolve the
+        loaded promise when it is observable by the page's script.
+
+        Test: fast/text/font-promises-gc.html
+
+        * css/CSSFontFace.cpp:
+        (WebCore::CSSFontFace::document const):
+        * css/CSSFontFace.h:
+        * css/FontFace.cpp:
+        (WebCore::FontFace::FontFace):
+        (WebCore::FontFace::fontStateChanged):
+        (WebCore::FontFace::loadForBindings):
+        (WebCore::FontFace::loadedForBindings):
+        (WebCore::FontFace::activeDOMObjectName const):
+        (WebCore::FontFace::hasPendingActivity const):
+        (WebCore::FontFace::load): Deleted.
+        * css/FontFace.h:
+        * css/FontFace.idl:
+
 2021-05-27  Brent Fulgham  <bfulgham@apple.com>
 
         Pass frame ref during navigationPolicyCompletionHandler
