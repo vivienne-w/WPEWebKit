@@ -28,6 +28,7 @@
 
 #include "GStreamerCommon.h"
 #include "GStreamerEMEUtilities.h"
+#include "Logging.h"
 #include "MainThreadNotifier.h"
 #include "MediaPlayerPrivate.h"
 #include "PlatformLayer.h"
@@ -37,6 +38,7 @@
 #include <wtf/Atomics.h>
 #include <wtf/Condition.h>
 #include <wtf/Forward.h>
+#include <wtf/LoggerHelper.h>
 #include <wtf/RunLoop.h>
 #include <wtf/WeakPtr.h>
 
@@ -117,7 +119,9 @@ class VideoTrackPrivateGStreamer;
 void registerWebKitGStreamerElements();
 
 // Use eager initialization for the WeakPtrFactory since we call makeWeakPtr() from another thread.
-class MediaPlayerPrivateGStreamer : public MediaPlayerPrivateInterface, public CanMakeWeakPtr<MediaPlayerPrivateGStreamer, WeakPtrFactoryInitialization::Eager>
+class MediaPlayerPrivateGStreamer : public MediaPlayerPrivateInterface
+    , public CanMakeWeakPtr<MediaPlayerPrivateGStreamer, WeakPtrFactoryInitialization::Eager>
+    , private LoggerHelper
 #if USE(TEXTURE_MAPPER_GL)
 #if USE(NICOSIA)
     , public Nicosia::ContentLayerTextureMapperImpl::Client
@@ -230,6 +234,14 @@ public:
 #if USE(GSTREAMER_GL)
     void flushCurrentBuffer();
 #endif
+
+    const Logger& logger() const final { return m_logger; }
+    const char* logClassName() const override { return "MediaPlayerPrivateGStreamer"; }
+    const void* logIdentifier() const final { return reinterpret_cast<const void*>(m_logIdentifier); }
+    WTFLogChannel& logChannel() const override;
+
+    const void* mediaPlayerLogIdentifier() { return logIdentifier(); }
+    const Logger& mediaPlayerLogger() { return logger(); }
 
 protected:
     enum MainThreadNotification {
@@ -543,6 +555,8 @@ private:
 #if USE(WPE_VIDEO_PLANE_DISPLAY_DMABUF)
     GUniquePtr<struct wpe_video_plane_display_dmabuf_source> m_wpeVideoPlaneDisplayDmaBuf;
 #endif
+    Ref<const Logger> m_logger;
+    const void* m_logIdentifier;
 };
 
 }

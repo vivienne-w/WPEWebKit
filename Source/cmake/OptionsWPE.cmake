@@ -80,6 +80,7 @@ WEBKIT_OPTION_DEFINE(ENABLE_GTKDOC "Whether or not to use generate gtkdoc." PUBL
 WEBKIT_OPTION_DEFINE(USE_OPENJPEG "Whether to enable support for JPEG2000 images." PUBLIC ON)
 WEBKIT_OPTION_DEFINE(USE_WOFF2 "Whether to enable support for WOFF2 Web Fonts." PUBLIC ON)
 WEBKIT_OPTION_DEFINE(ENABLE_WPE_QT_API "Whether to enable support for the Qt5/QML plugin" PUBLIC OFF)
+WEBKIT_OPTION_DEFINE(USE_SYSTEMD "Whether to enable journald logging" PUBLIC ON)
 
 # Private options specific to the WPE port.
 WEBKIT_OPTION_DEFINE(USE_GSTREAMER_HOLEPUNCH "Whether to enable GStreamer holepunch" PRIVATE OFF)
@@ -184,6 +185,16 @@ endif ()
 
 if (ENABLE_ENCRYPTED_MEDIA AND ENABLE_THUNDER)
   find_package(Thunder REQUIRED)
+endif ()
+
+if (USE_SYSTEMD)
+    find_package(Systemd)
+    if (Systemd_FOUND)
+        message(STATUS "Release logs will be sent to the Systemd journal")
+        SET_AND_EXPOSE_TO_BUILD(USE_JOURNALD TRUE)
+    else ()
+        message(FATAL_ERROR "libsystemd is needed for USE_SYSTEMD")
+    endif ()
 endif ()
 
 add_definitions(-DBUILDING_WPE__=1)

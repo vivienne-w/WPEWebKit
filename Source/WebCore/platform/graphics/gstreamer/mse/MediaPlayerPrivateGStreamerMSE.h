@@ -82,6 +82,8 @@ public:
 
     PlaybackPipeline* playbackPipeline() const { return m_playbackPipeline.get(); }
 
+    WTFLogChannel& logChannel() const final { return WebCore::LogMediaSource; }
+
 private:
     friend class MediaPlayerFactoryGStreamerMSE;
     static void getSupportedTypes(HashSet<String, ASCIICaseInsensitiveHash>&);

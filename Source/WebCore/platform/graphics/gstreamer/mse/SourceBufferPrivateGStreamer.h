@@ -41,12 +41,17 @@
 #include "SourceBufferPrivate.h"
 #include "SourceBufferPrivateClient.h"
 #include "WebKitMediaSourceGStreamer.h"
+#include <wtf/LoggerHelper.h>
 
 namespace WebCore {
 
 class MediaSourcePrivateGStreamer;
 
-class SourceBufferPrivateGStreamer final : public SourceBufferPrivate {
+class SourceBufferPrivateGStreamer final : public SourceBufferPrivate
+#if !RELEASE_LOG_DISABLED
+    , private LoggerHelper
+#endif
+{
 
 public:
     static Ref<SourceBufferPrivateGStreamer> create(MediaSourcePrivateGStreamer*, const ContentType&, MediaPlayerPrivateGStreamerMSE&);
@@ -99,6 +104,11 @@ private:
     bool m_isReadyForMoreSamples = true;
     bool m_notifyWhenReadyForMoreSamples = false;
     AtomString m_trackId;
+
+#if !RELEASE_LOG_DISABLED
+    Ref<const Logger> m_logger;
+    const void* m_logIdentifier;
+#endif
 };
 
 }

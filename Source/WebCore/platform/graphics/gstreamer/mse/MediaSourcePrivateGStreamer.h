@@ -39,6 +39,7 @@
 
 #include <wtf/Forward.h>
 #include <wtf/HashSet.h>
+#include <wtf/LoggerHelper.h>
 
 typedef struct _WebKitMediaSrc WebKitMediaSrc;
 
@@ -74,6 +75,15 @@ public:
 
     std::unique_ptr<PlatformTimeRanges> buffered();
 
+#if !RELEASE_LOG_DISABLED
+    const Logger& logger() const final { return m_logger; }
+    const char* logClassName() const override { return "MediaSourcePrivateGStreamer"; }
+    const void* logIdentifier() const final { return m_logIdentifier; }
+    WTFLogChannel& logChannel() const final;
+
+    const void* nextSourceBufferLogIdentifier() { return childLogIdentifier(++m_nextSourceBufferID); }
+#endif
+
 private:
     MediaSourcePrivateGStreamer(MediaSourcePrivateClient&, MediaPlayerPrivateGStreamerMSE&);
 
@@ -81,6 +91,11 @@ private:
     HashSet<SourceBufferPrivateGStreamer*> m_activeSourceBuffers;
     Ref<MediaSourcePrivateClient> m_mediaSource;
     MediaPlayerPrivateGStreamerMSE& m_playerPrivate;
+#if !RELEASE_LOG_DISABLED
+    Ref<const Logger> m_logger;
+    const void* m_logIdentifier;
+    uint64_t m_nextSourceBufferID { 0 };
+#endif
 };
 
 }
