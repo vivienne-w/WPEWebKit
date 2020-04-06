@@ -1,3 +1,17 @@
+2020-04-06  Cathie Chen  <cathiechen@igalia.com>
+
+        The change of zoom shouldn't affect ResizeObserverSize
+        https://bugs.webkit.org/show_bug.cgi?id=209947
+
+        Reviewed by Simon Fraser.
+
+        Zoom in/out shouldn't affect ResizeObserverSize. Use adjustLayoutUnitForAbsoluteZoom instead.
+
+        Test: imported/w3c/web-platform-tests/resize-observer/resize-observer-with-zoom.html
+
+        * page/ResizeObservation.cpp:
+        (WebCore::ResizeObservation::computeObservedSize const):
+
 2019-08-18  Cathie Chen  <cathiechen@igalia.com>
 
         Crash in Document::deliverResizeObservations
