@@ -381,7 +381,7 @@ void PlaybackPipeline::markEndOfStream(MediaSourcePrivate::EndOfStreamStatus)
         gst_app_src_end_of_stream(appsrc);
 }
 
-GstPadProbeReturn segmentFixerProbe(GstPad*, GstPadProbeInfo* info, gpointer)
+GstPadProbeReturn segmentFixerProbe(GstPad* pad, GstPadProbeInfo* info, gpointer userData)
 {
     GstEvent* event = GST_EVENT(info->data);
 
@@ -391,11 +391,16 @@ GstPadProbeReturn segmentFixerProbe(GstPad*, GstPadProbeInfo* info, gpointer)
     GstSegment* segment = nullptr;
     gst_event_parse_segment(event, const_cast<const GstSegment**>(&segment));
 
-    GST_TRACE("Fixed segment base time from %" GST_TIME_FORMAT " to %" GST_TIME_FORMAT,
-        GST_TIME_ARGS(segment->base), GST_TIME_ARGS(segment->start));
+    MediaTime seekTime(*static_cast<MediaTime*>(userData));
+    if (seekTime.isInvalid())
+        seekTime = MediaTime::zeroTime();
 
-    segment->base = segment->start;
+    GUniquePtr<GstSegment> originalSegment(gst_segment_copy(segment));
+    segment->base = segment->start - toGstClockTime(seekTime);
     segment->flags = static_cast<GstSegmentFlags>(0);
+
+    GST_TRACE("Segment at %s: %" GST_SEGMENT_FORMAT ", replaced by: %" GST_SEGMENT_FORMAT ", last seekTime: %s",
+        GST_ELEMENT_NAME(GST_PAD_PARENT(pad)), originalSegment.get(), segment, seekTime.toString().utf8().data());
 
     return GST_PAD_PROBE_REMOVE;
 }
@@ -472,7 +477,7 @@ void PlaybackPipeline::flush(AtomicString trackId)
     GRefPtr<GstPad> sinkPad = adoptGRef(gst_element_get_static_pad(appsrc, "src"));
     GRefPtr<GstPad> srcPad = sinkPad ? adoptGRef(gst_pad_get_peer(sinkPad.get())) : nullptr;
     if (srcPad)
-        gst_pad_add_probe(srcPad.get(), GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM, segmentFixerProbe, nullptr, nullptr);
+        gst_pad_add_probe(srcPad.get(), GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM, segmentFixerProbe, &m_webKitMediaSrc->priv->seekTime, nullptr);
 
     GST_TRACE("Sending new seamless segment: [%" GST_TIME_FORMAT ", %" GST_TIME_FORMAT "], rate: %f",
         GST_TIME_ARGS(segment->start), GST_TIME_ARGS(segment->stop), segment->rate);
