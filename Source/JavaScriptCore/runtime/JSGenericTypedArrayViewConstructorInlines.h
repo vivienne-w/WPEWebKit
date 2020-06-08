@@ -27,6 +27,7 @@
 
 #include "BuiltinNames.h"
 #include "Error.h"
+#include "HeapInlines.h"
 #include "IteratorOperations.h"
 #include "JSArrayBuffer.h"
 #include "JSCJSValueInlines.h"

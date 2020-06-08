@@ -32,6 +32,7 @@
 #include "DeferGC.h"
 #include "FreeListInlines.h"
 #include "Handle.h"
+#include "HeapInlines.h"
 #include "IsoSubspaceInlines.h"
 #include "JSCast.h"
 #include "JSDestructibleObject.h"
