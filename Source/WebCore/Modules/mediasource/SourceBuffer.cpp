@@ -1498,6 +1498,16 @@ void SourceBuffer::appendError(bool decodeErrorParam)
 
 void SourceBuffer::sourceBufferPrivateDidReceiveSample(MediaSample& sample)
 {
+    printf("### %s: MediaSample %p trackId=%s PTS=%s DUR=%s DTS=%s, %.0fx%.0f %s%s\n", __PRETTY_FUNCTION__,
+           &sample,
+           sample.trackID().string().utf8().data(),
+           sample.presentationTime().toString().utf8().data(),
+           sample.duration().toString().utf8().data(),
+           sample.decodeTime().toString().utf8().data(),
+           sample.presentationSize().width(), sample.presentationSize().height(),
+           sample.isSync() ? "[SYNC]" : "",
+           sample.isNonDisplaying() ? "[NON-DISPLAYING]" : ""); fflush(stdout);
+
     if (isRemoved())
         return;
 
@@ -1514,6 +1524,8 @@ void SourceBuffer::sourceBufferPrivateDidReceiveSample(MediaSample& sample)
 
     // 3.5.8 Coded Frame Processing
     // http://www.w3.org/TR/media-source/#sourcebuffer-coded-frame-processing
+
+    printf("### %s: (P1)\n", __PRETTY_FUNCTION__); fflush(stdout);
 
     // When complete coded frames have been parsed by the segment parser loop then the following steps
     // are run:
@@ -1707,19 +1719,63 @@ void SourceBuffer::sourceBufferPrivateDidReceiveSample(MediaSample& sample)
             }
         }
 
+        printf("### %s: (P2)\n", __PRETTY_FUNCTION__); fflush(stdout);
+
+        // @@@
+
+        printf("### %s: presentationTimestamp=%s, trackBuffer.highestPresentationTimestamp=%s, trackBuffer.lastFrameDuration=%s\n", __PRETTY_FUNCTION__,
+               presentationTimestamp.toString().utf8().data(),
+               trackBuffer.highestPresentationTimestamp.toString().utf8().data(),
+               trackBuffer.lastFrameDuration.toString().utf8().data()); fflush(stdout);
+
         // 1.15 Remove existing coded frames in track buffer:
         // If highest presentation timestamp for track buffer is not set:
         if (trackBuffer.highestPresentationTimestamp.isInvalid()) {
+            printf("### %s: (P3)\n", __PRETTY_FUNCTION__); fflush(stdout);
+
             // Remove all coded frames from track buffer that have a presentation timestamp greater than or
             // equal to presentation timestamp and less than frame end timestamp.
             auto iter_pair = trackBuffer.samples.presentationOrder().findSamplesBetweenPresentationTimes(presentationTimestamp, frameEndTimestamp);
-            if (iter_pair.first != trackBuffer.samples.presentationOrder().end())
+            if (iter_pair.first != trackBuffer.samples.presentationOrder().end()) {
+                const char* firstPts = "<invalid>";
+                const char* firstDts = "<invalid>";
+                const char* secondPts = "<invalid>";
+                const char* secondDts = "<invalid>";
+
+                if (iter_pair.first != trackBuffer.samples.presentationOrder().end()) {
+                    printf("### %s: (X1)\n", __PRETTY_FUNCTION__);
+                    std::pair<const WTF::MediaTime, WTF::RefPtr<WebCore::MediaSample> > pair = *(iter_pair.first);
+                    printf("### %s: (X2)\n", __PRETTY_FUNCTION__);
+                    const WTF::RefPtr<WebCore::MediaSample>& sampleRefPtr = pair.second;
+                    printf("### %s: (X3)\n", __PRETTY_FUNCTION__);
+                    firstPts = sampleRefPtr->presentationTime().toString().utf8().data();
+                    printf("### %s: (X4)\n", __PRETTY_FUNCTION__);
+                    firstDts = sampleRefPtr->decodeTime().toString().utf8().data();
+                    printf("### %s: (X5)\n", __PRETTY_FUNCTION__);
+                }
+                if (iter_pair.second != trackBuffer.samples.presentationOrder().end()) {
+                    printf("### %s: (Y1)\n", __PRETTY_FUNCTION__);
+                    std::pair<const WTF::MediaTime, WTF::RefPtr<WebCore::MediaSample> > pair = *(iter_pair.second);
+                    printf("### %s: (Y2)\n", __PRETTY_FUNCTION__);
+                    const WTF::RefPtr<WebCore::MediaSample>& sampleRefPtr = pair.second;
+                    printf("### %s: (Y3)\n", __PRETTY_FUNCTION__);
+                    secondPts = sampleRefPtr->presentationTime().toString().utf8().data();
+                    printf("### %s: (Y4)\n", __PRETTY_FUNCTION__);
+                    secondDts = sampleRefPtr->decodeTime().toString().utf8().data();
+                    printf("### %s: (Y5)\n", __PRETTY_FUNCTION__);
+                }
+                printf("### %s: (1) erasedSamples.addRange(PTS=%s DTS=%s, PTS=%s DTS=%s)\n", __PRETTY_FUNCTION__,
+                       firstPts, firstDts, secondPts, secondDts); fflush(stdout);
+
                 erasedSamples.addRange(iter_pair.first, iter_pair.second);
+            }
         }
 
         const MediaTime contiguousFrameTolerance = MediaTime(1, 1000);
         // If highest presentation timestamp for track buffer is set and less than or equal to presentation timestamp
-        if (trackBuffer.highestPresentationTimestamp.isValid() && trackBuffer.highestPresentationTimestamp <= presentationTimestamp) {
+        if (trackBuffer.highestPresentationTimestamp.isValid() && trackBuffer.highestPresentationTimestamp - contiguousFrameTolerance <= presentationTimestamp) {
+            printf("### %s: (P4)\n", __PRETTY_FUNCTION__); fflush(stdout);
+
             // Remove all coded frames from track buffer that have a presentation timestamp greater than highest
             // presentation timestamp and less than or equal to frame end timestamp.
             do {
@@ -1731,19 +1787,58 @@ void SourceBuffer::sourceBufferPrivateDidReceiveSample(MediaSample& sample)
                     break;
 
                 MediaTime highestBufferedTime = trackBuffer.buffered.maximumBufferedTime();
-                MediaTime eraseBeginTime = trackBuffer.highestPresentationTimestamp;
+                // We don't want to always apply the full tolerance here in case
+                // highestPresentationTimestamp - contiguousFrameTolerance <= presentationTimestamp,
+                // but highestPresentationTimestamp > presentationTimestamp.
+                MediaTime eraseBeginTime = std::min(trackBuffer.highestPresentationTimestamp, presentationTimestamp);
                 MediaTime eraseEndTime = frameEndTimestamp - contiguousFrameTolerance;
 
                 PresentationOrderSampleMap::iterator_range range;
-                if (highestBufferedTime - trackBuffer.highestPresentationTimestamp < trackBuffer.lastFrameDuration)
+                if (highestBufferedTime - trackBuffer.highestPresentationTimestamp < trackBuffer.lastFrameDuration) {
+                    printf("### %s: (A)\n", __PRETTY_FUNCTION__); fflush(stdout);
                     // If the new frame is at the end of the buffered ranges, perform a sequential scan from end (O(1)).
                     range = trackBuffer.samples.presentationOrder().findSamplesBetweenPresentationTimesFromEnd(eraseBeginTime, eraseEndTime);
-                else
+                } else {
+                    printf("### %s: (B)\n", __PRETTY_FUNCTION__); fflush(stdout);
                     // In any other case, perform a binary search (O(log(n)).
                     range = trackBuffer.samples.presentationOrder().findSamplesBetweenPresentationTimes(eraseBeginTime, eraseEndTime);
+                }
 
-                if (range.first != trackBuffer.samples.presentationOrder().end())
+                if (range.first != trackBuffer.samples.presentationOrder().end()) {
+                    const char* firstPts = "<invalid>";
+                    const char* firstDts = "<invalid>";
+                    const char* secondPts = "<invalid>";
+                    const char* secondDts = "<invalid>";
+
+                    if (range.first != trackBuffer.samples.presentationOrder().end()) {
+                        printf("### %s: (X1)\n", __PRETTY_FUNCTION__);
+                        std::pair<const WTF::MediaTime, WTF::RefPtr<WebCore::MediaSample> > pair = *(range.first);
+                        printf("### %s: (X2)\n", __PRETTY_FUNCTION__);
+                        const WTF::RefPtr<WebCore::MediaSample>& sampleRefPtr = pair.second;
+                        printf("### %s: (X3)\n", __PRETTY_FUNCTION__);
+                        firstPts = sampleRefPtr->presentationTime().toString().utf8().data();
+                        printf("### %s: (X4)\n", __PRETTY_FUNCTION__);
+                        firstDts = sampleRefPtr->decodeTime().toString().utf8().data();
+                        printf("### %s: (X5)\n", __PRETTY_FUNCTION__);
+                    }
+                    if (range.second != trackBuffer.samples.presentationOrder().end()) {
+                        printf("### %s: (Y1)\n", __PRETTY_FUNCTION__);
+                        std::pair<const WTF::MediaTime, WTF::RefPtr<WebCore::MediaSample> > pair = *(range.second);
+                        printf("### %s: (Y2)\n", __PRETTY_FUNCTION__);
+                        const WTF::RefPtr<WebCore::MediaSample>& sampleRefPtr = pair.second;
+                        printf("### %s: (Y3)\n", __PRETTY_FUNCTION__);
+                        secondPts = sampleRefPtr->presentationTime().toString().utf8().data();
+                        printf("### %s: (Y4)\n", __PRETTY_FUNCTION__);
+                        secondDts = sampleRefPtr->decodeTime().toString().utf8().data();
+                        printf("### %s: (Y5)\n", __PRETTY_FUNCTION__);
+                    }
+
+                    printf("### %s: (2) erasedSamples.addRange(PTS=%s DTS=%s, PTS=%s DTS=%s)\n", __PRETTY_FUNCTION__,
+                           firstPts, firstDts, secondPts, secondDts); fflush(stdout);
                     erasedSamples.addRange(range.first, range.second);
+                } else {
+                    printf("### %s: No samples to erase\n", __PRETTY_FUNCTION__); fflush(stdout);
+                }
             } while (false);
         }
 
