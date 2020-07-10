@@ -760,18 +760,26 @@ void AppendPipeline::appsinkNewSample(GstSample* sample)
         return;
     }
 
+    if (!m_presentationSize.isEmpty()) {
+        GstCaps* caps = gst_sample_get_caps(sample);
+        std::optional<FloatSize> size = getVideoResolutionFromCaps(caps);
+        if (size.has_value() && size.value() != m_presentationSize)
+            m_presentationSize = size.value();
+    }
+
     // This increases sample refcount, as GStreamerMediaSample manages its own reference.
     // We must still unref our own current ref before exiting this method.
     RefPtr<GStreamerMediaSample> mediaSample = WebCore::GStreamerMediaSample::create(sample, m_presentationSize, trackId());
 
-    GST_TRACE("append: trackId=%s PTS=%s DTS=%s DUR=%s presentationSize=%.0fx%.0f %s%s",
+    GST_TRACE("append: MediaSample %p trackId=%s PTS=%s DTS=%s DUR=%s presentationSize=%.0fx%.0f %s%s",
+        dynamic_cast<MediaSample*>(mediaSample.get()),
         mediaSample->trackID().string().utf8().data(),
         mediaSample->presentationTime().toString().utf8().data(),
         mediaSample->decodeTime().toString().utf8().data(),
         mediaSample->duration().toString().utf8().data(),
         mediaSample->presentationSize().width(), mediaSample->presentationSize().height(),
-        mediaSample->flags() == MediaSample::SampleFlags::IsSync ? "[SYNC]" : "",
-        mediaSample->flags() == MediaSample::SampleFlags::IsNonDisplaying ? "[NON-DISPLAYING]" : "");
+        mediaSample->isSync() ? "[SYNC]" : "",
+        mediaSample->isNonDisplaying() ? "[NON-DISPLAYING]" : "");
 
     // If we're beyond the duration, ignore this sample and the remaining ones.
     MediaTime duration = m_mediaSourceClient->duration();
