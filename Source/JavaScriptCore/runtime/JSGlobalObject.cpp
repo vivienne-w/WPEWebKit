@@ -64,6 +64,8 @@
 #include "ErrorConstructor.h"
 #include "ErrorPrototype.h"
 #include "Exception.h"
+#include "FinalizationRegistryConstructor.h"
+#include "FinalizationRegistryPrototype.h"
 #include "FunctionConstructor.h"
 #include "FunctionPrototype.h"
 #include "GeneratorFunctionConstructor.h"
@@ -93,6 +95,7 @@
 #include "JSDataView.h"
 #include "JSDataViewPrototype.h"
 #include "JSDollarVM.h"
+#include "JSFinalizationRegistry.h"
 #include "JSFunction.h"
 #include "JSGenerator.h"
 #include "JSGeneratorFunction.h"
@@ -346,6 +349,7 @@ const GlobalObjectMethodTable JSGlobalObject::s_globalObjectMethodTable = {
     nullptr, // moduleLoaderCreateImportMetaProperties
     nullptr, // moduleLoaderEvaluate
     nullptr, // promiseRejectionTracker
+    &reportUncaughtExceptionAtEventLoop,
     nullptr, // defaultLanguage
     nullptr, // compileStreaming
     nullptr, // instantiateStreaming
@@ -2087,6 +2091,11 @@ void JSGlobalObject::queueMicrotask(Ref<Microtask>&& task)
     }
 
     vm().queueMicrotask(*this, WTFMove(task));
+}
+
+void JSGlobalObject::reportUncaughtExceptionAtEventLoop(JSGlobalObject*, Exception* exception)
+{
+    dataLogLn("Uncaught Exception at run loop: ", exception->value());
 }
 
 void JSGlobalObject::setDebugger(Debugger* debugger)

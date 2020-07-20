@@ -777,6 +777,8 @@ runtime/ExceptionScope.cpp
 runtime/ExecutableBase.cpp
 runtime/FileBasedFuzzerAgent.cpp
 runtime/FileBasedFuzzerAgentBase.cpp
+runtime/FinalizationRegistryConstructor.cpp
+runtime/FinalizationRegistryPrototype.cpp
 runtime/FunctionConstructor.cpp
 runtime/FunctionExecutable.cpp
 runtime/FunctionExecutableDump.cpp
@@ -835,6 +837,7 @@ runtime/JSDataView.cpp
 runtime/JSDataViewPrototype.cpp
 runtime/JSDateMath.cpp
 runtime/JSDestructibleObjectHeapCellType.cpp
+runtime/JSFinalizationRegistry.cpp
 runtime/JSFunction.cpp
 runtime/JSGenerator.cpp
 runtime/JSGeneratorFunction.cpp
@@ -917,7 +920,7 @@ runtime/Operations.cpp
 runtime/Options.cpp
 runtime/PredictionFileCreatingFuzzerAgent.cpp
 runtime/ProgramExecutable.cpp
-runtime/PromiseTimer.cpp
+runtime/DeferredWorkTimer.cpp
 runtime/PropertyDescriptor.cpp
 runtime/PropertySlot.cpp
 runtime/PropertyTable.cpp
