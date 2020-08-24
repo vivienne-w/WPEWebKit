@@ -1041,16 +1041,16 @@ void NetworkDataTaskSoup::didFail(const ResourceError& error)
     dispatchDidCompleteWithError(error);
 }
 
-void NetworkDataTaskSoup::networkEventCallback(SoupMessage* soupMessage, GSocketClientEvent event, GIOStream*, NetworkDataTaskSoup* task)
+void NetworkDataTaskSoup::networkEventCallback(SoupMessage* soupMessage, GSocketClientEvent event, GIOStream* stream, NetworkDataTaskSoup* task)
 {
     if (task->state() == State::Canceling || task->state() == State::Completed || !task->m_client)
         return;
 
     ASSERT(task->m_soupMessage.get() == soupMessage);
-    task->networkEvent(event);
+    task->networkEvent(stream, event);
 }
 
-void NetworkDataTaskSoup::networkEvent(GSocketClientEvent event)
+void NetworkDataTaskSoup::networkEvent(GIOStream* stream, GSocketClientEvent event)
 {
     Seconds deltaTime = MonotonicTime::now() - m_startTime;
     switch (event) {
@@ -1063,9 +1063,20 @@ void NetworkDataTaskSoup::networkEvent(GSocketClientEvent event)
     case G_SOCKET_CLIENT_CONNECTING:
         m_networkLoadMetrics.connectStart = deltaTime;
         break;
-    case G_SOCKET_CLIENT_CONNECTED:
-        // Web Timing considers that connection time involves dns, proxy & TLS negotiation...
-        // so we better pick G_SOCKET_CLIENT_COMPLETE for connectEnd
+    case G_SOCKET_CLIENT_CONNECTED: {
+            // Web Timing considers that connection time involves dns, proxy & TLS negotiation...
+            // so we better pick G_SOCKET_CLIENT_COMPLETE for connectEnd
+            GSocketConnection* socketconnection = G_SOCKET_CONNECTION(stream);
+
+            if( socketconnection != nullptr ) {
+
+                GSocket* socket = g_socket_connection_get_socket(socketconnection);
+
+                if( socket != nullptr ) {
+                    g_socket_set_keepalive(socket, TRUE);
+                }
+            }
+        }
         break;
     case G_SOCKET_CLIENT_PROXY_NEGOTIATING:
         break;
@@ -1076,8 +1087,8 @@ void NetworkDataTaskSoup::networkEvent(GSocketClientEvent event)
         break;
     case G_SOCKET_CLIENT_TLS_HANDSHAKED:
         break;
-    case G_SOCKET_CLIENT_COMPLETE:
-        m_networkLoadMetrics.connectEnd = deltaTime;
+    case G_SOCKET_CLIENT_COMPLETE: 
+            m_networkLoadMetrics.connectEnd = deltaTime;
         break;
     default:
         ASSERT_NOT_REACHED();
