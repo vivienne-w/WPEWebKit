@@ -49,6 +49,11 @@ bool InjectedBundle::initialize(const WebProcessCreationParameters&, API::Object
         return false;
     }
 
+    if (!initializationUserData) {
+        g_warning("Error: initializationUserData for injected bundle should not be null.");
+        return false;
+    }
+
     initializeFunction(toAPI(this), toAPI(initializationUserData));
     return true;
 }
