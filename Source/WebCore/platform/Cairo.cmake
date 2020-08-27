@@ -26,3 +26,5 @@ list(APPEND WebCore_SOURCES
 list(APPEND WebCore_LIBRARIES
     ${CAIRO_LIBRARIES}
 )
+
+add_definitions(${EGL_CFLAGS})
