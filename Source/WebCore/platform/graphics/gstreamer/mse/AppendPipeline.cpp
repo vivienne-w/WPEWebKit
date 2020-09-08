@@ -1313,6 +1313,14 @@ void AppendPipeline::handleProtectedBufferProbeInformation(GstPadProbeInfo* info
     gst_structure_set_value(protectionMeta->info, "stream-encryption-events", &m_cachedProtectionEvents);
 }
 
+void AppendPipeline::injectProtectionEvent(GRefPtr<GstEvent> protectionEvent)
+{
+    GST_DEBUG("Distributing protectionEvent %" GST_PTR_FORMAT " to AppendPipeline %s on demuxer %" GST_PTR_FORMAT, protectionEvent.get(), m_sourceBufferPrivate->type().raw().utf8().data(), m_demux.get());
+    GRefPtr<GstPad> demuxerSinkPad = adoptGRef(gst_element_get_static_pad(m_demux.get(), "sink"));
+    bool wasHandled = gst_pad_send_event(demuxerSinkPad.get(), protectionEvent.leakRef());
+    GST_DEBUG("Protection event %s handled by %" GST_PTR_FORMAT, wasHandled ? "was" : "was NOT", demuxerSinkPad.get());
+}
+
 static GstPadProbeReturn appendPipelineAppsinkPadProtectionProbe(GstPad*, GstPadProbeInfo* info, struct PadProbeInformation *padProbeInformation)
 {
     WebCore::AppendPipeline* appendPipeline = padProbeInformation->appendPipeline;
