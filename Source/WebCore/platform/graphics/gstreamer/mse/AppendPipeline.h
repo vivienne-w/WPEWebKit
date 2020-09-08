@@ -97,6 +97,7 @@ public:
     void demuxerIsDoneSendingProtectionEvents(const GstStructure*);
     void cacheProtectionEvent(GstEvent*);
     void handleProtectedBufferProbeInformation(GstPadProbeInfo*);
+    void injectProtectionEvent(GRefPtr<GstEvent>);
 #endif
 
 private:
