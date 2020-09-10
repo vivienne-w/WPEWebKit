@@ -1196,9 +1196,46 @@ void AppendPipeline::connectDemuxerSrcPadToAppsink(GstPad* demuxerSrcPad)
     m_padAddRemoveCondition.notifyOne();
 }
 
-void AppendPipeline::disconnectDemuxerSrcPadFromAppsinkFromAnyThread(GstPad*)
+void AppendPipeline::disconnectDemuxerSrcPadFromAppsinkFromAnyThread(GstPad* demuxerSrcPad)
 {
     GST_DEBUG_BIN_TO_DOT_FILE_WITH_TS(GST_BIN(m_pipeline.get()), GST_DEBUG_GRAPH_SHOW_ALL, "pad-removed-before");
+
+    // Reconnect the other pad if it's the only remaining after removing this one and wasn't connected yet (has a black hole probe).
+    if (m_demux->numsrcpads == 1) {
+        auto remainingPad = GST_PAD(m_demux->srcpads->data);
+
+        auto probeId = GPOINTER_TO_ULONG(g_object_get_data(G_OBJECT(remainingPad), "blackHoleProbeId"));
+        if (remainingPad && probeId) {
+            auto oldPeerPad = adoptGRef(gst_element_get_static_pad(m_appsink.get(), "sink"));
+            while (gst_pad_is_linked(oldPeerPad.get())) {
+                // Get sink pad of the parser before appsink.
+                // All the expected elements between the demuxer and appsink are supposed to have pads named "sink".
+                oldPeerPad = adoptGRef(gst_pad_get_peer(oldPeerPad.get()));
+                auto element = adoptGRef(gst_pad_get_parent_element(oldPeerPad.get()));
+                oldPeerPad = adoptGRef(gst_element_get_static_pad(element.get(), "sink"));
+                ASSERT(oldPeerPad);
+            }
+
+            gst_pad_remove_probe(remainingPad, probeId);
+
+            // FIXME: Unlike in upstream (2020-09-10), demuxerSrcPad and oldPeerPad always have null caps at this point, so it doesn't
+            // make much sense to try to check if they're incompatible (see original patch).
+
+            GST_DEBUG("The remaining pad has a blackHoleProbe, reconnecting as main pad. oldPad: %" GST_PTR_FORMAT ", newPad: %" GST_PTR_FORMAT ", peerPad: %" GST_PTR_FORMAT, demuxerSrcPad, remainingPad, oldPeerPad.get());
+
+            gst_pad_link(remainingPad, oldPeerPad.get());
+            if (m_parser)
+                gst_element_set_state(m_parser.get(), GST_STATE_NULL);
+            gst_element_set_state(m_appsink.get(), GST_STATE_NULL);
+            gst_element_set_state(m_appsink.get(), GST_STATE_PLAYING);
+            if (m_parser)
+                gst_element_set_state(m_parser.get(), GST_STATE_PLAYING);
+
+            GST_DEBUG_BIN_TO_DOT_FILE_WITH_TS(GST_BIN(m_pipeline.get()), GST_DEBUG_GRAPH_SHOW_ALL, "webkit-after-relink");
+
+            return;
+        }
+    }
 
     GST_DEBUG("Disconnecting appsink");
 
