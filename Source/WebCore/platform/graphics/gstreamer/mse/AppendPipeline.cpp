@@ -1313,7 +1313,7 @@ void AppendPipeline::handleProtectedBufferProbeInformation(GstPadProbeInfo* info
     gst_structure_set_value(protectionMeta->info, "stream-encryption-events", &m_cachedProtectionEvents);
 }
 
-void AppendPipeline::injectProtectionEvent(GRefPtr<GstEvent> protectionEvent)
+void AppendPipeline::injectProtectionEvent(GRefPtr<GstEvent>&& protectionEvent)
 {
     GST_DEBUG("Distributing protectionEvent %" GST_PTR_FORMAT " to AppendPipeline %s on demuxer %" GST_PTR_FORMAT, protectionEvent.get(), m_sourceBufferPrivate->type().raw().utf8().data(), m_demux.get());
     GRefPtr<GstPad> demuxerSinkPad = adoptGRef(gst_element_get_static_pad(m_demux.get(), "sink"));

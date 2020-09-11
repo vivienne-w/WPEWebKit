@@ -1093,11 +1093,11 @@ void MediaPlayerPrivateGStreamerMSE::cdmInstanceAttached(const CDMInstance& inst
 
     GST_DEBUG("MSE: cdmInstanceAttached: keySystem: %s, systemId: %s, distributing to %d append pipelines", instance.keySystem().utf8().data(), systemId, m_appendPipelinesMap.size());
 
-    for (auto iterator : m_appendPipelinesMap) {
-        GRefPtr<GstBuffer> data = adoptGRef(gst_buffer_new());
-        GRefPtr<GstEvent> protectionEvent = adoptGRef(gst_event_new_protection(systemId, data.get(), "webkit-media-player-synthesized"));
-        iterator.value->injectProtectionEvent(protectionEvent);
-    }
+    GRefPtr<GstBuffer> data = adoptGRef(gst_buffer_new());
+    GRefPtr<GstEvent> protectionEvent = adoptGRef(gst_event_new_protection(systemId, data.get(), "webkit-media-player-synthesized"));
+    GST_TRACE("MSE: cdmInstanceAttached: distributing protectionEvent %" GST_PTR_FORMAT, protectionEvent.get());
+    for (auto iterator : m_appendPipelinesMap)
+        iterator.value->injectProtectionEvent(protectionEvent.get());
 }
 #endif
 
