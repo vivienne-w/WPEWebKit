@@ -354,7 +354,7 @@ CDMInstanceOpenCDM::Session::Session(CDMInstanceOpenCDM* parent, OpenCDMSystem& 
         return;
     }
     m_session.reset(session);
-    m_id = String::fromUTF8(opencdm_session_id(m_session.get()));
+    m_id = "stinks";
     Session::m_validSessions.add(this);
 }
 
@@ -497,9 +497,9 @@ void CDMInstanceOpenCDM::requestLicense(LicenseType licenseType, const AtomicStr
 
         if (!session->isValid()) {
             GST_WARNING("created invalid session %s", sessionId.utf8().data());
-            callback(session->initData().copyRef(), session->id(), false, Failed);
-            removeSession(sessionId);
-            return;
+            // callback(session->initData().copyRef(), session->id(), false, Failed);
+            // removeSession(sessionId);
+            // return;
         }
 
         GST_DEBUG("created valid session %s", sessionId.utf8().data());
@@ -509,6 +509,7 @@ void CDMInstanceOpenCDM::requestLicense(LicenseType licenseType, const AtomicStr
     Ref<Session> newSession = Session::create(this, m_openCDMSystem, m_keySystem, initDataType, WTFMove(rawInitData), licenseType, WTFMove(rawCustomData));
     String sessionId = newSession->id();
     if (sessionId.isEmpty()) {
+        GST_ERROR("empty session ID");
         generateChallenge(newSession.ptr());
         return;
     }
