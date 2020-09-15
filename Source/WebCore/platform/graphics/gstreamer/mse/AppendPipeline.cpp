@@ -918,6 +918,8 @@ GstFlowReturn AppendPipeline::pushNewBuffer(GstBuffer* buffer)
 
     setAppendState(AppendPipeline::AppendState::Ongoing);
 
+    injectProtectionEventIfPending();
+
     GST_TRACE_OBJECT(this, "pushing data buffer %" GST_PTR_FORMAT, buffer);
     GstFlowReturn pushDataBufferRet = gst_app_src_push_buffer(GST_APP_SRC(m_appsrc.get()), buffer);
     // Pushing buffers to appsrc can only fail if the appsrc is flushing, in EOS or stopped. Neither of these should
@@ -1278,6 +1280,11 @@ static GstPadProbeReturn appendPipelinePadProbeDebugInformation(GstPad*, GstPadP
 #if ENABLE(ENCRYPTED_MEDIA)
 void AppendPipeline::cacheProtectionEvent(GstEvent* event)
 {
+    const gchar* origin = nullptr;
+    gst_event_parse_protection(event, nullptr, nullptr, &origin);
+    if (!g_strcmp0(origin, "webkit-media-player-synthesized"))
+        return;
+
     if (!m_isProcessingProtectionEvents) {
         GST_TRACE("first event, resetting list");
         m_isProcessingProtectionEvents = true;
@@ -1319,12 +1326,28 @@ void AppendPipeline::handleProtectedBufferProbeInformation(GstPadProbeInfo* info
     gst_structure_set_value(protectionMeta->info, "stream-encryption-events", &m_cachedProtectionEvents);
 }
 
-void AppendPipeline::injectProtectionEvent(GRefPtr<GstEvent>&& protectionEvent)
+void AppendPipeline::injectProtectionEvent(GRefPtr<GstEvent>&& event)
 {
-    GST_DEBUG("Distributing protectionEvent %" GST_PTR_FORMAT " to AppendPipeline %s on demuxer %" GST_PTR_FORMAT, protectionEvent.get(), m_sourceBufferPrivate->type().raw().utf8().data(), m_demux.get());
+    ASSERT(event);
+
+    m_protectionEventPendingToInject = WTFMove(event);
+    injectProtectionEventIfPending();
+}
+
+void AppendPipeline::injectProtectionEventIfPending()
+{
+    if (!m_protectionEventPendingToInject) {
+        GST_TRACE("No pending protection event to be injected");
+        return;
+    }
+
+    GST_DEBUG("Distributing protectionEvent %" GST_PTR_FORMAT " to AppendPipeline %s on demuxer %" GST_PTR_FORMAT, m_protectionEventPendingToInject.get(), m_sourceBufferPrivate->type().raw().utf8().data(), m_demux.get());
     GRefPtr<GstPad> demuxerSinkPad = adoptGRef(gst_element_get_static_pad(m_demux.get(), "sink"));
-    bool wasHandled = gst_pad_send_event(demuxerSinkPad.get(), protectionEvent.leakRef());
+    GRefPtr<GstEvent> event = m_protectionEventPendingToInject;
+    bool wasHandled = gst_pad_send_event(demuxerSinkPad.get(), event.leakRef());
     GST_DEBUG("Protection event %s handled by %" GST_PTR_FORMAT, wasHandled ? "was" : "was NOT", demuxerSinkPad.get());
+    if (wasHandled)
+        m_protectionEventPendingToInject.clear();
 }
 
 static GstPadProbeReturn appendPipelineAppsinkPadProtectionProbe(GstPad*, GstPadProbeInfo* info, struct PadProbeInformation *padProbeInformation)
