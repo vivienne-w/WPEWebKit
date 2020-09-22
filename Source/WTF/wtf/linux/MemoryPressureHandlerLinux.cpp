@@ -294,11 +294,18 @@ void MemoryPressureHandler::pollMemoryPressure()
     do {
         if (s_pollMaximumProcessMemoryCriticalLimit) {
             size_t vmRSS = readToken(s_processStatus, "VmRSS:", KB);
+            size_t vmSwap = readToken(s_processStatus, "VmSwap:", KB);
 
             if (!vmRSS)
                 return;
 
-            if (vmRSS > s_pollMaximumProcessMemoryNonCriticalLimit) {
+            size_t total = vmRSS;
+
+            if (vmSwap > 0){
+                total += vmSwap;
+            }
+
+            if (total > s_pollMaximumProcessMemoryNonCriticalLimit) {
                 critical = vmRSS > s_pollMaximumProcessMemoryCriticalLimit;
                 break;
             }
