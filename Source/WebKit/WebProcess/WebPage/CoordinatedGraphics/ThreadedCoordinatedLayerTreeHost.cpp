@@ -92,6 +92,18 @@ void ThreadedCoordinatedLayerTreeHost::forceRepaint()
     m_compositor->forceRepaint();
 }
 
+void ThreadedCoordinatedLayerTreeHost::pauseRendering()
+{
+    CoordinatedLayerTreeHost::pauseRendering();
+    m_compositor->suspend();
+}
+
+void ThreadedCoordinatedLayerTreeHost::resumeRendering()
+{
+    CoordinatedLayerTreeHost::resumeRendering();
+    m_compositor->resume();
+}
+
 void ThreadedCoordinatedLayerTreeHost::frameComplete()
 {
     m_compositor->frameComplete();
@@ -184,18 +196,6 @@ void ThreadedCoordinatedLayerTreeHost::pageBackgroundTransparencyChanged()
     }
 
     CoordinatedLayerTreeHost::pageBackgroundTransparencyChanged();
-    m_compositor->setDrawsBackground(m_webPage.drawsBackground());
-}
-
-void ThreadedCoordinatedLayerTreeHost::forceBackgroundTransparency()
-{
-    CoordinatedLayerTreeHost::forceBackgroundTransparency();
-    m_compositor->setDrawsBackground(false);
-}
-
-void ThreadedCoordinatedLayerTreeHost::restoreBackgroundTransparency()
-{
-    CoordinatedLayerTreeHost::restoreBackgroundTransparency();
     m_compositor->setDrawsBackground(m_webPage.drawsBackground());
 }
 

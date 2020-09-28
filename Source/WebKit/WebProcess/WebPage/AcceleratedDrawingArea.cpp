@@ -353,20 +353,13 @@ void AcceleratedDrawingArea::handleIsInWindowChanged()
     // besides the empty content we have a transparent background.
 
     if (!m_webPage.corePage()->isInWindow()) {
-        if (m_layerTreeHost)
-            m_layerTreeHost->forceBackgroundTransparency();
-
+        suspendPainting();
         m_webPage.corePage()->suspendActiveDOMObjectsAndAnimations();
-        m_webPage.corePage()->suspendScriptedAnimations();
         return;
     }
 
-    if (m_layerTreeHost)
-        m_layerTreeHost->restoreBackgroundTransparency();
-
-    setNeedsDisplay();
     m_webPage.corePage()->resumeActiveDOMObjectsAndAnimations();
-    m_webPage.corePage()->resumeScriptedAnimations();
+    resumePainting();
 }
 
 void AcceleratedDrawingArea::enterAcceleratedCompositingMode(GraphicsLayer* graphicsLayer)

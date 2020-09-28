@@ -122,6 +122,37 @@ void ThreadedCompositor::invalidate()
     m_compositingRunLoop = nullptr;
 }
 
+void ThreadedCompositor::suspend()
+{
+    if (++m_suspendedCount > 1)
+        return;
+
+    m_compositingRunLoop->suspend();
+    m_compositingRunLoop->performTaskSync([this, protectedThis = makeRef(*this)] {
+        m_client.willRenderFrame();
+        if (!m_nonCompositedWebGLEnabled) {
+            m_context->makeContextCurrent();
+            glClearColor(0, 0, 0, 0);
+            glClear(GL_COLOR_BUFFER_BIT);
+            m_context->swapBuffers();
+        }
+        m_client.didRenderFrame();
+        m_scene->setActive(false);
+    });
+}
+
+void ThreadedCompositor::resume()
+{
+    ASSERT(m_suspendedCount > 0);
+    if (--m_suspendedCount > 0)
+        return;
+
+    m_compositingRunLoop->performTaskSync([this, protectedThis = makeRef(*this)] {
+        m_scene->setActive(true);
+    });
+    m_compositingRunLoop->resume();
+}
+
 void ThreadedCompositor::setNativeSurfaceHandleForCompositing(uint64_t handle)
 {
     m_compositingRunLoop->stopUpdates();
