@@ -142,6 +142,21 @@ void CompositingRunLoop::performTaskSync(Function<void ()>&& function)
     m_dispatchSyncCondition.wait(m_dispatchSyncConditionMutex);
 }
 
+void CompositingRunLoop::suspend()
+{
+    LockHolder stateLocker(m_state.lock);
+    m_state.isSuspended = true;
+    m_updateTimer.stop();
+}
+
+void CompositingRunLoop::resume()
+{
+    LockHolder stateLocker(m_state.lock);
+    m_state.isSuspended = false;
+    if (m_state.update == UpdateState::Scheduled)
+        m_updateTimer.startOneShot(0_s);
+}
+
 void CompositingRunLoop::scheduleUpdate()
 {
     LockHolder stateLocker(m_state.lock);
@@ -161,7 +176,8 @@ void CompositingRunLoop::scheduleUpdate(LockHolder& stateLocker)
     switch (m_state.update) {
     case UpdateState::Idle:
         m_state.update = UpdateState::Scheduled;
-        m_updateTimer.startOneShot(0_s);
+        if (!m_state.isSuspended)
+            m_updateTimer.startOneShot(0_s);
         return;
     case UpdateState::Scheduled:
         return;
@@ -204,7 +220,8 @@ void CompositingRunLoop::compositionCompleted(LockHolder& stateLocker)
         if (m_state.pendingUpdate) {
             m_state.pendingUpdate = false;
             m_state.update = UpdateState::Scheduled;
-            m_updateTimer.startOneShot(0_s);
+            if (!m_state.isSuspended)
+                m_updateTimer.startOneShot(0_s);
             return;
         }
 
@@ -236,7 +253,8 @@ void CompositingRunLoop::updateCompleted(LockHolder& stateLocker)
         if (m_state.pendingUpdate) {
             m_state.pendingUpdate = false;
             m_state.update = UpdateState::Scheduled;
-            m_updateTimer.startOneShot(0_s);
+            if (!m_state.isSuspended)
+                m_updateTimer.startOneShot(0_s);
             return;
         }
 
@@ -252,6 +270,8 @@ void CompositingRunLoop::updateTimerFired()
     {
         // Both composition and scene update are now in progress.
         LockHolder locker(m_state.lock);
+        if (m_state.isSuspended)
+            return;
         m_state.composition = CompositionState::InProgress;
         m_state.update = UpdateState::InProgress;
     }

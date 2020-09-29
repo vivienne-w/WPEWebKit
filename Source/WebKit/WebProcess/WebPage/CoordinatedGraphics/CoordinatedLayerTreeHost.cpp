@@ -105,6 +105,16 @@ void CoordinatedLayerTreeHost::invalidate()
     LayerTreeHost::invalidate();
 }
 
+void CoordinatedLayerTreeHost::pauseRendering()
+{
+    LayerTreeHost::pauseRendering();
+}
+
+void CoordinatedLayerTreeHost::resumeRendering()
+{
+    LayerTreeHost::resumeRendering();
+}
+
 void CoordinatedLayerTreeHost::forceRepaint()
 {
     // This is necessary for running layout tests. Since in this case we are not waiting for a UIProcess to reply nicely.

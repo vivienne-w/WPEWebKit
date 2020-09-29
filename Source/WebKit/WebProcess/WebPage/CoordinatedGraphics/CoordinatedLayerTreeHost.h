@@ -50,14 +50,15 @@ protected:
     void setRootCompositingLayer(WebCore::GraphicsLayer*) override;
     void invalidate() override;
 
+    void pauseRendering() override;
+    void resumeRendering() override;
+
     void forceRepaint() override;
     bool forceRepaintAsync(CallbackID) override;
     void sizeDidChange(const WebCore::IntSize& newSize) override;
 
     void deviceOrPageScaleFactorChanged() override;
     void pageBackgroundTransparencyChanged() override;
-    void forceBackgroundTransparency() override { };
-    void restoreBackgroundTransparency() override { };
 
     void setVisibleContentsRect(const WebCore::FloatRect&);
     void renderNextFrame(bool);

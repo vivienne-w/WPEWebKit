@@ -48,6 +48,9 @@ public:
     void performTask(Function<void ()>&&);
     void performTaskSync(Function<void ()>&&);
 
+    void suspend();
+    void resume();
+
     Lock& stateLock() { return m_state.lock; }
 
     void scheduleUpdate();
@@ -82,6 +85,7 @@ private:
         CompositionState composition { CompositionState::Idle };
         UpdateState update { UpdateState::Idle };
         bool pendingUpdate { false };
+        bool isSuspended { false };
     } m_state;
 };
 
