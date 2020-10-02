@@ -213,6 +213,7 @@ static GstFlowReturn webkitMediaCommonEncryptionDecryptTransformInPlace(GstBaseT
 {
     WebKitMediaCommonEncryptionDecrypt* self = WEBKIT_MEDIA_CENC_DECRYPT(base);
     WebKitMediaCommonEncryptionDecryptPrivate* priv = WEBKIT_MEDIA_CENC_DECRYPT_GET_PRIVATE(self);
+    WebKitMediaCommonEncryptionDecryptClass* klass = WEBKIT_MEDIA_CENC_DECRYPT_GET_CLASS(self);
 
     GstProtectionMeta* protectionMeta = reinterpret_cast<GstProtectionMeta*>(gst_buffer_get_protection_meta(buffer));
     if (!protectionMeta) {
@@ -243,14 +244,19 @@ static GstFlowReturn webkitMediaCommonEncryptionDecryptTransformInPlace(GstBaseT
 
     keyIDBuffer = gst_value_get_buffer(value);
 
-    if (!priv->m_protectionEvents.isEmpty()) {
-        GstMappedBuffer mappedKeyID(keyIDBuffer, GST_MAP_READ);
-        if (!mappedKeyID) {
-            GST_ERROR_OBJECT(self, "Failed to map key ID buffer");
-            return GST_FLOW_NOT_SUPPORTED;
-        }
-        auto keyId = WebCore::SharedBuffer::create(mappedKeyID.data(), mappedKeyID.size());
-        webkitMediaCommonEncryptionDecryptProcessProtectionEvents(self, WTFMove(keyId));
+    GstMappedBuffer mappedKeyID(keyIDBuffer, GST_MAP_READ);
+    if (!mappedKeyID) {
+        GST_ERROR_OBJECT(self, "Failed to map key ID buffer");
+        return GST_FLOW_NOT_SUPPORTED;
+    }
+    auto keyId = WebCore::SharedBuffer::create(mappedKeyID.data(), mappedKeyID.size());
+
+    if (!priv->m_protectionEvents.isEmpty())
+        webkitMediaCommonEncryptionDecryptProcessProtectionEvents(self, keyId.copyRef());
+
+    if (!priv->m_keyReceived) {
+        GST_DEBUG_OBJECT(self, "key not available, attempting to decrypt with current ID");
+        priv->m_keyReceived = klass->attemptToDecryptWithLocalInstance(self, keyId);
     }
 
     // The key might not have been received yet. Wait for it.
@@ -273,9 +279,9 @@ static GstFlowReturn webkitMediaCommonEncryptionDecryptTransformInPlace(GstBaseT
             GST_DEBUG_OBJECT(self, "flushing");
             return GST_FLOW_FLUSHING;
         }
-
-        GST_DEBUG_OBJECT(self, "key received, continuing");
     }
+
+    GST_TRACE_OBJECT(self, "key available, preparing for decryption");
 
     unsigned ivSize;
     if (!gst_structure_get_uint(protectionMeta->info, "iv_size", &ivSize)) {
@@ -316,18 +322,8 @@ static GstFlowReturn webkitMediaCommonEncryptionDecryptTransformInPlace(GstBaseT
         subSamplesBuffer = gst_value_get_buffer(value);
     }
 
-#ifndef GST_DISABLE_GST_DEBUG
-    if (gst_debug_category_get_threshold(GST_CAT_DEFAULT) >= GST_LEVEL_MEMDUMP) {
-        GstMappedBuffer mappedKeyID(keyIDBuffer, GST_MAP_READ);
-        if (!mappedKeyID) {
-            GST_ERROR_OBJECT(self, "failed to map key ID buffer");
-            return GST_FLOW_NOT_SUPPORTED;
-        }
-        GST_MEMDUMP_OBJECT(self, "key ID for sample", mappedKeyID.data(), mappedKeyID.size());
-    }
-#endif
+    GST_MEMDUMP_OBJECT(self, "key ID for sample", mappedKeyID.data(), mappedKeyID.size());
 
-    WebKitMediaCommonEncryptionDecryptClass* klass = WEBKIT_MEDIA_CENC_DECRYPT_GET_CLASS(self);
     if (!klass->setupCipher(self, keyIDBuffer)) {
         GST_ERROR_OBJECT(self, "Failed to configure cipher");
         gst_buffer_remove_meta(buffer, reinterpret_cast<GstMeta*>(protectionMeta));
