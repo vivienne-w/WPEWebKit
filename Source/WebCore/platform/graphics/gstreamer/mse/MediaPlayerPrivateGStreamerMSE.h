@@ -91,6 +91,7 @@ public:
 
 #if ENABLE(ENCRYPTED_MEDIA)
     void dispatchDecryptionStructure(GUniquePtr<GstStructure>&&) final;
+    void cdmInstanceAttached(CDMInstance&) final;
 #endif
 
 private:
