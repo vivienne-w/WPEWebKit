@@ -306,7 +306,7 @@ void MemoryPressureHandler::pollMemoryPressure()
             }
 
             if (total > s_pollMaximumProcessMemoryNonCriticalLimit) {
-                critical = vmRSS > s_pollMaximumProcessMemoryCriticalLimit;
+                critical = total > s_pollMaximumProcessMemoryCriticalLimit;
                 break;
             }
         }
