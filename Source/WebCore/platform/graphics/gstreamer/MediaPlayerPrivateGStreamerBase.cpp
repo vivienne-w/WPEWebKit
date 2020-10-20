@@ -1375,9 +1375,15 @@ unsigned MediaPlayerPrivateGStreamerBase::decodedFrameCount() const
 {
     guint64 decodedFrames = 0;
     GstElement* sink = m_fpsSink.get();
+    GRefPtr<GstElement> scopedSink;
 
     if (!sink)
-        sink = m_videoSink ? m_videoSink.get() : getElement(m_pipeline.get(), ElementType::SINK, MediaType::VIDEO);
+        sink = m_videoSink ? m_videoSink.get() : nullptr;
+
+    if (!sink) {
+        scopedSink = getElement(m_pipeline.get(), ElementType::SINK, MediaType::VIDEO);
+        sink = scopedSink.get();
+    }
 
     if (sink && g_object_class_find_property(G_OBJECT_GET_CLASS(sink), "frames-rendered")) {
         g_object_get(sink, "frames-rendered", &decodedFrames, nullptr);
