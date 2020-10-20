@@ -153,6 +153,8 @@ GstElement* findElement(GstElement* container, ElementType type, MediaType media
             g_free(name);
         }
     }
+    if (re)
+        g_object_ref(re);
     return re;
 }
 
@@ -485,22 +487,29 @@ void connectSimpleBusMessageCallback(GstElement* pipeline)
     g_signal_connect(bus.get(), "message", G_CALLBACK(simpleBusMessageCallback), pipeline);
 }
 
-GstElement* getElement(GstElement* container, ElementType type, MediaType media)
+GRefPtr<GstElement> getElement(GstElement* container, ElementType type, MediaType media)
 {
-    GstElement* found = nullptr;
+    GRefPtr<GstElement> ret;
     if (GST_IS_PIPELINE(container)) {
         if (type == ElementType::SINK) {
             if (media == MediaType::AUDIO)
-                g_object_get(container, "audio-sink", &found, nullptr);
+                g_object_get(container, "audio-sink", &ret.outPtr(), nullptr);
             else
-                g_object_get(container, "video-sink", &found, nullptr);
+                g_object_get(container, "video-sink", &ret.outPtr(), nullptr);
         }
     }
 
-    if (!found)
-        found = findElement(container, type, media);
+    if (!ret) {
+        auto element = findElement(container, type, media);
+        if (element) {
+            // findElement() does not copy/transfer ownership but due to
+            // the fact GRefPtr is returned ref element before assigning.
+            g_object_ref(element);
+            ret.outPtr() = element;
+        }
+    }
 
-    return found;
+    return ret;
 }
 
 }

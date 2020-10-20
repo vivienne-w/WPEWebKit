@@ -125,7 +125,7 @@ enum class MediaType : int {
 bool gstRegistryHasElementForMediaType(GList* elementFactories, const char* capsString);
 void connectSimpleBusMessageCallback(GstElement *pipeline);
 void disconnectSimpleBusMessageCallback(GstElement *pipeline);
-GstElement* getElement(GstElement* container, ElementType, MediaType);
+GRefPtr<GstElement> getElement(GstElement* container, ElementType, MediaType);
 
 }
 
