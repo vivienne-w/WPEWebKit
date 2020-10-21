@@ -489,27 +489,20 @@ void connectSimpleBusMessageCallback(GstElement* pipeline)
 
 GRefPtr<GstElement> getElement(GstElement* container, ElementType type, MediaType media)
 {
-    GRefPtr<GstElement> ret;
+    GRefPtr<GstElement> result;
     if (GST_IS_PIPELINE(container)) {
         if (type == ElementType::SINK) {
             if (media == MediaType::AUDIO)
-                g_object_get(container, "audio-sink", &ret.outPtr(), nullptr);
+                g_object_get(container, "audio-sink", &result.outPtr(), nullptr);
             else
-                g_object_get(container, "video-sink", &ret.outPtr(), nullptr);
+                g_object_get(container, "video-sink", &result.outPtr(), nullptr);
         }
     }
 
-    if (!ret) {
-        auto element = findElement(container, type, media);
-        if (element) {
-            // findElement() does not copy/transfer ownership but due to
-            // the fact GRefPtr is returned ref element before assigning.
-            g_object_ref(element);
-            ret.outPtr() = element;
-        }
-    }
+    if (!result)
+        result = findElement(container, type, media);
 
-    return ret;
+    return result;
 }
 
 }
