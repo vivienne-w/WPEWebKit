@@ -1073,6 +1073,7 @@ void MediaPlayerPrivateGStreamerMSE::dispatchDecryptionStructure(GUniquePtr<GstS
 
 void MediaPlayerPrivateGStreamerMSE::cdmInstanceAttached(CDMInstance& instance)
 {
+    GST_TRACE("cdmInstanceAttached()");
     ASSERT(isMainThread());
     MediaPlayerPrivateGStreamer::cdmInstanceAttached(instance);
 

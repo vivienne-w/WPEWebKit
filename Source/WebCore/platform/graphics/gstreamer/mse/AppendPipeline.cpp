@@ -281,6 +281,8 @@ AppendPipeline::AppendPipeline(Ref<MediaSourceClientGStreamerMSE> mediaSourceCli
 
 AppendPipeline::~AppendPipeline()
 {
+    GST_DEBUG("Destructing AppendPipeline");
+
     ASSERT(WTF::isMainThread());
 
     setAppendState(AppendState::Invalid);
@@ -416,6 +418,8 @@ void AppendPipeline::handleApplicationMessage(GstMessage* message)
     RefPtr<AppendPipeline> protectedThis(this);
 
     const GstStructure* structure = gst_message_get_structure(message);
+
+    GST_TRACE("%s", gst_structure_get_name(structure));
 
     if (gst_structure_has_name(structure, "demuxer-connect-to-appsink")) {
         GRefPtr<GstPad> demuxerSrcPad;
@@ -713,6 +717,7 @@ void AppendPipeline::appsinkCapsChanged()
     bool previousCapsWereNull = !m_appsinkCaps;
 
     if (m_appsinkCaps != caps) {
+        GST_DEBUG("Caps changed, calling trackDetected()");
         m_appsinkCaps = WTFMove(caps);
         if (m_playerPrivate)
             m_playerPrivate->trackDetected(this, m_track, previousCapsWereNull);
@@ -924,7 +929,7 @@ GstFlowReturn AppendPipeline::pushNewBuffer(GstBuffer* buffer)
     injectProtectionEventIfPending();
 #endif
 
-    GST_TRACE_OBJECT(this, "pushing data buffer %" GST_PTR_FORMAT, buffer);
+    GST_TRACE_OBJECT(this, "AppendPipeline %s: pushing data buffer %" GST_PTR_FORMAT, m_sourceBufferPrivate->type().raw().utf8().data(), buffer);
     GstFlowReturn pushDataBufferRet = gst_app_src_push_buffer(GST_APP_SRC(m_appsrc.get()), buffer);
     // Pushing buffers to appsrc can only fail if the appsrc is flushing, in EOS or stopped. Neither of these should
     // be true at this point.
@@ -1150,6 +1155,10 @@ void AppendPipeline::connectDemuxerSrcPadToAppsink(GstPad* demuxerSrcPad)
     GRefPtr<GstCaps> caps = adoptGRef(gst_pad_get_current_caps(GST_PAD(demuxerSrcPad)));
 
     if (!caps || m_appendState == AppendState::Invalid || !m_playerPrivate) {
+        GST_DEBUG("Early return because %s%s%s",
+            (!caps) ? "no caps" : "",
+            (m_appendState == AppendState::Invalid) ? "append state Invalid" : "",
+            (!m_playerPrivate) ? "player private null" : "");
         m_padAddRemoveCondition.notifyOne();
         return;
     }
@@ -1189,12 +1198,14 @@ void AppendPipeline::connectDemuxerSrcPadToAppsink(GstPad* demuxerSrcPad)
         m_padAddRemoveCondition.notifyOne();
         locker.unlockEarly();
         didReceiveInitializationSegment();
+        GST_DEBUG("Early return because stream type Invalid");
         return;
     default:
         // No useful data.
         break;
     }
 
+    GST_DEBUG("Connect to appsink, calling trackDetected()");
     m_appsinkCaps = WTFMove(caps);
     if (m_playerPrivate)
         m_playerPrivate->trackDetected(this, m_track, true);
