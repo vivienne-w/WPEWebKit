@@ -153,8 +153,7 @@ GstElement* findElement(GstElement* container, ElementType type, MediaType media
             g_free(name);
         }
     }
-    if (re)
-        g_object_ref(re);
+
     return re;
 }
 
