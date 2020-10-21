@@ -1374,19 +1374,13 @@ void MediaPlayerPrivateGStreamerBase::setStreamVolumeElement(GstStreamVolume* vo
 unsigned MediaPlayerPrivateGStreamerBase::decodedFrameCount() const
 {
     guint64 decodedFrames = 0;
-    GstElement* sink = m_fpsSink.get();
-    GRefPtr<GstElement> scopedSink;
+    GRefPtr<GstElement> sink = m_fpsSink;
 
     if (!sink)
-        sink = m_videoSink ? m_videoSink.get() : nullptr;
+        sink = m_videoSink ? m_videoSink : getElement(m_pipeline.get(), ElementType::SINK, MediaType::VIDEO);
 
-    if (!sink) {
-        scopedSink = getElement(m_pipeline.get(), ElementType::SINK, MediaType::VIDEO);
-        sink = scopedSink.get();
-    }
-
-    if (sink && g_object_class_find_property(G_OBJECT_GET_CLASS(sink), "frames-rendered")) {
-        g_object_get(sink, "frames-rendered", &decodedFrames, nullptr);
+    if (sink && g_object_class_find_property(G_OBJECT_GET_CLASS(sink.get()), "frames-rendered")) {
+        g_object_get(sink.get(), "frames-rendered", &decodedFrames, nullptr);
         GST_DEBUG("frames decoded: %llu",  decodedFrames);
     }
     return static_cast<unsigned>(decodedFrames);
