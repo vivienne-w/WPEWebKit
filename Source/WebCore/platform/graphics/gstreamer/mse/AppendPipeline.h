@@ -168,7 +168,8 @@ private:
     struct PadProbeInformation m_appsinkPadProtectionProbeInformation;
     GValue m_cachedProtectionEvents;
     bool m_isProcessingProtectionEvents { false };
-    GRefPtr<GstEvent> m_protectionEventPendingToInject;
+    GRefPtr<GstEvent> m_protectionEventToInject;
+    bool m_isProtectionEventAlreadyInjected { false };
 #endif
     // Keeps track of the states of append processing, to avoid performing actions inappropriate for the current state
     // (eg: processing more samples when the last one has been detected, etc.). See setAppendState() for valid
