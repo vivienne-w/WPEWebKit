@@ -209,8 +209,26 @@ static GstCaps* webkitMediaCommonEncryptionDecryptTransformCaps(GstBaseTransform
     return transformedCaps;
 }
 
+class ScopeLogger {
+public:
+    ScopeLogger(GstObject* object, const gchar* label, GstClockTime pts)
+        : object(object)
+        , label(label)
+        , pts(pts) {
+        GST_DEBUG_OBJECT(object, "%s: PTS=%" GST_TIME_FORMAT " ·BEGIN", label, GST_TIME_ARGS(pts));
+    }
+    ~ScopeLogger() {
+        GST_DEBUG_OBJECT(object, "%s: PTS=%" GST_TIME_FORMAT " ·END", label, GST_TIME_ARGS(pts));
+    }
+
+    GstObject* object;
+    const gchar* label;
+    GstClockTime pts;
+};
+
 static GstFlowReturn webkitMediaCommonEncryptionDecryptTransformInPlace(GstBaseTransform* base, GstBuffer* buffer)
 {
+    ScopeLogger s(GST_OBJECT(base), __PRETTY_FUNCTION__, GST_BUFFER_PTS(buffer));
     WebKitMediaCommonEncryptionDecrypt* self = WEBKIT_MEDIA_CENC_DECRYPT(base);
     WebKitMediaCommonEncryptionDecryptPrivate* priv = WEBKIT_MEDIA_CENC_DECRYPT_GET_PRIVATE(self);
     WebKitMediaCommonEncryptionDecryptClass* klass = WEBKIT_MEDIA_CENC_DECRYPT_GET_CLASS(self);
