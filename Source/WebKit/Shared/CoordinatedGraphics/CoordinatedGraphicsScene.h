@@ -151,6 +151,7 @@ private:
 
 #if USE(COORDINATED_GRAPHICS_THREADED)
     HashMap<WebCore::TextureMapperLayer*, RefPtr<WebCore::TextureMapperPlatformLayerProxy>> m_platformLayerProxies;
+    Vector<RefPtr<WebCore::TextureMapperPlatformLayerProxy>> m_platformLayerProxiesToDelete;
 #endif
 
     // Below two members are accessed by only the main thread. The painting thread must lock the main thread to access both members.

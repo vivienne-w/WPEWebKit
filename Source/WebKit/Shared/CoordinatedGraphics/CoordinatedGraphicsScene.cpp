@@ -118,6 +118,13 @@ void CoordinatedGraphicsScene::syncPlatformLayerIfNeeded(TextureMapperLayer* lay
     if (state.platformLayerProxy) {
         m_platformLayerProxies.set(layer, state.platformLayerProxy);
         state.platformLayerProxy->activateOnCompositingThread(this, layer);
+        // If the proxy is being reused, remove it from the list of proxies to invalidate.
+        for (size_t i = 0; i < m_platformLayerProxiesToDelete.size(); i++) {
+            if (state.platformLayerProxy.get() == m_platformLayerProxiesToDelete.at(i).get()) {
+                m_platformLayerProxiesToDelete.remove(i);
+                break;
+            }
+        }
     } else
         m_platformLayerProxies.remove(layer);
 #else
@@ -256,7 +263,7 @@ void CoordinatedGraphicsScene::deleteLayer(CoordinatedLayerID layerID)
     m_backingStores.remove(layer.get());
 #if USE(COORDINATED_GRAPHICS_THREADED)
     if (auto platformLayerProxy = m_platformLayerProxies.take(layer.get()))
-        platformLayerProxy->invalidate();
+        m_platformLayerProxiesToDelete.append(platformLayerProxy);
 #endif
 }
 
@@ -447,6 +454,10 @@ void CoordinatedGraphicsScene::commitSceneState(const CoordinatedGraphicsState& 
 
     for (auto& backingStore : commitScope.backingStoresWithPendingBuffers)
         backingStore->commitTileOperations(*m_textureMapper);
+
+    for (size_t i = 0; i < m_platformLayerProxiesToDelete.size(); i++)
+        m_platformLayerProxiesToDelete.at(i)->invalidate();
+    m_platformLayerProxiesToDelete.clear();
 }
 
 void CoordinatedGraphicsScene::ensureRootLayer()
