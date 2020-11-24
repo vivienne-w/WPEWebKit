@@ -411,9 +411,9 @@ MediaTime MediaPlayerPrivateGStreamer::playbackPosition() const
             gst_query_parse_position(query, 0, (gint64*)&audioPosition);
     }
     if (videoPosition == GST_CLOCK_TIME_NONE)
-        videoPosition = 0;
+        videoPosition = m_seekTime.isValid() ? toGstClockTime(m_seekTime) : 0;
     if (audioPosition == GST_CLOCK_TIME_NONE)
-        audioPosition = 0;
+        audioPosition = m_seekTime.isValid() ? toGstClockTime(m_seekTime) : 0;
 
     GST_TRACE("videoPosition: %" GST_TIME_FORMAT ", audioPosition: %" GST_TIME_FORMAT, GST_TIME_ARGS(videoPosition), GST_TIME_ARGS(audioPosition));
 
