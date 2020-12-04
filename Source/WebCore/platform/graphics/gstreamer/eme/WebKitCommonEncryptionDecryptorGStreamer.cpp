@@ -45,7 +45,6 @@ struct _WebKitMediaCommonEncryptionDecryptPrivate {
     Condition m_condition;
     RefPtr<CDMInstance> m_cdmInstance;
     WTF::HashMap<String, WebCore::InitData> m_initDatas;
-    WTF::HashMap<WebCore::InitData, Ref<WebCore::SharedBuffer>> m_keyIds;
     Vector<GRefPtr<GstEvent>> m_protectionEvents;
     uint32_t m_currentEvent { 0 };
     bool m_isFlushing { false };
@@ -210,13 +209,14 @@ static GstCaps* webkitMediaCommonEncryptionDecryptTransformCaps(GstBaseTransform
     return transformedCaps;
 }
 
-static void attemptToDecryptWithLocalInstance(WebKitMediaCommonEncryptionDecrypt* self, Ref<WebCore::SharedBuffer>&& keyID)
+static void attemptToDecryptWithLocalInstance(WebKitMediaCommonEncryptionDecrypt* self, const Ref<WebCore::SharedBuffer>& keyID)
 {
   RELEASE_ASSERT(WEBKIT_IS_MEDIA_CENC_DECRYPT(self));
   WebKitMediaCommonEncryptionDecryptPrivate* priv = WEBKIT_MEDIA_CENC_DECRYPT_GET_PRIVATE(self);
   WebKitMediaCommonEncryptionDecryptClass* klass = WEBKIT_MEDIA_CENC_DECRYPT_GET_CLASS(self);
+  ASSERT(priv->m_mutex.isLocked());
   priv->m_currentKeyID.reset();
-  bool keyReceived = klass->attemptToDecryptWithLocalInstance(self, keyID);
+  bool keyReceived = klass->attemptToDecryptWithLocalInstance(self, keyID.get());
   if (keyReceived)
       priv->m_currentKeyID = keyID.copyRef();
 }
@@ -273,22 +273,23 @@ static GstFlowReturn webkitMediaCommonEncryptionDecryptTransformInPlace(GstBaseT
         GST_TRACE_OBJECT(self, "current key ID not set");
 
     if (!priv->m_currentKeyID.has_value() || priv->m_currentKeyID.value().ptr() != keyId.ptr()) {
-        GST_DEBUG_OBJECT(self, "requested key not available, attempting to decrypt with new ID");
-        attemptToDecryptWithLocalInstance(self, WTFMove(keyId));
-    }
-
-    // The key might not have been received yet. Wait for it.
-    if (!priv->m_currentKeyID.has_value()) {
-        GST_DEBUG_OBJECT(self, "key not available yet, waiting for it");
+        priv->m_currentKeyID.reset();
         if (GST_STATE(GST_ELEMENT(self)) < GST_STATE_PAUSED || (GST_STATE_TARGET(GST_ELEMENT(self)) != GST_STATE_VOID_PENDING && GST_STATE_TARGET(GST_ELEMENT(self)) < GST_STATE_PAUSED)) {
             GST_ERROR_OBJECT(self, "can't process key requests in less than PAUSED state");
             return GST_FLOW_NOT_SUPPORTED;
         }
-        if (!priv->m_condition.waitFor(priv->m_mutex, WEBCORE_GSTREAMER_EME_LICENSE_KEY_RESPONSE_TIMEOUT, [priv] { return priv->m_isFlushing || priv->m_currentKeyID.has_value(); })) {
-            if (!priv->m_currentKeyID.has_value()) {
-                GST_ERROR_OBJECT(self, "key not available");
-                return GST_FLOW_NOT_SUPPORTED;
+        if (!priv->m_condition.waitFor(priv->m_mutex, WEBCORE_GSTREAMER_EME_LICENSE_KEY_RESPONSE_TIMEOUT, [self, priv, keyID = WTFMove(keyId)] {
+            if (priv->m_isFlushing)
+                return true;
+            if (!priv->m_currentKeyID.has_value())
+                attemptToDecryptWithLocalInstance(self, keyID);
+            if (priv->m_currentKeyID.has_value())
+                return true;
+            else {
+                GST_DEBUG_OBJECT(self, "key not received yet, may wait for it");
+                return false;
             }
+        })) {
             GST_ERROR_OBJECT(self, "key not available");
             return GST_FLOW_NOT_SUPPORTED;
         }
@@ -468,7 +469,6 @@ static void webkitMediaCommonEncryptionDecryptProcessProtectionEvents(WebKitMedi
             GST_MEMDUMP_OBJECT(self, "init data", mappedBuffer.data(), mappedBuffer.size());
             priv->m_initDatas.set(eventKeySystem, initData);
             GST_MEMDUMP_OBJECT(self, "key ID", reinterpret_cast<const uint8_t*>(kid->data()), kid->size());
-            priv->m_keyIds.set(initData, kid.copyRef());
             handleKeyID(self, WTFMove(kid));
             if (!priv->m_currentKeyID.has_value()) {
                 if (isCDMInstanceAvailable) {
@@ -536,17 +536,8 @@ static gboolean webkitMediaCommonEncryptionDecryptSinkEventHandler(GstBaseTransf
             result = TRUE;
             LockHolder locker(priv->m_mutex);
             RELEASE_ASSERT(webkitMediaCommonEncryptionDecryptIsCDMInstanceAvailable(self));
-            auto initData = priv->m_initDatas.get(priv->m_cdmInstance->keySystem());
-            auto keyId = !initData.isEmpty() ? priv->m_keyIds.get(initData) : nullptr;
-            GST_DEBUG_OBJECT(self, "attempting to decrypt with local instance %p, key id %p", priv->m_cdmInstance.get(), keyId);
-            if (keyId) {
-                GST_MEMDUMP_OBJECT(self, "key id", reinterpret_cast<const uint8_t*>(keyId->data()), keyId->size());
-                attemptToDecryptWithLocalInstance(self, *keyId);
-            }
-            GST_DEBUG_OBJECT(self, "attempted to decrypt with local instance %p, key received %s", priv->m_cdmInstance.get(),
-                WTF::boolForPrinting(priv->m_currentKeyID.has_value()));
-            if (priv->m_currentKeyID.has_value())
-                priv->m_condition.notifyOne();
+            GST_DEBUG_OBJECT(self, "attempting to decrypt with local instance %p", priv->m_cdmInstance.get());
+            priv->m_condition.notifyOne();
         }
         break;
     }
