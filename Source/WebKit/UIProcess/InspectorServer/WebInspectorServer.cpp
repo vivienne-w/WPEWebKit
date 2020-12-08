@@ -129,6 +129,8 @@ void WebInspectorServer::didReceiveUnrecognizedHTTPRequest(WebSocketServerConnec
     headerFields.set(HTTPHeaderName::ContentLength, String::number(body.size()));
     if (found)
         headerFields.set(HTTPHeaderName::ContentType, contentType);
+    if (path.startsWith("/pagelist.json"))
+        headerFields.set(HTTPHeaderName::AccessControlAllowOrigin, "*");
 
     // Send when ready and close immediately afterwards.
     connection->sendHTTPResponseHeader(found ? 200 : 404, found ? "OK" : "Not Found", headerFields);
