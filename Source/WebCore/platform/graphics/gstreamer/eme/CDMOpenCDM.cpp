@@ -46,6 +46,44 @@ using OCDMKeyStatus = KeyStatus;
 
 namespace WebCore {
 
+class DebugLockHolder {
+public:
+    DebugLockHolder(Lock& lock, const char* lockName, const char* caller)
+        : lockName(lockName)
+        , caller(caller)
+        , lock(&lock)
+    {
+        GST_DEBUG("DebugLockHolder %p: Lock %s(%p) attempted to take by %s", this, lockName, this->lock, caller);
+        lockHolder = new LockHolder(lock);
+        GST_DEBUG("DebugLockHolder %p: Lock %s(%p) taken by %s", this, lockName, this->lock, caller);
+    }
+    DebugLockHolder(DebugLockHolder&& source)
+        : lockName(source.lockName)
+        , caller(source.caller)
+        , lock(source.lock)
+        , lockHolder(source.lockHolder) {
+        GST_DEBUG("Lock %s(%p) transferred from DebugLockHolder %p to DebugLockHolder %p", lockName, lock, &source, this);
+        source.lockName = nullptr;
+        source.caller = nullptr;
+        source.lock = nullptr;
+        source.lockHolder = nullptr;
+    }
+    virtual ~DebugLockHolder() {
+        if (!lockHolder) {
+            return;
+        }
+        delete lockHolder;
+        lockHolder = nullptr;
+        GST_DEBUG("DebugLockHolder %p: Lock %s(%p) released by %s", this, lockName, lock, caller);
+    }
+
+private:
+    const char* lockName;
+    const char* caller;
+    Lock* lock;
+    LockHolder* lockHolder;
+};
+
 class CDMPrivateOpenCDM : public CDMPrivate {
 private:
     CDMPrivateOpenCDM() = delete;
@@ -530,7 +568,7 @@ void CDMInstanceOpenCDM::updateLicense(const String& sessionId, LicenseType, con
     // We take the session map mutex here and we do not release it
     // until the the update lambda is executed by moving the lock into
     // it.
-    LockHolder locker(m_sessionMapMutex);
+    DebugLockHolder locker(m_sessionMapMutex, "m_sessionMapMutex", __FUNCTION__);
     auto session = lookupSessionUnlocked(sessionId);
     if (!session) {
         GST_WARNING("cannot update the session %s cause we can't find it", sessionId.utf8().data());
@@ -657,7 +695,7 @@ void CDMInstanceOpenCDM::closeSession(const String& sessionId, CloseSessionCallb
 
 String CDMInstanceOpenCDM::sessionIdByKeyId(const SharedBuffer& keyId) const
 {
-    LockHolder locker(m_sessionMapMutex);
+    DebugLockHolder locker(m_sessionMapMutex, "m_sessionMapMutex", __FUNCTION__);
 
     GST_MEMDUMP("kid", reinterpret_cast<const uint8_t*>(keyId.data()), keyId.size());
     if (!m_sessionsMap.size() || !keyId.data()) {
@@ -692,14 +730,14 @@ bool CDMInstanceOpenCDM::isKeyIdInSessionUsable(const SharedBuffer& keyId, const
 
 bool CDMInstanceOpenCDM::addSession(const String& sessionId, RefPtr<Session>&& session)
 {
-    LockHolder locker(m_sessionMapMutex);
+    DebugLockHolder locker(m_sessionMapMutex, "m_sessionMapMutex", __FUNCTION__);
     ASSERT(session);
     return m_sessionsMap.set(sessionId, session).isNewEntry;
 }
 
 bool CDMInstanceOpenCDM::removeSession(const String& sessionId)
 {
-    LockHolder locker(m_sessionMapMutex);
+    DebugLockHolder locker(m_sessionMapMutex, "m_sessionMapMutex", __FUNCTION__);
     return m_sessionsMap.remove(sessionId);
 }
 
@@ -712,7 +750,7 @@ RefPtr<CDMInstanceOpenCDM::Session> CDMInstanceOpenCDM::lookupSessionUnlocked(co
 
 RefPtr<CDMInstanceOpenCDM::Session> CDMInstanceOpenCDM::lookupSession(const String& sessionId) const
 {
-    LockHolder locker(m_sessionMapMutex);
+    DebugLockHolder locker(m_sessionMapMutex, "m_sessionMapMutex", __FUNCTION__);
     return lookupSessionUnlocked(sessionId);
 }
 
