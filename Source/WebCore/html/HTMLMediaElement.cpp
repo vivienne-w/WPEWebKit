@@ -166,6 +166,10 @@
 #include "VideoFullscreenModel.h"
 #endif
 
+#include <gst/gst.h>
+GST_DEBUG_CATEGORY_EXTERN(webkit_media_player_debug);
+#define GST_CAT_DEFAULT webkit_media_player_debug
+
 namespace WTF {
 template <>
 struct LogArgument<WebCore::URL> {
@@ -185,6 +189,15 @@ struct LogArgument<WebCore::URL> {
 };
 }
 
+// ### DEBUG ###
+#undef LOG_DISABLED
+#define LOG_DISABLED 0
+#undef LOG
+#define LOG(channel, msg, ...) do { printf("%s: ", #channel); printf(msg, ## __VA_ARGS__); printf("\n"); fflush(stdout); } while (false)
+
+#if !LOG_DISABLED
+#include <wtf/text/StringBuilder.h>
+#endif
 
 namespace WebCore {
 
@@ -1093,6 +1106,7 @@ void HTMLMediaElement::scheduleEvent(const AtomicString& eventName)
 {
     RefPtr<Event> event = Event::create(eventName, Event::CanBubble::No, Event::IsCancelable::Yes);
 
+    GST_DEBUG("%s", eventName.string().utf8().data());
     // Don't set the event target, the event queue will set it in GenericEventQueue::timerFired and setting it here
     // will trigger an ASSERT if this element has been marked for deletion.
 
