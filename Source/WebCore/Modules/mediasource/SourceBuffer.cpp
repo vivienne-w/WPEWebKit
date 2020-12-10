@@ -68,6 +68,10 @@
 #include <wtf/text/StringBuilder.h>
 #endif
 
+#include <gst/gst.h>
+GST_DEBUG_CATEGORY_EXTERN(webkit_mse_debug);
+#define GST_CAT_DEFAULT webkit_mse_debug
+
 namespace WebCore {
 
 static inline bool mediaSourceLogEnabled()
@@ -542,6 +546,8 @@ void SourceBuffer::scheduleEvent(const AtomicString& eventName)
 {
     auto event = Event::create(eventName, Event::CanBubble::No, Event::IsCancelable::No);
     event->setTarget(this);
+
+    GST_DEBUG("%s", eventName.string().utf8().data());
 
     m_asyncEventQueue.enqueueEvent(WTFMove(event));
 }
