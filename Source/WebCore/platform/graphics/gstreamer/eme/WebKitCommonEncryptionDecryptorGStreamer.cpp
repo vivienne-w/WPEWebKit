@@ -65,6 +65,21 @@ GST_DEBUG_CATEGORY_STATIC(webkit_media_common_encryption_decrypt_debug_category)
 #define webkit_media_common_encryption_decrypt_parent_class parent_class
 G_DEFINE_TYPE(WebKitMediaCommonEncryptionDecrypt, webkit_media_common_encryption_decrypt, GST_TYPE_BASE_TRANSFORM);
 
+#define CHECK_FOR_LOCK_TAKEN(self) { \
+    WebKitMediaCommonEncryptionDecryptPrivate* priv = WEBKIT_MEDIA_CENC_DECRYPT_GET_PRIVATE(self); \
+    if (priv->m_mutex.isLocked()) \
+        GST_TRACE_OBJECT(self, "lock is properly taken"); \
+    else { \
+        GST_WARNING_OBJECT(self, "lock is NOT taken!"); \
+        RELEASE_ASSERT_NOT_REACHED(); \
+    } \
+}
+
+#define TRACE_LOCK(self) { \
+    WebKitMediaCommonEncryptionDecryptPrivate* priv = WEBKIT_MEDIA_CENC_DECRYPT_GET_PRIVATE(self); \
+    GST_TRACE_OBJECT(self, "attempting to take lock. Was taken and will wait? %s", boolForPrinting(priv->m_mutex.isLocked())); \
+}
+
 static void webkit_media_common_encryption_decrypt_class_init(WebKitMediaCommonEncryptionDecryptClass* klass)
 {
     GObjectClass* gobjectClass = G_OBJECT_CLASS(klass);
@@ -172,7 +187,9 @@ static GstCaps* webkitMediaCommonEncryptionDecryptTransformCaps(GstBaseTransform
             gst_structure_set(outgoingStructure.get(), "original-media-type", G_TYPE_STRING, gst_structure_get_name(incomingStructure), nullptr);
 
             WebKitMediaCommonEncryptionDecryptPrivate* priv = self->priv;
+            TRACE_LOCK(self);
             LockHolder locker(priv->m_mutex);
+            CHECK_FOR_LOCK_TAKEN(self);
 
             if (webkitMediaCommonEncryptionDecryptIsCDMInstanceAvailable(self)) {
                 gst_structure_set_name(outgoingStructure.get(),
@@ -215,6 +232,7 @@ static void attemptToDecryptWithLocalInstance(WebKitMediaCommonEncryptionDecrypt
   WebKitMediaCommonEncryptionDecryptPrivate* priv = WEBKIT_MEDIA_CENC_DECRYPT_GET_PRIVATE(self);
   WebKitMediaCommonEncryptionDecryptClass* klass = WEBKIT_MEDIA_CENC_DECRYPT_GET_CLASS(self);
   ASSERT(priv->m_mutex.isLocked());
+  CHECK_FOR_LOCK_TAKEN(self);
   priv->m_currentKeyID.reset();
   bool keyReceived = klass->attemptToDecryptWithLocalInstance(self, keyID.get());
   if (keyReceived)
@@ -233,7 +251,9 @@ static GstFlowReturn webkitMediaCommonEncryptionDecryptTransformInPlace(GstBaseT
         return GST_FLOW_OK;
     }
 
+    TRACE_LOCK(self);
     LockHolder locker(priv->m_mutex);
+    CHECK_FOR_LOCK_TAKEN(self);
     const GValue* streamEncryptionEventsList = gst_structure_get_value(protectionMeta->info, "stream-encryption-events");
     if (streamEncryptionEventsList && GST_VALUE_HOLDS_LIST(streamEncryptionEventsList)) {
         unsigned streamEncryptionEventsListSize = gst_value_list_get_size(streamEncryptionEventsList);
@@ -279,13 +299,19 @@ static GstFlowReturn webkitMediaCommonEncryptionDecryptTransformInPlace(GstBaseT
             return GST_FLOW_NOT_SUPPORTED;
         }
         if (!priv->m_condition.waitFor(priv->m_mutex, WEBCORE_GSTREAMER_EME_LICENSE_KEY_RESPONSE_TIMEOUT, [self, priv, keyID = WTFMove(keyId)] {
-            if (priv->m_isFlushing)
+            CHECK_FOR_LOCK_TAKEN(self);
+            if (priv->m_isFlushing) {
+                GST_TRACE_OBJECT(self, "flushing");
                 return true;
-            if (!priv->m_currentKeyID.has_value())
+            }
+            if (!priv->m_currentKeyID.has_value()) {
+                GST_TRACE_OBJECT(self, "attempting to decrypt");
                 attemptToDecryptWithLocalInstance(self, keyID);
-            if (priv->m_currentKeyID.has_value())
+            }
+            if (priv->m_currentKeyID.has_value()) {
+                GST_TRACE_OBJECT(self, "key received");
                 return true;
-            else {
+            } else {
                 GST_DEBUG_OBJECT(self, "key not received yet, may wait for it");
                 return false;
             }
@@ -376,6 +402,7 @@ static bool webkitMediaCommonEncryptionDecryptIsCDMInstanceAvailable(WebKitMedia
     WebKitMediaCommonEncryptionDecryptPrivate* priv = WEBKIT_MEDIA_CENC_DECRYPT_GET_PRIVATE(self);
 
     ASSERT(priv->m_mutex.isLocked());
+    CHECK_FOR_LOCK_TAKEN(self);
 
     if (!priv->m_cdmInstance) {
         GRefPtr<GstContext> context = adoptGRef(gst_element_get_context(GST_ELEMENT(self), "drm-cdm-instance"));
@@ -414,6 +441,7 @@ static void webkitMediaCommonEncryptionDecryptProcessProtectionEvents(WebKitMedi
     WebKitMediaCommonEncryptionDecryptPrivate* priv = WEBKIT_MEDIA_CENC_DECRYPT_GET_PRIVATE(self);
 
     ASSERT(priv->m_mutex.isLocked());
+    CHECK_FOR_LOCK_TAKEN(self);
 
     bool isCDMInstanceAvailable = webkitMediaCommonEncryptionDecryptIsCDMInstanceAvailable(self);
 
@@ -523,7 +551,9 @@ static gboolean webkitMediaCommonEncryptionDecryptSinkEventHandler(GstBaseTransf
         gst_event_parse_protection(event, &systemId, nullptr, nullptr);
         GST_TRACE_OBJECT(self, "received protection event %u for %s", GST_EVENT_SEQNUM(event), systemId);
 
+        TRACE_LOCK(self);
         LockHolder locker(priv->m_mutex);
+        CHECK_FOR_LOCK_TAKEN(self);
         priv->m_protectionEvents.append(event);
         result = TRUE;
         gst_event_unref(event);
@@ -534,7 +564,9 @@ static gboolean webkitMediaCommonEncryptionDecryptSinkEventHandler(GstBaseTransf
         if (gst_structure_has_name(structure, "drm-attempt-to-decrypt-with-local-instance")) {
             gst_event_unref(event);
             result = TRUE;
+            TRACE_LOCK(self);
             LockHolder locker(priv->m_mutex);
+            CHECK_FOR_LOCK_TAKEN(self);
             RELEASE_ASSERT(webkitMediaCommonEncryptionDecryptIsCDMInstanceAvailable(self));
             GST_DEBUG_OBJECT(self, "attempting to decrypt with local instance %p", priv->m_cdmInstance.get());
             priv->m_condition.notifyOne();
@@ -543,7 +575,9 @@ static gboolean webkitMediaCommonEncryptionDecryptSinkEventHandler(GstBaseTransf
     }
     case GST_EVENT_FLUSH_START: {
         {
+            TRACE_LOCK(self);
             LockHolder locker(priv->m_mutex);
+            CHECK_FOR_LOCK_TAKEN(self);
             ASSERT(!priv->m_isFlushing);
             priv->m_isFlushing = true;
             GST_DEBUG_OBJECT(self, "flushing");
@@ -554,7 +588,9 @@ static gboolean webkitMediaCommonEncryptionDecryptSinkEventHandler(GstBaseTransf
     }
     case GST_EVENT_FLUSH_STOP: {
         {
+            TRACE_LOCK(self);
             LockHolder locker(priv->m_mutex);
+            CHECK_FOR_LOCK_TAKEN(self);
             ASSERT(priv->m_isFlushing);
             priv->m_isFlushing = false;
             GST_DEBUG_OBJECT(self, "flushing done");
@@ -599,7 +635,9 @@ static void webKitMediaCommonEncryptionDecryptorSetContext(GstElement* element, 
 
     if (gst_context_has_context_type(context, "drm-cdm-instance")) {
         const GValue* value = gst_structure_get_value(gst_context_get_structure(context), "cdm-instance");
+        TRACE_LOCK(self);
         LockHolder locker(priv->m_mutex);
+        CHECK_FOR_LOCK_TAKEN(self);
         priv->m_cdmInstance = value ? reinterpret_cast<CDMInstance*>(g_value_get_pointer(value)) : nullptr;
         GST_DEBUG_OBJECT(self, "received new CDMInstance %p", priv->m_cdmInstance.get());
         return;
@@ -612,6 +650,7 @@ RefPtr<CDMInstance> webKitMediaCommonEncryptionDecryptCDMInstance(WebKitMediaCom
 {
     WebKitMediaCommonEncryptionDecryptPrivate* priv = WEBKIT_MEDIA_CENC_DECRYPT_GET_PRIVATE(self);
     ASSERT(priv->m_mutex.isLocked());
+    CHECK_FOR_LOCK_TAKEN(self);
     return webkitMediaCommonEncryptionDecryptIsCDMInstanceAvailable(self) ? priv->m_cdmInstance : nullptr;
 }
 #endif // ENABLE(ENCRYPTED_MEDIA) && USE(GSTREAMER)
