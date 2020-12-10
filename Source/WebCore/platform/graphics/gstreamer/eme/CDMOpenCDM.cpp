@@ -183,8 +183,11 @@ private:
     void removeFailure() { updateFailure(); }
     void updateFailure()
     {
+        GST_TRACE("%p: m_sessionChangedCallbacks has %zu items", this, m_sessionChangedCallbacks.size());
+        GST_TRACE("Calling all callbacks in sessionChangedCallbacks");
         for (auto& sessionChangedCallback : m_sessionChangedCallbacks)
             sessionChangedCallback(this, false, nullptr, m_keyStatuses);
+        GST_TRACE("Clearing sessionChangedCallbacks");
         m_sessionChangedCallbacks.clear();
     }
 
@@ -370,6 +373,7 @@ CDMInstanceOpenCDM::Session::Session(CDMInstanceOpenCDM* parent, OpenCDMSystem& 
     , m_ocdmSystem(source)
     , m_parent(parent)
 {
+    GST_TRACE("%p", this);
     OpenCDMSession* session = nullptr;
     m_openCDMSessionCallbacks.process_challenge_callback = [](OpenCDMSession* session, void* userData, const char[], const uint8_t challenge[], const uint16_t challengeLength) {
         Session::openCDMNotification(session, userData, &Session::challengeGeneratedCallback, "challenge", challenge, challengeLength);
@@ -398,12 +402,14 @@ CDMInstanceOpenCDM::Session::Session(CDMInstanceOpenCDM* parent, OpenCDMSystem& 
 
 CDMInstanceOpenCDM::Session::~Session()
 {
+    GST_TRACE("%p", this);
     close();
     Session::m_validSessions.remove(this);
 }
 
 void CDMInstanceOpenCDM::Session::challengeGeneratedCallback(RefPtr<SharedBuffer>&& buffer)
 {
+    GST_TRACE("%p", this);
     std::optional<WebCore::MediaKeyMessageType> requestType;
     auto message = buffer ? parseResponseMessage(*buffer, requestType) : nullptr;
 
@@ -418,8 +424,10 @@ void CDMInstanceOpenCDM::Session::challengeGeneratedCallback(RefPtr<SharedBuffer
             challengeCallback(this);
         m_challengeCallbacks.clear();
     } else if (!m_sessionChangedCallbacks.isEmpty()) {
+        GST_TRACE("Calling all callbacks in sessionChangedCallbacks");
         for (auto& sessionChangedCallback : m_sessionChangedCallbacks)
             sessionChangedCallback(this, true, message.copyRef(), m_keyStatuses);
+        GST_TRACE("Clearing sessionChangedCallbacks");
         m_sessionChangedCallbacks.clear();
     } else {
         if (m_parent->client() && requestType.has_value())
@@ -429,6 +437,7 @@ void CDMInstanceOpenCDM::Session::challengeGeneratedCallback(RefPtr<SharedBuffer
 
 void CDMInstanceOpenCDM::Session::keyUpdatedCallback(RefPtr<SharedBuffer>&& buffer)
 {
+    GST_TRACE("%p", this);
     GST_MEMDUMP("Updated key", reinterpret_cast<const guint8*>(buffer->data()), buffer->size());
     auto index = m_keyStatuses.findMatching([&buffer](const std::pair<Ref<SharedBuffer>, KeyStatus>& item) {
         return memmem(buffer->data(), buffer->size(), item.first->data(), item.first->size());
@@ -443,30 +452,38 @@ void CDMInstanceOpenCDM::Session::keyUpdatedCallback(RefPtr<SharedBuffer>&& buff
 
 void CDMInstanceOpenCDM::Session::keysUpdateDoneCallback(RefPtr<SharedBuffer>&&)
 {
+    GST_TRACE("%p: m_sessionChangedCallbacks has %zu items", this, m_sessionChangedCallbacks.size());
     bool appliesToApiCall = !m_sessionChangedCallbacks.isEmpty();
     if (!appliesToApiCall && m_parent && m_parent->client()) {
+        GST_TRACE("Early return");
         m_parent->client()->updateKeyStatuses(copyAndMaybeReplaceValue(m_keyStatuses));
         return;
     }
 
+    GST_TRACE("Calling all callbacks in sessionChangedCallbacks");
     for (auto& sessionChangedCallback : m_sessionChangedCallbacks)
         sessionChangedCallback(this, true, nullptr, m_keyStatuses);
+    GST_TRACE("Clearing sessionChangedCallbacks");
     m_sessionChangedCallbacks.clear();
 }
 
 void CDMInstanceOpenCDM::Session::errorCallback(RefPtr<SharedBuffer>&& message)
 {
+    GST_TRACE("%p", this);
     for (const auto& challengeCallback : m_challengeCallbacks)
         challengeCallback(this);
     m_challengeCallbacks.clear();
 
+    GST_TRACE("Calling all callbacks in sessionChangedCallbacks");
     for (auto& sessionChangedCallback : m_sessionChangedCallbacks)
         sessionChangedCallback(this, false, WTFMove(message), m_keyStatuses);
+    GST_TRACE("Clearing sessionChangedCallbacks");
     m_sessionChangedCallbacks.clear();
 }
 
 void CDMInstanceOpenCDM::Session::generateChallenge(ChallengeGeneratedCallback&& callback)
 {
+    GST_TRACE("%p", this);
     if (isValid()) {
         callback(this);
         return;
@@ -477,6 +494,7 @@ void CDMInstanceOpenCDM::Session::generateChallenge(ChallengeGeneratedCallback&&
 
 void CDMInstanceOpenCDM::Session::update(const uint8_t* data, const unsigned length, SessionChangedCallback&& callback)
 {
+    GST_TRACE("%p", this);
     m_keyStatuses.clear();
     m_sessionChangedCallbacks.append(WTFMove(callback));
     if (!m_session || id().isEmpty() || opencdm_session_update(m_session.get(), data, length))
@@ -487,6 +505,7 @@ void CDMInstanceOpenCDM::Session::update(const uint8_t* data, const unsigned len
 
 void CDMInstanceOpenCDM::Session::load(SessionChangedCallback&& callback)
 {
+    GST_TRACE("%p", this);
     m_keyStatuses.clear();
     m_sessionChangedCallbacks.append(WTFMove(callback));
     if (!m_session || id().isEmpty() || opencdm_session_load(m_session.get()))
@@ -497,6 +516,7 @@ void CDMInstanceOpenCDM::Session::load(SessionChangedCallback&& callback)
 
 void CDMInstanceOpenCDM::Session::remove(SessionChangedCallback&& callback)
 {
+    GST_TRACE("%p", this);
     // m_keyStatuses are not cleared here not to rely on CDM callbacks with Released status.
     m_sessionChangedCallbacks.append(WTFMove(callback));
     if (!m_session || id().isEmpty() || opencdm_session_remove(m_session.get()))
@@ -577,9 +597,11 @@ void CDMInstanceOpenCDM::updateLicense(const String& sessionId, LicenseType, con
     }
 
     session->update(reinterpret_cast<const uint8_t*>(response.data()), response.size(), [callback = WTFMove(callback), locker = WTFMove(locker)](Session* session, bool success, RefPtr<SharedBuffer>&& buffer, KeyStatusVector& keyStatuses) {
+        GST_DEBUG("Running session->update() callback passed by updateLicense()");
         if (success) {
             if (!buffer) {
                 ASSERT(!keyStatuses.isEmpty());
+                GST_DEBUG("No buffer");
                 callback(false, copyAndMaybeReplaceValue(keyStatuses), std::nullopt, std::nullopt, SuccessValue::Succeeded);
             } else {
                 // FIXME: Using JSON reponse messages is much cleaner than using string prefixes, I believe there
