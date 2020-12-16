@@ -97,7 +97,6 @@ public:
     void demuxerIsDoneSendingProtectionEvents(const GstStructure*);
     void cacheProtectionEvent(GstEvent*);
     void handleProtectedBufferProbeInformation(GstPadProbeInfo*);
-    void injectProtectionEvent(GRefPtr<GstEvent>&&);
 #endif
 
 private:
@@ -108,15 +107,13 @@ private:
     void removeAppsrcDataLeavingProbe();
     void setAppsrcDataLeavingProbe();
     void demuxerNoMorePads();
+    void consumeAppSinkAvailableSamples();
+
     void consumeAppsinkAvailableSamples();
 
     GstPadProbeReturn appsrcEndOfAppendCheckerProbe(GstPadProbeInfo*);
 
     static void staticInitialization();
-
-#if ENABLE(ENCRYPTED_MEDIA)
-    void injectProtectionEventIfPending();
-#endif
 
     static std::once_flag s_staticInitializationFlag;
     static GType s_endOfAppendMetaType;
@@ -168,7 +165,6 @@ private:
     struct PadProbeInformation m_appsinkPadProtectionProbeInformation;
     GValue m_cachedProtectionEvents;
     bool m_isProcessingProtectionEvents { false };
-    GRefPtr<GstEvent> m_protectionEventPendingToInject;
 #endif
     // Keeps track of the states of append processing, to avoid performing actions inappropriate for the current state
     // (eg: processing more samples when the last one has been detected, etc.). See setAppendState() for valid
