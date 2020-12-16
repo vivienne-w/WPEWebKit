@@ -881,8 +881,6 @@ void AppendPipeline::resetPipeline()
     gst_element_set_state(m_pipeline.get(), GST_STATE_READY);
     gst_element_get_state(m_pipeline.get(), nullptr, nullptr, 0);
 
-    m_isProtectionEventAlreadyInjected = false;
-
 #if (!(LOG_DISABLED || defined(GST_DISABLE_GST_DEBUG)))
     {
         static unsigned i = 0;
@@ -1334,41 +1332,22 @@ void AppendPipeline::injectProtectionEvent(GRefPtr<GstEvent>&& event)
 {
     ASSERT(event);
 
-    if (m_protectionEventToInject && (m_protectionEventToInject->type & GST_EVENT_PROTECTION)) {
-        const gchar *oldSystemId = nullptr;
-        const gchar *oldOrigin = nullptr;
-        const gchar *newSystemId = nullptr;
-        const gchar *newOrigin = nullptr;
-        gst_event_parse_protection(m_protectionEventToInject.get(), &oldSystemId, nullptr, &oldOrigin);
-        gst_event_parse_protection(event.get(), &newSystemId, nullptr, &newOrigin);
-        if (!g_strcmp0(oldSystemId, newSystemId) && !g_strcmp0(oldOrigin, newOrigin)) {
-            GST_TRACE("An event like this one was already injected, bailing out");
-            return;
-        }
-    }
-    m_protectionEventToInject = WTFMove(event);
-    m_isProtectionEventAlreadyInjected = false;
+    m_protectionEventPendingToInject = WTFMove(event);
     injectProtectionEventIfPending();
 }
 
 void AppendPipeline::injectProtectionEventIfPending()
 {
-    if (!m_protectionEventToInject) {
+    if (!m_protectionEventPendingToInject) {
         GST_TRACE("No pending protection event to be injected");
         return;
     }
 
-    if (m_isProtectionEventAlreadyInjected) {
-        GST_TRACE("Protection event already injected");
-        return;
-    }
-
-    GST_TRACE("Distributing protectionEvent %" GST_PTR_FORMAT " to AppendPipeline %s on demuxer %" GST_PTR_FORMAT, m_protectionEventToInject.get(), m_sourceBufferPrivate->type().raw().utf8().data(), m_demux.get());
+    GST_TRACE("Distributing protectionEvent %" GST_PTR_FORMAT " to AppendPipeline %s on demuxer %" GST_PTR_FORMAT, m_protectionEventPendingToInject.get(), m_sourceBufferPrivate->type().raw().utf8().data(), m_demux.get());
     GRefPtr<GstPad> demuxerSinkPad = adoptGRef(gst_element_get_static_pad(m_demux.get(), "sink"));
-    GRefPtr<GstEvent> event = m_protectionEventToInject;
+    GRefPtr<GstEvent> event = m_protectionEventPendingToInject;
     if (gst_pad_send_event(demuxerSinkPad.get(), event.leakRef()))
-        m_isProtectionEventAlreadyInjected = true;
-    GST_TRACE("Distributed protectionEvent %" GST_PTR_FORMAT " to AppendPipeline %s on demuxer %" GST_PTR_FORMAT, m_protectionEventToInject.get(), m_sourceBufferPrivate->type().raw().utf8().data(), m_demux.get());
+        m_protectionEventPendingToInject.clear();
 }
 
 static GstPadProbeReturn appendPipelineAppsinkPadProtectionProbe(GstPad*, GstPadProbeInfo* info, struct PadProbeInformation *padProbeInformation)
