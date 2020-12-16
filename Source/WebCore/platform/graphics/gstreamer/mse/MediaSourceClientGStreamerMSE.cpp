@@ -70,10 +70,8 @@ MediaSourcePrivate::AddStatus MediaSourceClientGStreamerMSE::addSourceBuffer(Ref
     GST_TRACE("Adding SourceBuffer to AppendPipeline: this=%p sourceBuffer=%p appendPipeline=%p", this, sourceBufferPrivate.get(), appendPipeline.get());
     m_playerPrivate->m_appendPipelinesMap.add(sourceBufferPrivate, appendPipeline);
 
-#if ENABLE(ENCRYPTED_MEDIA)
     if (m_playerPrivate->m_synthesizedProtectionEvent)
         appendPipeline->injectProtectionEvent(m_playerPrivate->m_synthesizedProtectionEvent.get());
-#endif
 
     return m_playerPrivate->m_playbackPipeline->addSourceBuffer(sourceBufferPrivate);
 }
