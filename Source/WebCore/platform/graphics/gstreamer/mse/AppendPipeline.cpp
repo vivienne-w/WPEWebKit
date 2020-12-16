@@ -881,9 +881,7 @@ void AppendPipeline::resetPipeline()
     gst_element_set_state(m_pipeline.get(), GST_STATE_READY);
     gst_element_get_state(m_pipeline.get(), nullptr, nullptr, 0);
 
-#if ENABLE(ENCRYPTED_MEDIA)
     m_isProtectionEventAlreadyInjected = false;
-#endif
 
 #if (!(LOG_DISABLED || defined(GST_DISABLE_GST_DEBUG)))
     {
