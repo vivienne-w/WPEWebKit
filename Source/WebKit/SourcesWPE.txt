@@ -108,6 +108,7 @@ UIProcess/WebViewportAttributes.cpp
 
 UIProcess/API/C/WKGrammarDetail.cpp
 UIProcess/API/C/WKViewportAttributes.cpp
+UIProcess/API/C/WKUserScriptRef.cpp
 
 UIProcess/API/C/soup/WKCookieManagerSoup.cpp
 UIProcess/API/C/soup/WKSoupSession.cpp
