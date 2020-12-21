@@ -91,6 +91,9 @@ static GRefPtr<GstCaps> createSinkPadTemplateCaps()
     if (!opencdm_is_type_supported(WebCore::GStreamerEMEUtilities::s_PlayReadyKeySystems[0], emptyString.c_str()))
         addKeySystemToSinkPadCaps(caps, WEBCORE_GSTREAMER_EME_UTILITIES_PLAYREADY_UUID);
 
+    for (int i = 0; cencEncryptionMediaTypes[i]; ++i)
+        gst_caps_append_structure(caps.get(), gst_structure_new("application/x-cenc", "original-media-type", G_TYPE_STRING, cencEncryptionMediaTypes[i], nullptr));
+
     if (!opencdm_is_type_supported(WebCore::GStreamerEMEUtilities::s_WidevineKeySystem, emptyString.c_str())) {
         addKeySystemToSinkPadCaps(caps, WEBCORE_GSTREAMER_EME_UTILITIES_WIDEVINE_UUID);
         // No key system UUID for webm. It's not set in caps for it.
