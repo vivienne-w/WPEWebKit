@@ -73,27 +73,15 @@ enum SessionResult {
     OldSession
 };
 
-static void addKeySystemToSinkPadCaps(GRefPtr<GstCaps>& caps, const char* uuid)
-{
-    GST_INFO("adding sink pad template caps for %s", uuid);
-    for (int i = 0; cencEncryptionMediaTypes[i]; ++i)
-        gst_caps_append_structure(caps.get(), gst_structure_new("application/x-cenc", "original-media-type", G_TYPE_STRING, cencEncryptionMediaTypes[i], "protection-system", G_TYPE_STRING, uuid, nullptr));
-}
-
 static GRefPtr<GstCaps> createSinkPadTemplateCaps()
 {
     std::string emptyString;
     GRefPtr<GstCaps> caps = adoptGRef(gst_caps_new_empty());
 
-    if (!opencdm_is_type_supported(WebCore::GStreamerEMEUtilities::s_ClearKeyKeySystem, emptyString.c_str()))
-        addKeySystemToSinkPadCaps(caps, WEBCORE_GSTREAMER_EME_UTILITIES_CLEARKEY_UUID);
-
-    if (!opencdm_is_type_supported(WebCore::GStreamerEMEUtilities::s_PlayReadyKeySystems[0], emptyString.c_str()))
-        addKeySystemToSinkPadCaps(caps, WEBCORE_GSTREAMER_EME_UTILITIES_PLAYREADY_UUID);
+    for (int i = 0; cencEncryptionMediaTypes[i]; ++i)
+        gst_caps_append_structure(caps.get(), gst_structure_new("application/x-cenc", "original-media-type", G_TYPE_STRING, cencEncryptionMediaTypes[i], nullptr));
 
     if (!opencdm_is_type_supported(WebCore::GStreamerEMEUtilities::s_WidevineKeySystem, emptyString.c_str())) {
-        addKeySystemToSinkPadCaps(caps, WEBCORE_GSTREAMER_EME_UTILITIES_WIDEVINE_UUID);
-        // No key system UUID for webm. It's not set in caps for it.
         for (int i = 0; webmEncryptionMediaTypes[i]; ++i)
             gst_caps_append_structure(caps.get(), gst_structure_new("application/x-webm-enc", "original-media-type", G_TYPE_STRING, webmEncryptionMediaTypes[i], nullptr));
     }
