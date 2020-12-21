@@ -191,13 +191,9 @@ static GstCaps* webkitMediaCommonEncryptionDecryptTransformCaps(GstBaseTransform
             LockHolder locker(priv->m_mutex);
             CHECK_FOR_LOCK_TAKEN(self);
 
-            if (webkitMediaCommonEncryptionDecryptIsCDMInstanceAvailable(self)) {
+            if (webkitMediaCommonEncryptionDecryptIsCDMInstanceAvailable(self))
                 gst_structure_set_name(outgoingStructure.get(),
                     WebCore::GStreamerEMEUtilities::isUnspecifiedKeySystem(priv->m_cdmInstance->keySystem()) ? "application/x-webm-enc" : "application/x-cenc");
-                gst_structure_set(outgoingStructure.get(),
-                    "protection-system", G_TYPE_STRING, WebCore::GStreamerEMEUtilities::keySystemToUuid(priv->m_cdmInstance->keySystem()), nullptr);
-
-            }
         }
 
         bool duplicate = false;
