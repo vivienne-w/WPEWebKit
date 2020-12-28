@@ -43,6 +43,22 @@ double ResourceRequestBase::s_defaultTimeoutInterval = INT_MAX;
 double ResourceRequestBase::s_defaultTimeoutInterval = 0;
 #endif
 
+ResourceRequestBase::ResourceRequestBase(const URL& url, ResourceRequestCachePolicy policy)
+    : m_url(url)
+    , m_timeoutInterval(s_defaultTimeoutInterval)
+    , m_httpMethod("GET"_s)
+    , m_cachePolicy(policy)
+    , m_allowCookies(true)
+    , m_resourceRequestUpdated(true)
+    , m_resourceRequestBodyUpdated(true)
+{
+    if (m_url.host().toStringWithoutCopying().containsIgnoringASCIICase(String("vpe-static.bamgrid.com"))
+        && m_url.protocol().containsIgnoringASCIICase(String("https"))) {
+        printf("### %s: URL %s detected, changing from https to http\n", __PRETTY_FUNCTION__, m_url.string().utf8().data()); fflush(stdout);
+        m_url.setProtocol(String("http"));
+    }
+}
+
 inline const ResourceRequest& ResourceRequestBase::asResourceRequest() const
 {
     return *static_cast<const ResourceRequest*>(this);
