@@ -60,6 +60,10 @@ bool EventTarget::isNode() const
 
 bool EventTarget::addEventListener(const AtomicString& eventType, Ref<EventListener>&& listener, const AddEventListenerOptions& options)
 {
+    if (eventType == AtomicString("addsourcebuffer")) {
+        printf("@@@ %s: %s, eventListener: %p\n", __PRETTY_FUNCTION__, eventType.string().utf8().data(), listener.ptr()); fflush(stdout);
+    }
+
     auto passive = options.passive;
 
     if (!passive.has_value() && eventNames().isTouchScrollBlockingEventType(eventType)) {
@@ -183,6 +187,10 @@ ExceptionOr<bool> EventTarget::dispatchEventForBindings(Event& event)
 
 void EventTarget::dispatchEvent(Event& event)
 {
+    if (event.type() == AtomicString("addsourcebuffer")) {
+        printf("@@@ %s: dispatching %s\n", __PRETTY_FUNCTION__, event.type().string().utf8().data()); fflush(stdout);
+    }
+
     ASSERT(event.isInitialized());
     ASSERT(!event.isBeingDispatched());
 
@@ -192,6 +200,10 @@ void EventTarget::dispatchEvent(Event& event)
     event.resetBeforeDispatch();
     fireEventListeners(event);
     event.resetAfterDispatch();
+
+    if (event.type() == AtomicString("addsourcebuffer")) {
+        printf("@@@ %s: dispatched %s\n", __PRETTY_FUNCTION__, event.type().string().utf8().data()); fflush(stdout);
+    }
 }
 
 void EventTarget::uncaughtExceptionInEventHandler()
@@ -254,6 +266,10 @@ void EventTarget::fireEventListeners(Event& event)
 // Note that removal still has an effect due to the removed field in RegisteredEventListener.
 void EventTarget::fireEventListeners(Event& event, EventListenerVector listeners)
 {
+    if (event.type() == AtomicString("addsourcebuffer")) {
+        printf("@@@ %s: %s\n", __PRETTY_FUNCTION__, event.type().string().utf8().data()); fflush(stdout);
+    }
+
     Ref<EventTarget> protectedThis(*this);
     ASSERT(!listeners.isEmpty());
     ASSERT(scriptExecutionContext());
@@ -265,6 +281,23 @@ void EventTarget::fireEventListeners(Event& event, EventListenerVector listeners
         willDispatchEventCookie = InspectorInstrumentation::willDispatchEvent(downcast<Document>(context), event, true);
 
     for (auto& registeredListener : listeners) {
+        if (event.type() == AtomicString("addsourcebuffer")) {
+            const char* type = "unknown";
+            switch (registeredListener->callback().type()) {
+            case EventListener::JSEventListenerType: type = "JSEventListener"; break;
+            case EventListener::ImageEventListenerType: type = "ImageEventListenerType"; break;
+            case EventListener::ObjCEventListenerType: type = "ObjCEventListenerType"; break;
+            case EventListener::CPPEventListenerType: type = "CPPEventListenerType"; break;
+            case EventListener::ConditionEventListenerType: type = "ConditionEventListenerType"; break;
+            case EventListener::GObjectEventListenerType: type = "GObjectEventListenerType"; break;
+            case EventListener::NativeEventListenerType: type = "NativeEventListenerType"; break;
+            case EventListener::SVGTRefTargetEventListenerType: type = "SVGTRefTargetEventListenerType"; break;
+            default: type = "unknown";
+            }
+
+            printf("@@@ %s: %s, listener type: %s\n", __PRETTY_FUNCTION__, event.type().string().utf8().data(), type); fflush(stdout);
+        }
+
         if (UNLIKELY(registeredListener->wasRemoved()))
             continue;
 
@@ -281,6 +314,10 @@ void EventTarget::fireEventListeners(Event& event, EventListenerVector listeners
         if (event.immediatePropagationStopped())
             break;
 
+        if (event.type() == AtomicString("addsourcebuffer")) {
+            printf("@@@ %s: %s, (A)\n", __PRETTY_FUNCTION__, event.type().string().utf8().data()); fflush(stdout);
+        }
+
         // Do this before invocation to avoid reentrancy issues.
         if (registeredListener->isOnce())
             removeEventListener(event.type(), registeredListener->callback(), ListenerOptions(registeredListener->useCapture()));
@@ -289,6 +326,9 @@ void EventTarget::fireEventListeners(Event& event, EventListenerVector listeners
             event.setInPassiveListener(true);
 
         InspectorInstrumentation::willHandleEvent(context, event, *registeredListener);
+        if (event.type() == AtomicString("addsourcebuffer")) {
+            printf("@@@ %s: %s, calling EventListener::handleEvent()\n", __PRETTY_FUNCTION__, event.type().string().utf8().data()); fflush(stdout);
+        }
         registeredListener->callback().handleEvent(context, event);
         InspectorInstrumentation::didHandleEvent(context);
 

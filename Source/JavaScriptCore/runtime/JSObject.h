@@ -1311,6 +1311,7 @@ inline JSObject::JSObject(VM& vm, Structure* structure, Butterfly* butterfly)
     : JSCell(vm, structure)
     , m_butterfly(vm, this, butterfly)
 {
+    printf("%s: %p %s\n", __PRETTY_FUNCTION__, this, JSObject::className(this, vm).utf8().data()); fflush(stdout);
 }
 
 inline JSValue JSObject::getPrototypeDirect(VM& vm) const

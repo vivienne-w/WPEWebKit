@@ -55,9 +55,13 @@ JSEventListener::JSEventListener(JSObject* function, JSObject* wrapper, bool isA
         m_jsFunction = JSC::Weak<JSC::JSObject>(function);
     } else
         ASSERT(!function);
+    printf("@@@ %s: %p, wrapper: %p, function: %p, m_jsFunction: %p\n", __PRETTY_FUNCTION__, this, wrapper, function, m_jsFunction.get()); fflush(stdout);
 }
 
-JSEventListener::~JSEventListener() = default;
+JSEventListener::~JSEventListener() //= default;
+{
+    printf("@@@ %s: %p, m_jsFunction: %p\n", __PRETTY_FUNCTION__, this, m_jsFunction.get()); fflush(stdout);
+}
 
 Ref<JSEventListener> JSEventListener::create(JSC::JSObject* listener, JSC::JSObject* wrapper, bool isAttribute, DOMWrapperWorld& world)
 {
@@ -98,8 +102,16 @@ static void handleBeforeUnloadEventReturnValue(BeforeUnloadEvent& event, const S
 
 void JSEventListener::handleEvent(ScriptExecutionContext& scriptExecutionContext, Event& event)
 {
-    if (scriptExecutionContext.isJSExecutionForbidden())
+    if (event.type() == AtomicString("addsourcebuffer")) {
+        printf("@@@ %s: %s, this: %p, m_jsFunction: %p, m_wrapper: %p\n", __PRETTY_FUNCTION__, event.type().string().utf8().data(), this, m_jsFunction.get(), m_wrapper.get()); fflush(stdout);
+    }
+
+    if (scriptExecutionContext.isJSExecutionForbidden()) {
+        if (event.type() == AtomicString("addsourcebuffer")) {
+            printf("@@@ %s: %s: JS execution forbidden, returning\n", __PRETTY_FUNCTION__, event.type().string().utf8().data()); fflush(stdout);
+        }
         return;
+    }
 
     VM& vm = scriptExecutionContext.vm();
     JSLockHolder lock(vm);
@@ -110,23 +122,45 @@ void JSEventListener::handleEvent(ScriptExecutionContext& scriptExecutionContext
     // exception.
 
     JSObject* jsFunction = this->jsFunction(scriptExecutionContext);
-    if (!jsFunction)
+    if (!jsFunction) {
+        if (event.type() == AtomicString("addsourcebuffer")) {
+            printf("@@@ %s: %s: no jsFunction, returning\n", __PRETTY_FUNCTION__, event.type().string().utf8().data()); fflush(stdout);
+        }
         return;
+    }
 
     JSDOMGlobalObject* globalObject = toJSDOMGlobalObject(scriptExecutionContext, m_isolatedWorld);
-    if (!globalObject)
+    if (!globalObject) {
+        if (event.type() == AtomicString("addsourcebuffer")) {
+            printf("@@@ %s: %s: no globalObject, returning\n", __PRETTY_FUNCTION__, event.type().string().utf8().data()); fflush(stdout);
+        }
         return;
+    }
 
     if (scriptExecutionContext.isDocument()) {
         JSDOMWindow* window = jsCast<JSDOMWindow*>(globalObject);
-        if (!window->wrapped().isCurrentlyDisplayedInFrame())
+        if (!window->wrapped().isCurrentlyDisplayedInFrame()) {
+            if (event.type() == AtomicString("addsourcebuffer")) {
+                printf("@@@ %s: %s: no isCurrentlyDisplayedInFrame, returning\n", __PRETTY_FUNCTION__, event.type().string().utf8().data()); fflush(stdout);
+            }
             return;
-        if (wasCreatedFromMarkup() && !scriptExecutionContext.contentSecurityPolicy()->allowInlineEventHandlers(sourceURL(), sourcePosition().m_line))
+        }
+        if (wasCreatedFromMarkup() && !scriptExecutionContext.contentSecurityPolicy()->allowInlineEventHandlers(sourceURL(), sourcePosition().m_line)) {
+            if (event.type() == AtomicString("addsourcebuffer")) {
+                printf("@@@ %s: %s: no allowInlineEventHandlers, returning\n", __PRETTY_FUNCTION__, event.type().string().utf8().data()); fflush(stdout);
+            }
             return;
+        }
         // FIXME: Is this check needed for other contexts?
         ScriptController& script = window->wrapped().frame()->script();
-        if (!script.canExecuteScripts(AboutToExecuteScript) || script.isPaused())
+        if (!script.canExecuteScripts(AboutToExecuteScript) || script.isPaused()) {
+            if (event.type() == AtomicString("addsourcebuffer")) {
+                printf("@@@ %s: %s: %s, %s, returning\n", __PRETTY_FUNCTION__, event.type().string().utf8().data(),
+                       (!script.canExecuteScripts(AboutToExecuteScript)) ? "no canExecuteScripts" : "canExecuteScripts",
+                       (script.isPaused()) ? "script.isPaused" : "no script.isPaused"); fflush(stdout);
+            }
             return;
+        }
     }
 
     ExecState* exec = globalObject->globalExec();
@@ -144,6 +178,9 @@ void JSEventListener::handleEvent(ScriptExecutionContext& scriptExecutionContext
             scope.clearException();
             event.target()->uncaughtExceptionInEventHandler();
             reportException(exec, exception);
+            if (event.type() == AtomicString("addsourcebuffer")) {
+                printf("@@@ %s: %s: reportException, returning\n", __PRETTY_FUNCTION__, event.type().string().utf8().data()); fflush(stdout);
+            }
             return;
         }
         callType = getCallData(vm, handleEventFunction, callData);
@@ -169,6 +206,18 @@ void JSEventListener::handleEvent(ScriptExecutionContext& scriptExecutionContext
 
         JSValue thisValue = handleEventFunction == jsFunction ? toJS(exec, globalObject, event.currentTarget()) : jsFunction;
         NakedPtr<JSC::Exception> exception;
+
+        if (event.type() == AtomicString("addsourcebuffer")) {
+            const String name("unknown");
+            StringPrintStream p;
+            if (jsFunction) {
+                jsFunction->dump(p);
+                JSFunction *f = static_cast<JSFunction*>(jsFunction);
+                const String name = f->calculatedDisplayName(vm);
+            }
+            printf("@@@ %s: %s, calling JS function: %s %s\n", __PRETTY_FUNCTION__, event.type().string().utf8().data(), p.toString().utf8().data(), name.utf8().data()); fflush(stdout);
+        }
+
         JSValue retval = JSExecState::profiledCall(exec, JSC::ProfilingReason::Other, handleEventFunction, callType, callData, thisValue, args, exception);
 
         InspectorInstrumentation::didCallFunction(cookie, &scriptExecutionContext);

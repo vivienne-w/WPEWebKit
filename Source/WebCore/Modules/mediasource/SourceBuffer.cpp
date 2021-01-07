@@ -272,6 +272,7 @@ ExceptionOr<void> SourceBuffer::setAppendWindowEnd(double newValue)
 
 ExceptionOr<void> SourceBuffer::appendBuffer(const BufferSource& data)
 {
+    GST_DEBUG("%zu bytes", data.length());
     return appendBufferInternal(static_cast<const unsigned char*>(data.data()), data.length());
 }
 
@@ -305,6 +306,7 @@ void SourceBuffer::resetParserState()
 
 ExceptionOr<void> SourceBuffer::abort()
 {
+    GST_DEBUG("");
     // Section 3.2 abort() method steps.
     // https://rawgit.com/w3c/media-source/45627646344eea0170dd1cbc5a3d508ca751abb8/media-source-respec.html#dom-sourcebuffer-abort
     // 1. If this object has been removed from the sourceBuffers attribute of the parent media source
@@ -433,6 +435,7 @@ void SourceBuffer::readyStateChanged()
 
 void SourceBuffer::removedFromMediaSource()
 {
+    GST_DEBUG("");
     if (isRemoved())
         return;
 
@@ -503,6 +506,7 @@ bool SourceBuffer::hasPendingActivity() const
 
 void SourceBuffer::suspend(ReasonForSuspension reason)
 {
+    GST_DEBUG("");
     switch (reason) {
     case ReasonForSuspension::PageCache:
     case ReasonForSuspension::PageWillBeSuspended:
@@ -517,11 +521,13 @@ void SourceBuffer::suspend(ReasonForSuspension reason)
 
 void SourceBuffer::resume()
 {
+    GST_DEBUG("");
     m_asyncEventQueue.resume();
 }
 
 void SourceBuffer::stop()
 {
+    GST_DEBUG("");
     m_asyncEventQueue.close();
     m_appendBufferTimer.stop();
     m_removeTimer.stop();
@@ -1504,6 +1510,7 @@ public:
 
 void SourceBuffer::appendError(bool decodeErrorParam)
 {
+    GST_DEBUG("");
     // 3.5.3 Append Error Algorithm
     // https://rawgit.com/w3c/media-source/c3ad59c7a370d04430969ba73d18dc9bcde57a33/index.html#sourcebuffer-append-error [Editor's Draft 09 January 2015]
 
@@ -2365,13 +2372,17 @@ ExceptionOr<void> SourceBuffer::setMode(AppendMode newMode)
 
     // 1. Let new mode equal the new value being assigned to this attribute.
     // 2. If generate timestamps flag equals true and new mode equals "segments", then throw an InvalidAccessError exception and abort these steps.
-    if (m_shouldGenerateTimestamps && newMode == AppendMode::Segments)
+    if (m_shouldGenerateTimestamps && newMode == AppendMode::Segments) {
+        GST_DEBUG("mode: Segments, InvalidAccessError");
         return Exception { InvalidAccessError };
+    }
 
     // 3. If this object has been removed from the sourceBuffers attribute of the parent media source, then throw an InvalidStateError exception and abort these steps.
     // 4. If the updating attribute equals true, then throw an InvalidStateError exception and abort these steps.
-    if (isRemoved() || m_updating)
+    if (isRemoved() || m_updating) {
+        GST_DEBUG("mode: %s, InvalidStateError", (newMode == AppendMode::Segments) ? "Segments" : "Sequence");
         return Exception { InvalidStateError };
+    }
 
     // 5. If the readyState attribute of the parent media source is in the "ended" state then run the following steps:
     if (m_source->isEnded()) {
@@ -2381,8 +2392,10 @@ ExceptionOr<void> SourceBuffer::setMode(AppendMode newMode)
     }
 
     // 6. If the append state equals PARSING_MEDIA_SEGMENT, then throw an InvalidStateError and abort these steps.
-    if (m_appendState == ParsingMediaSegment)
+    if (m_appendState == ParsingMediaSegment) {
+        GST_DEBUG("mode: %s, InvalidStateError", (newMode == AppendMode::Segments) ? "Segments" : "Sequence");
         return Exception { InvalidStateError };
+    }
 
     // 7. If the new mode equals "sequence", then set the group start timestamp to the group end timestamp.
     if (newMode == AppendMode::Sequence)
@@ -2391,6 +2404,7 @@ ExceptionOr<void> SourceBuffer::setMode(AppendMode newMode)
     // 8. Update the attribute to new mode.
     m_mode = newMode;
 
+    GST_DEBUG("mode: %s", (newMode == AppendMode::Segments) ? "Segments" : "Sequence");
     return { };
 }
 
