@@ -90,13 +90,6 @@ static inline void getClassPropertyNames(ExecState* exec, const ClassInfo* class
     }
 }
 
-JSObject::JSObject(VM& vm, Structure* structure, Butterfly* butterfly)
-    : JSCell(vm, structure)
-    , m_butterfly(vm, this, butterfly)
-{
-    printf("%s: %p %s\n", __PRETTY_FUNCTION__, this, JSObject::className(this, vm).utf8().data()); fflush(stdout);
-}
-
 ALWAYS_INLINE void JSObject::markAuxiliaryAndVisitOutOfLineProperties(SlotVisitor& visitor, Butterfly* butterfly, Structure* structure, PropertyOffset lastOffset)
 {
     // We call this when we found everything without races.

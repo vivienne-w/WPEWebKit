@@ -26,8 +26,6 @@
 #pragma once
 
 #include "JSCJSValue.h"
-#include "wtf/StringPrintStream.h"
-#include <signal.h>
 
 namespace JSC {
 
@@ -60,33 +58,17 @@ public:
 
     static WeakImpl* asWeakImpl(JSValue*);
 
-    void setDebug(bool debug) {
-        m_debug = debug;
-    }
 private:
     const JSValue m_jsValue;
     WeakHandleOwner* m_weakHandleOwner;
     void* m_context;
-    bool m_debug = false;
 };
-
-static const char* stateToString(const WeakImpl::State& state)
-{
-    switch (state) {
-    case WeakImpl::Live: return "Live";
-    case WeakImpl::Dead: return "Dead";
-    case WeakImpl::Finalized: return "Finalized";
-    case WeakImpl::Deallocated: return "Deallocated";
-    default: return "<Unknown>";
-    }
-}
 
 inline WeakImpl::WeakImpl()
     : m_weakHandleOwner(0)
     , m_context(0)
 {
     setState(Deallocated);
-    printf("@@@ %s: %p, state: %s\n", __PRETTY_FUNCTION__, this, stateToString(state())); fflush(stdout);
 }
 
 inline WeakImpl::WeakImpl(JSValue jsValue, WeakHandleOwner* weakHandleOwner, void* context)
@@ -94,10 +76,6 @@ inline WeakImpl::WeakImpl(JSValue jsValue, WeakHandleOwner* weakHandleOwner, voi
     , m_weakHandleOwner(weakHandleOwner)
     , m_context(context)
 {
-    StringPrintStream p;
-    m_jsValue.dump(p);
-    printf("@@@ %s: %p, m_jsValue: %s %p, state: %s\n", __PRETTY_FUNCTION__, this, p.toString().utf8().data(), &m_jsValue, stateToString(state())); fflush(stdout);
-
     ASSERT(state() == Live);
     ASSERT(m_jsValue && m_jsValue.isCell());
 }
@@ -109,11 +87,6 @@ inline WeakImpl::State WeakImpl::state()
 
 inline void WeakImpl::setState(WeakImpl::State state)
 {
-    printf("@@@ %s: %p, state: %s --> %s\n", __PRETTY_FUNCTION__, this, stateToString(this->state()), stateToString(state)); fflush(stdout);
-    if (m_debug && state > WeakImpl::Live && getenv("DEBUGSTOP")) {
-        printf("@@@ %s: %p Pausing process: raise(SIGSTOP)\n", __PRETTY_FUNCTION__, this); fflush(stdout);
-        raise(SIGSTOP);
-    }
     ASSERT(state >= this->state());
     m_weakHandleOwner = reinterpret_cast<WeakHandleOwner*>((reinterpret_cast<uintptr_t>(m_weakHandleOwner) & ~StateMask) | state);
 }

@@ -47,13 +47,11 @@ SourceBufferList::SourceBufferList(ScriptExecutionContext* context)
     : ActiveDOMObject(context)
     , m_asyncEventQueue(*this)
 {
-    printf("@@@ %s: %p\n", __PRETTY_FUNCTION__, this); fflush(stdout);
     suspendIfNeeded();
 }
 
 SourceBufferList::~SourceBufferList()
 {
-    printf("@@@ %s: %p\n", __PRETTY_FUNCTION__, this); fflush(stdout);
     ASSERT(m_list.isEmpty());
 }
 

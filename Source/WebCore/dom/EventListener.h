@@ -55,8 +55,6 @@ public:
     virtual bool isAttribute() const { return false; }
     Type type() const { return m_type; }
 
-    virtual void setDebug(bool) { }
-
 protected:
     explicit EventListener(Type type)
         : m_type(type)

@@ -34,7 +34,6 @@ namespace JSC {
 template<typename T> inline Weak<T>::Weak(T* cell, WeakHandleOwner* weakOwner, void* context)
     : m_impl(cell ? WeakSet::allocate(cell, weakOwner, context) : 0)
 {
-    printf("@@@ %s: %p, WeakImpl: %p\n", __PRETTY_FUNCTION__, this, m_impl); fflush(stdout);
 }
 
 template<typename T> inline bool Weak<T>::isHashTableDeletedValue() const
@@ -45,30 +44,25 @@ template<typename T> inline bool Weak<T>::isHashTableDeletedValue() const
 template<typename T> inline Weak<T>::Weak(typename Weak<T>::HashTableDeletedValueTag)
     : m_impl(hashTableDeletedValue())
 {
-    printf("@@@ %s: %p\n", __PRETTY_FUNCTION__, this); fflush(stdout);
 }
 
 template<typename T> inline Weak<T>::Weak(Weak&& other)
     : m_impl(other.leakImpl())
 {
-    printf("@@@ %s: %p\n", __PRETTY_FUNCTION__, this); fflush(stdout);
 }
 
 template<class T> inline void swap(Weak<T>& a, Weak<T>& b)
 {
-    printf("@@@ %s: %p <--> %p\n", __PRETTY_FUNCTION__, &a, &b); fflush(stdout);
     a.swap(b);
 }
 
 template<typename T> inline void Weak<T>::swap(Weak& other)
 {
-    printf("@@@ %s: %p <--> %p\n", __PRETTY_FUNCTION__, this, &other); fflush(stdout);
     std::swap(m_impl, other.m_impl);
 }
 
 template<typename T> inline auto Weak<T>::operator=(Weak&& other) -> Weak&
 {
-    printf("@@@ %s: %p\n", __PRETTY_FUNCTION__, this); fflush(stdout);
     Weak weak = WTFMove(other);
     swap(weak);
     return *this;
@@ -76,7 +70,6 @@ template<typename T> inline auto Weak<T>::operator=(Weak&& other) -> Weak&
 
 template<typename T> inline T* Weak<T>::operator->() const
 {
-    printf("@@@ %s: %p, result: %p\n", __PRETTY_FUNCTION__, this, static_cast<T*>(m_impl->jsValue().asCell())); fflush(stdout);
     ASSERT(m_impl && m_impl->state() == WeakImpl::Live);
     // We can't use jsCast here since we could be called in a finalizer.
     return static_cast<T*>(m_impl->jsValue().asCell());
@@ -84,7 +77,6 @@ template<typename T> inline T* Weak<T>::operator->() const
 
 template<typename T> inline T& Weak<T>::operator*() const
 {
-    printf("@@@ %s: %p, result: %p\n", __PRETTY_FUNCTION__, this, static_cast<T*>(m_impl->jsValue().asCell())); fflush(stdout);
     ASSERT(m_impl && m_impl->state() == WeakImpl::Live);
     // We can't use jsCast here since we could be called in a finalizer.
     return *static_cast<T*>(m_impl->jsValue().asCell());
@@ -92,24 +84,19 @@ template<typename T> inline T& Weak<T>::operator*() const
 
 template<typename T> inline T* Weak<T>::get() const
 {
-    if (!m_impl || m_impl->state() != WeakImpl::Live) {
-        printf("@@@ %s: %p, early return! WeakImpl: %p, state!=live: %s\n", __PRETTY_FUNCTION__, this, m_impl, (!m_impl || m_impl->state() != WeakImpl::Live) ? "true" : "false"); fflush(stdout);
+    if (!m_impl || m_impl->state() != WeakImpl::Live)
         return nullptr;
-    }
-    printf("@@@ %s: %p, result: %p\n", __PRETTY_FUNCTION__, this, static_cast<T*>(m_impl->jsValue().asCell())); fflush(stdout);
     // We can't use jsCast here since we could be called in a finalizer.
     return static_cast<T*>(m_impl->jsValue().asCell());
 }
 
 template<typename T> inline bool Weak<T>::was(T* other) const
 {
-    printf("@@@ %s: %p, result: %p == %p\n", __PRETTY_FUNCTION__, this, static_cast<T*>(m_impl->jsValue().asCell()), other); fflush(stdout);
     return static_cast<T*>(m_impl->jsValue().asCell()) == other;
 }
 
 template<typename T> inline bool Weak<T>::operator!() const
 {
-    printf("@@@ %s: %p WeakImpl: %p, state!=live: %s\n", __PRETTY_FUNCTION__, this, m_impl, (!m_impl || m_impl->state() != WeakImpl::Live) ? "true" : "false"); fflush(stdout);
     return !m_impl || !m_impl->jsValue() || m_impl->state() != WeakImpl::Live;
 }
 
@@ -120,7 +107,6 @@ template<typename T> inline Weak<T>::operator bool() const
 
 template<typename T> inline WeakImpl* Weak<T>::leakImpl()
 {
-    printf("@@@ %s: %p leaking WeakImpl: %p\n", __PRETTY_FUNCTION__, this, m_impl); fflush(stdout);
     WeakImpl* impl = m_impl;
     m_impl = nullptr;
     return impl;

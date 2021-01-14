@@ -55,7 +55,7 @@ JSEventListener::JSEventListener(JSObject* function, JSObject* wrapper, bool isA
         m_jsFunction = JSC::Weak<JSC::JSObject>(function);
     } else
         ASSERT(!function);
-    printf("@@@ %s: %p, wrapper: %p (Weak is %p), function: %p, m_jsFunction: %p\n", __PRETTY_FUNCTION__, this, wrapper, &m_wrapper, function, m_jsFunction.get()); fflush(stdout);
+    printf("@@@ %s: %p, wrapper: %p, function: %p, m_jsFunction: %p\n", __PRETTY_FUNCTION__, this, wrapper, function, m_jsFunction.get()); fflush(stdout);
 }
 
 JSEventListener::~JSEventListener() //= default;
@@ -103,7 +103,7 @@ static void handleBeforeUnloadEventReturnValue(BeforeUnloadEvent& event, const S
 void JSEventListener::handleEvent(ScriptExecutionContext& scriptExecutionContext, Event& event)
 {
     if (event.type() == AtomicString("addsourcebuffer")) {
-        printf("@@@ %s: %s, this: %p, m_jsFunction: %p, m_wrapper: %p (Weak is %p)\n", __PRETTY_FUNCTION__, event.type().string().utf8().data(), this, m_jsFunction.get(), m_wrapper.get(), &m_wrapper); fflush(stdout);
+        printf("@@@ %s: %s, this: %p, m_jsFunction: %p, m_wrapper: %p\n", __PRETTY_FUNCTION__, event.type().string().utf8().data(), this, m_jsFunction.get(), m_wrapper.get()); fflush(stdout);
     }
 
     if (scriptExecutionContext.isJSExecutionForbidden()) {

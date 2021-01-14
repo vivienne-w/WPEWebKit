@@ -62,8 +62,6 @@ bool EventTarget::addEventListener(const AtomicString& eventType, Ref<EventListe
 {
     if (eventType == AtomicString("addsourcebuffer")) {
         printf("@@@ %s: %s, eventListener: %p\n", __PRETTY_FUNCTION__, eventType.string().utf8().data(), listener.ptr()); fflush(stdout);
-        printf("@@@ %s: Setting Weak --> WeakImpl as debug to pause process on WeakImpl dying\n", __PRETTY_FUNCTION__); fflush(stdout);
-        listener->setDebug(true);
     }
 
     auto passive = options.passive;

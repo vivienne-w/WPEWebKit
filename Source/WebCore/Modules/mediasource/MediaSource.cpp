@@ -106,7 +106,6 @@ MediaSource::MediaSource(ScriptExecutionContext& context)
 {
     LOG(MediaSource, "MediaSource::MediaSource %p", this);
     m_sourceBuffers = SourceBufferList::create(scriptExecutionContext());
-    printf("@@@ %s: Created m_sourceBuffers: %p\n", __PRETTY_FUNCTION__, m_sourceBuffers.get()); fflush(stdout);
     m_activeSourceBuffers = SourceBufferList::create(scriptExecutionContext());
 }
 
@@ -691,7 +690,6 @@ ExceptionOr<Ref<SourceBuffer>> MediaSource::addSourceBuffer(const String& type)
     buffer->setMode(shouldGenerateTimestamps ? SourceBuffer::AppendMode::Sequence : SourceBuffer::AppendMode::Segments);
 
     // 8. Add the new object to sourceBuffers and fire a addsourcebuffer on that object.
-    printf("@@@ %s: Adding SourceBuffer %p to m_sourceBuffers %p\n", __PRETTY_FUNCTION__, buffer.ptr(), m_sourceBuffers.get()); fflush(stdout);
     m_sourceBuffers->add(buffer.copyRef());
     regenerateActiveSourceBuffers();
 
@@ -917,7 +915,6 @@ void MediaSource::detachFromElement(HTMLMediaElement& element)
 
     // 5. Remove all the SourceBuffer objects from sourceBuffers.
     // 6. Queue a task to fire a simple event named removesourcebuffer at sourceBuffers.
-    printf("@@@ %s: Removing all SourceBuffers from m_sourceBuffers %p\n", __PRETTY_FUNCTION__, m_sourceBuffers.get()); fflush(stdout);
     while (m_sourceBuffers->length())
         removeSourceBuffer(*m_sourceBuffers->item(0));
 
@@ -1071,7 +1068,6 @@ URLRegistry& MediaSource::registry() const
 
 void MediaSource::regenerateActiveSourceBuffers()
 {
-    printf("@@@ %s: Before: m_sourceBuffers %p\n", __PRETTY_FUNCTION__, m_sourceBuffers.get()); fflush(stdout);
     Vector<RefPtr<SourceBuffer>> newList;
     for (auto& sourceBuffer : *m_sourceBuffers) {
         if (sourceBuffer->active())
@@ -1080,7 +1076,6 @@ void MediaSource::regenerateActiveSourceBuffers()
     m_activeSourceBuffers->swap(newList);
     for (auto& sourceBuffer : *m_activeSourceBuffers)
         sourceBuffer->setBufferedDirty(true);
-    printf("@@@ %s: After: m_sourceBuffers %p\n", __PRETTY_FUNCTION__, m_sourceBuffers.get()); fflush(stdout);
 }
 
 }
