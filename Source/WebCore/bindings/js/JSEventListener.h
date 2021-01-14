@@ -109,10 +109,8 @@ inline JSC::JSObject* JSEventListener::jsFunction(ScriptExecutionContext& script
     ASSERT(!m_isolatedWorld->isNormal() || m_wrapper || !m_jsFunction);
 
     // If m_wrapper is null, then m_jsFunction is zombied, and should never be accessed.
-    if (!m_wrapper) {
-        printf("%s: %p !m_wrapper, so m_jsFunction is zombied!\n", __PRETTY_FUNCTION__, this); fflush(stdout);
+    if (!m_wrapper)
         return nullptr;
-    }
 
     // Try to verify that m_jsFunction wasn't recycled. (Not exact, since an
     // event listener can be almost anything, but this makes test-writing easier).

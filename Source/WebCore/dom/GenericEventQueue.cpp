@@ -52,9 +52,6 @@ void GenericEventQueue::enqueueEvent(RefPtr<Event>&& event)
     if (event->target() == &m_owner)
         event->setTarget(nullptr);
 
-    if (event->type() == AtomicString("addsourcebuffer")) {
-        printf("@@@ %s: %s enqueued %s\n", __PRETTY_FUNCTION__, event->type().string().utf8().data(), m_isSuspended ? " (but GenericEventQueue is suspended!)" : ""); fflush(stdout);
-    }
     m_pendingEvents.append(WTFMove(event));
 
     if (m_isSuspended)
@@ -70,16 +67,6 @@ void GenericEventQueue::dispatchOneEvent()
     Ref<EventTarget> protect(m_owner);
     RefPtr<Event> event = m_pendingEvents.takeFirst();
     EventTarget& target = event->target() ? *event->target() : m_owner;
-
-    if (event->type() == AtomicString("addsourcebuffer")) {
-        printf("@@@ %s: dispatching %s\n", __PRETTY_FUNCTION__, event->type().string().utf8().data()); fflush(stdout);
-
-        if (!(!target.scriptExecutionContext()->activeDOMObjectsAreStopped())) {
-            printf("@@@ %s: An attempt to dispatch an event on a stopped target by EventTargetInterface=%d (nodeName=%s target=%p owner=%p)\n", __PRETTY_FUNCTION__,
-                m_owner.eventTargetInterface(), m_owner.isNode() ? static_cast<Node&>(m_owner).nodeName().ascii().data() : "", &target, &m_owner); fflush(stdout);
-        }
-    }
-
     ASSERT_WITH_MESSAGE(!target.scriptExecutionContext()->activeDOMObjectsAreStopped(),
         "An attempt to dispatch an event on a stopped target by EventTargetInterface=%d (nodeName=%s target=%p owner=%p)",
         m_owner.eventTargetInterface(), m_owner.isNode() ? static_cast<Node&>(m_owner).nodeName().ascii().data() : "", &target, &m_owner);
