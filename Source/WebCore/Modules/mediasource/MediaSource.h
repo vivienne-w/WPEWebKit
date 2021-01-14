@@ -89,7 +89,10 @@ public:
 
     HTMLMediaElement* mediaElement() const { return m_mediaElement; }
 
-    SourceBufferList* sourceBuffers() { return m_sourceBuffers.get(); }
+    SourceBufferList* sourceBuffers() {
+        printf("@@@ %s: Returning m_sourceBuffers %p\n", __PRETTY_FUNCTION__, m_sourceBuffers.get()); fflush(stdout);
+        return m_sourceBuffers.get();
+    }
     SourceBufferList* activeSourceBuffers() { return m_activeSourceBuffers.get(); }
     ExceptionOr<Ref<SourceBuffer>> addSourceBuffer(const String& type);
     ExceptionOr<void> removeSourceBuffer(SourceBuffer&);

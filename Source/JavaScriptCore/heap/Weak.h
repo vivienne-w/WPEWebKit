@@ -30,6 +30,7 @@
 #include <wtf/HashTraits.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/VectorTraits.h>
+#include "WeakImpl.h"
 
 namespace JSC {
 
@@ -45,11 +46,13 @@ public:
     Weak()
         : m_impl(0)
     {
+        printf("@@@ %s: %p\n", __PRETTY_FUNCTION__, this); fflush(stdout);
     }
 
     Weak(std::nullptr_t)
         : m_impl(0)
     {
+        printf("@@@ %s: %p\n", __PRETTY_FUNCTION__, this); fflush(stdout);
     }
 
     inline Weak(T*, WeakHandleOwner* = 0, void* context = 0);
@@ -62,6 +65,7 @@ public:
 
     ~Weak()
     {
+        printf("@@@ %s: %p\n", __PRETTY_FUNCTION__, this); fflush(stdout);
         clear();
     }
 
@@ -81,9 +85,17 @@ public:
     inline WeakImpl* leakImpl() WARN_UNUSED_RETURN;
     void clear()
     {
+        printf("@@@ %s: %p\n", __PRETTY_FUNCTION__, this); fflush(stdout);
         if (!m_impl)
             return;
         weakClearSlowCase(m_impl);
+    }
+
+    void setDebug(bool debug) {
+        if (!m_impl) {
+            printf("@@@: %s: m_impl is null, doing nothing\n", __PRETTY_FUNCTION__); fflush(stdout);
+        }
+        m_impl->setDebug(debug);
     }
     
 private:

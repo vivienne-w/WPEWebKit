@@ -52,10 +52,14 @@ public:
     DOMWrapperWorld& isolatedWorld() const { return m_isolatedWorld; }
 
     JSC::JSObject* wrapper() const { return m_wrapper.get(); }
-    void setWrapper(JSC::VM&, JSC::JSObject* wrapper) const { m_wrapper = JSC::Weak<JSC::JSObject>(wrapper); }
+    void setWrapper(JSC::VM&, JSC::JSObject* wrapper) const {
+        printf("@@@ %s: %p, old wrapper: %p, new wrapper: %p\n", __PRETTY_FUNCTION__, this, m_wrapper.get(), wrapper); fflush(stdout);
+        m_wrapper = JSC::Weak<JSC::JSObject>(wrapper);
+    }
 
     virtual String sourceURL() const { return String(); }
     virtual TextPosition sourcePosition() const { return TextPosition(); }
+    virtual void setDebug(bool debug) { m_wrapper.setDebug(debug); };
 
 private:
     virtual JSC::JSObject* initializeJSFunction(ScriptExecutionContext&) const;

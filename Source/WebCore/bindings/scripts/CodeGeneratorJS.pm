@@ -2532,15 +2532,19 @@ sub GenerateHeader
     if ($interfaceName eq "DOMWindow" || $interfaceName eq "RemoteDOMWindow") {
         push(@headerContent, "    static $className* create(JSC::VM& vm, JSC::Structure* structure, Ref<$implType>&& impl, JSWindowProxy* proxy)\n");
         push(@headerContent, "    {\n");
+        push(@headerContent, "        $implType* implptr = impl.ptr();\n");
         push(@headerContent, "        $className* ptr = new (NotNull, JSC::allocateCell<$className>(vm.heap)) ${className}(vm, structure, WTFMove(impl), proxy);\n");
         push(@headerContent, "        ptr->finishCreation(vm, proxy);\n");
+        push(@headerContent, "        printf(\"%s: %p implementation $implType: %p\\n\", __PRETTY_FUNCTION__, ptr, implptr); fflush(stdout);\n");
         push(@headerContent, "        return ptr;\n");
         push(@headerContent, "    }\n\n");
     } elsif ($codeGenerator->InheritsInterface($interface, "WorkerGlobalScope")) {
         push(@headerContent, "    static $className* create(JSC::VM& vm, JSC::Structure* structure, Ref<$implType>&& impl, JSC::JSProxy* proxy)\n");
         push(@headerContent, "    {\n");
+        push(@headerContent, "        $implType* implptr = impl.ptr();\n");
         push(@headerContent, "        $className* ptr = new (NotNull, JSC::allocateCell<$className>(vm.heap)) ${className}(vm, structure, WTFMove(impl));\n");
         push(@headerContent, "        ptr->finishCreation(vm, proxy);\n");
+        push(@headerContent, "        printf(\"%s: %p implementation $implType: %p\\n\", __PRETTY_FUNCTION__, ptr, implptr); fflush(stdout);\n");
         push(@headerContent, "        return ptr;\n");
         push(@headerContent, "    }\n\n");
     } elsif ($interface->extendedAttributes->{MasqueradesAsUndefined}) {
@@ -2548,8 +2552,10 @@ sub GenerateHeader
         push(@headerContent, "    static $className* create(JSC::Structure* structure, JSDOMGlobalObject* globalObject, Ref<$implType>&& impl)\n");
         push(@headerContent, "    {\n");
         push(@headerContent, "        globalObject->masqueradesAsUndefinedWatchpoint()->fireAll(globalObject->vm(), \"Allocated masquerading object\");\n");
+        push(@headerContent, "        $implType* implptr = impl.ptr();\n");
         push(@headerContent, "        $className* ptr = new (NotNull, JSC::allocateCell<$className>(globalObject->vm().heap)) $className(structure, *globalObject, WTFMove(impl));\n");
         push(@headerContent, "        ptr->finishCreation(globalObject->vm());\n");
+        push(@headerContent, "        printf(\"%s: %p implementation $implType: %p\\n\", __PRETTY_FUNCTION__, ptr, implptr); fflush(stdout);\n");
         push(@headerContent, "        return ptr;\n");
         push(@headerContent, "    }\n\n");
     } elsif (!NeedsImplementationClass($interface)) {
@@ -2563,8 +2569,10 @@ sub GenerateHeader
         AddIncludesForImplementationTypeInHeader($implType);
         push(@headerContent, "    static $className* create(JSC::Structure* structure, JSDOMGlobalObject* globalObject, Ref<$implType>&& impl)\n");
         push(@headerContent, "    {\n");
+        push(@headerContent, "        $implType* implptr = impl.ptr();\n");
         push(@headerContent, "        $className* ptr = new (NotNull, JSC::allocateCell<$className>(globalObject->vm().heap)) $className(structure, *globalObject, WTFMove(impl));\n");
         push(@headerContent, "        ptr->finishCreation(globalObject->vm());\n");
+        push(@headerContent, "        printf(\"%s: %p implementation $implType: %p\\n\", __PRETTY_FUNCTION__, ptr, implptr); fflush(stdout);\n");
         push(@headerContent, "        return ptr;\n");
         push(@headerContent, "    }\n\n");
     }
@@ -2824,6 +2832,13 @@ sub GenerateHeader
             push(@headerContent, "    }\n");
         }
     }
+
+    #if ($className == "JSSourceBufferList") {
+    #    push(@headerContent, "    virtual ~$className()\n");
+    #    push(@headerContent, "    {\n");
+    #    push(@headerContent, "        printf(\"%s: %p implementation $implType\\n\", __PRETTY_FUNCTION__, this); fflush(stdout);\n");
+    #    push(@headerContent, "    }\n");
+    #}
 
     # structure flags
     if (%structureFlags) {
