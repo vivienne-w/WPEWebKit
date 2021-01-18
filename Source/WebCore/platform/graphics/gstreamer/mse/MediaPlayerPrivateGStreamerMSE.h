@@ -130,9 +130,7 @@ private:
     MediaTime m_mediaTimeDuration;
     bool m_mseSeekCompleted = true;
     RefPtr<PlaybackPipeline> m_playbackPipeline;
-#if ENABLE(ENCRYPTED_MEDIA)
     GRefPtr<GstEvent> m_synthesizedProtectionEvent;
-#endif
 };
 
 } // namespace WebCore
