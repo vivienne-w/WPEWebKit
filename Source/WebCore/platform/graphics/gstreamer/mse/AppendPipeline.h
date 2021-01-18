@@ -92,7 +92,6 @@ public:
     void demuxerIsDoneSendingProtectionEvents(const GstStructure*);
     void cacheProtectionEvent(GstEvent*);
     void handleProtectedBufferProbeInformation(GstPadProbeInfo*);
-    void injectProtectionEvent(GRefPtr<GstEvent>&&);
 #endif
 
 private:
@@ -104,10 +103,6 @@ private:
     void setAppsrcDataLeavingProbe();
     void demuxerNoMorePads();
     void consumeAppSinkAvailableSamples();
-
-#if ENABLE(ENCRYPTED_MEDIA)
-    void injectProtectionEventIfPending();
-#endif
 
     Ref<MediaSourceClientGStreamerMSE> m_mediaSourceClient;
     Ref<SourceBufferPrivateGStreamer> m_sourceBufferPrivate;
@@ -157,7 +152,6 @@ private:
     struct PadProbeInformation m_appsinkPadProtectionProbeInformation;
     GValue m_cachedProtectionEvents;
     bool m_isProcessingProtectionEvents { false };
-    GRefPtr<GstEvent> m_protectionEventPendingToInject;
 #endif
     // Keeps track of the states of append processing, to avoid performing actions inappropriate for the current state
     // (eg: processing more samples when the last one has been detected, etc.). See setAppendState() for valid

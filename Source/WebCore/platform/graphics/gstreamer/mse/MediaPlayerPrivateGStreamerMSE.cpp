@@ -1081,20 +1081,6 @@ void MediaPlayerPrivateGStreamerMSE::dispatchDecryptionStructure(GUniquePtr<GstS
     if (m_playbackPipeline)
         gst_element_send_event(m_playbackPipeline->pipeline(), gst_event_new_custom(GST_EVENT_CUSTOM_DOWNSTREAM_OOB, structure.release()));
 }
-
-void MediaPlayerPrivateGStreamerMSE::cdmInstanceAttached(const CDMInstance& instance)
-{
-    ASSERT(isMainThread());
-    MediaPlayerPrivateGStreamer::cdmInstanceAttached(instance);
-
-    const gchar* systemId = GStreamerEMEUtilities::keySystemToUuid(instance.keySystem());
-
-    GRefPtr<GstBuffer> data = adoptGRef(gst_buffer_new());
-    GRefPtr<GstEvent> protectionEvent = adoptGRef(gst_event_new_protection(systemId, data.get(), "webkit-media-player-synthesized"));
-    GST_TRACE("keySystem: %s, systemId: %s, distributing protectionEvent %" GST_PTR_FORMAT " to %d append pipelines", instance.keySystem().utf8().data(), systemId, protectionEvent.get(), m_appendPipelinesMap.size());
-    for (auto iterator : m_appendPipelinesMap)
-        iterator.value->injectProtectionEvent(protectionEvent.get());
-}
 #endif
 
 } // namespace WebCore.
