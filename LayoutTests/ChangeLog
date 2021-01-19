@@ -24,6 +24,20 @@
         * compositing/video/video-update-rendering-expected.txt: Added.
         * compositing/video/video-update-rendering.html: Added.
 
+2019-06-04  Chris Dumez  <cdumez@apple.com>
+
+        Crash when calling XMLHttpRequest.setRequestHeader() in a worker
+        https://bugs.webkit.org/show_bug.cgi?id=198534
+        <rdar://problem/51393912>
+
+        Reviewed by Alex Christensen.
+
+        Add layout test coverage.
+
+        * fast/workers/resources/worker-xhr-setRequestHeader.js: Added.
+        * fast/workers/worker-xhr-setRequestHeader-expected.txt: Added.
+        * fast/workers/worker-xhr-setRequestHeader.html: Added.
+
 2018-10-18  Jer Noble  <jer.noble@apple.com>
 
         Safari is not able to adapt between H264 streams with EditList and without EditList

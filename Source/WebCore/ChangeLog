@@ -27,6 +27,22 @@
         * rendering/RenderLayerBacking.cpp:
         (WebCore::RenderLayerBacking::contentChanged):
 
+2019-06-04  Chris Dumez  <cdumez@apple.com>
+
+        Crash when calling XMLHttpRequest.setRequestHeader() in a worker
+        https://bugs.webkit.org/show_bug.cgi?id=198534
+        <rdar://problem/51393912>
+
+        Reviewed by Alex Christensen.
+
+        Make sure the script execution context is a Document because calling document()
+        to get the settings.
+
+        Test: fast/workers/worker-xhr-setRequestHeader.html
+
+        * xml/XMLHttpRequest.cpp:
+        (WebCore::XMLHttpRequest::setRequestHeader):
+
 2018-09-21  Mike Gorse  <mgorse@suse.com>
 
         Build tools should work when the /usr/bin/python is python3
