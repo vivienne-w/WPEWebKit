@@ -106,7 +106,7 @@ private:
 static LazyNeverDestroyed<Semaphore> globalSemaphoreForSuspendResume;
 
 // We use SIGUSR1 to suspend and resume machine threads in JavaScriptCore.
-static constexpr const int SigThreadSuspendResume = SIGUSR1;
+static constexpr const int SigThreadSuspendResume = SIGPWR;
 static std::atomic<Thread*> targetThread { nullptr };
 
 IGNORE_GCC_WARNINGS_BEGIN("return-local-addr")
