@@ -204,6 +204,8 @@ private:
     RunLoop::Timer<MemoryPressureHandler> m_holdOffTimer;
     void holdOffTimerFired();
 
+    struct MemoryUsagePollerThreadContext;
+
     class MemoryUsagePoller {
         WTF_MAKE_NONCOPYABLE(MemoryUsagePoller); WTF_MAKE_FAST_ALLOCATED;
     public:
@@ -212,6 +214,7 @@ private:
 
     private:
         RefPtr<Thread> m_thread;
+        RefPtr<MemoryUsagePollerThreadContext> m_context;
     };
 
     std::unique_ptr<MemoryUsagePoller> m_memoryUsagePoller;
