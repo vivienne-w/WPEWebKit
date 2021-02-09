@@ -245,7 +245,7 @@ void AuxiliaryProcess::didReceiveInvalidMessage(IPC::Connection&, IPC::StringRef
 #if OS(LINUX)
 void AuxiliaryProcess::didReceiveMemoryPressureEvent(bool isCritical)
 {
-    MemoryPressureHandler::singleton().triggerMemoryPressureEvent(isCritical);
+    MemoryPressureHandler::singleton().triggerMemoryPressureEvent(isCritical, isCritical);
 }
 #endif
 
