@@ -134,6 +134,8 @@ public:
 
     bool handleSyncMessage(GstMessage*) override;
 
+    String errorMessage() const override { return m_errorMessage; }
+
 private:
     static void getSupportedTypes(HashSet<String, ASCIICaseInsensitiveHash>&);
     static MediaPlayer::SupportsType supportsType(const MediaEngineSupportParameters&);
@@ -191,6 +193,7 @@ protected:
     bool m_buffering;
     int m_bufferingPercentage;
     mutable MediaTime m_cachedPosition;
+    mutable MediaTime m_playbackProgress;
     bool m_canFallBackToLastFinishedSeekPosition;
     bool m_changingRate;
     bool m_downloadFinished;
@@ -237,6 +240,7 @@ protected:
     static GstFlowReturn newTextSampleCallback(MediaPlayerPrivateGStreamer*);
 #endif
     static gboolean durationChangedCallback(MediaPlayerPrivateGStreamer*);
+    static void elementSetupCallback(MediaPlayerPrivateGStreamer*, GstElement*, GstElement*);
 
 private:
 
@@ -288,6 +292,8 @@ private:
 #endif
 #endif
     virtual bool isMediaSource() const { return false; }
+
+    String m_errorMessage;
 };
 }
 

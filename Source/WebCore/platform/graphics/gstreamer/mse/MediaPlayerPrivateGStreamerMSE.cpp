@@ -1023,15 +1023,15 @@ void MediaPlayerPrivateGStreamerMSE::unmarkEndOfStream()
 {
     GST_DEBUG("Unmarking end of stream");
     m_eosPending = false;
+    m_eosMarked = false;
+    m_isEndReached = false;
 }
 
 MediaTime MediaPlayerPrivateGStreamerMSE::currentMediaTime() const
 {
-    MediaTime cachedPosition = m_cachedPosition;
     MediaTime position = MediaPlayerPrivateGStreamer::currentMediaTime();
-    MediaTime playbackProgress = abs(position - cachedPosition);
 
-    if (m_eosPending && abs(position - durationMediaTime()) < MediaTime(GST_SECOND, GST_SECOND) && !playbackProgress) {
+    if (m_eosPending && abs(position - durationMediaTime()) < MediaTime(GST_SECOND, GST_SECOND) && (!m_playbackProgress || position > durationMediaTime())) {
         if (m_networkState != MediaPlayer::Loaded) {
             m_networkState = MediaPlayer::Loaded;
             m_player->networkStateChanged();
@@ -1062,6 +1062,15 @@ MediaTime MediaPlayerPrivateGStreamerMSE::maxMediaTimeSeekable() const
     }
 
     return result;
+}
+
+MediaTime MediaPlayerPrivateGStreamerMSE::maxTimeLoaded() const
+{
+    if (m_errorOccured)
+        return MediaTime::zeroTime();
+
+    MediaTime maxBufferedTime = buffered()->maximumBufferedTime();
+    return maxBufferedTime.isValid() ? maxBufferedTime : MediaTime::zeroTime();
 }
 
 #if ENABLE(ENCRYPTED_MEDIA)
