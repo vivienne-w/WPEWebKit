@@ -379,9 +379,17 @@ ALWAYS_INLINE void SlotVisitor::visitChildren(const JSCell* cell)
         break;
         
     default:
-        // FIXME: This could be so much better.
-        // https://bugs.webkit.org/show_bug.cgi?id=162462
-        cell->methodTable(vm())->visitChildren(const_cast<JSCell*>(cell), *this);
+        if (cell->type() > LastJSCObjectType) {
+            dataLogF("SlotVisitor::visitChildren(): Cell %p has inconsistent type %d. We won't attempt to visit its children.\n", cell, cell->type());
+        } else if (!cell->structure(vm())) {
+            dataLogF("SlotVisitor::visitChildren(): Cell %p has null structure? We won't attempt to visit its children.\n", cell);
+        } else if (!cell->methodTable(vm())) {
+            dataLogF("SlotVisitor::visitChildren(): Cell %p has null methodTable? We won't attempt to visit its children.\n", cell);
+        } else {
+            // FIXME: This could be so much better.
+            // https://bugs.webkit.org/show_bug.cgi?id=162462
+            cell->methodTable(vm())->visitChildren(const_cast<JSCell*>(cell), *this);
+        }
         break;
     }
     
