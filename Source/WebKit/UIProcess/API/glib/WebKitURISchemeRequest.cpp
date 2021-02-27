@@ -180,6 +180,8 @@ static void webkitURISchemeRequestReadCallback(GInputStream* inputStream, GAsync
     if (!priv->bytesRead) {
         ResourceResponse response(priv->task->request().url(), extractMIMETypeFromMediaType(priv->contentType.data()), priv->streamLength, emptyString());
         response.setTextEncodingName(extractCharsetFromMediaType(priv->contentType.data()));
+        response.setHTTPStatusCode(200);
+        response.setHTTPStatusText("OK"_s);
         if (response.mimeType().isEmpty())
             response.setMimeType(MIMETypeRegistry::getMIMETypeForPath(response.url().path()));
         priv->task->didReceiveResponse(response);
