@@ -2511,8 +2511,11 @@ void HTMLMediaElement::setReadyState(MediaPlayer::ReadyState state)
         setShouldDelayLoadEvent(false);
     }
 
+    bool isPotentiallyPlaying = potentiallyPlaying();
     if (m_readyState == HAVE_FUTURE_DATA && oldState <= HAVE_CURRENT_DATA && tracksAreReady) {
         scheduleEvent(eventNames().canplayEvent);
+        if (isPotentiallyPlaying)
+            scheduleNotifyAboutPlaying();
         shouldUpdateDisplayState = true;
     }
 
@@ -2522,6 +2525,9 @@ void HTMLMediaElement::setReadyState(MediaPlayer::ReadyState state)
 
         scheduleEvent(eventNames().canplaythroughEvent);
 
+        if (isPotentiallyPlaying && oldState <= HAVE_CURRENT_DATA)
+            scheduleNotifyAboutPlaying();
+
         auto success = canTransitionFromAutoplayToPlay();
         if (success) {
             m_paused = false;
@@ -2529,6 +2535,7 @@ void HTMLMediaElement::setReadyState(MediaPlayer::ReadyState state)
             setAutoplayEventPlaybackState(AutoplayEventPlaybackState::StartedWithoutUserGesture);
             m_playbackStartedTime = currentMediaTime().toDouble();
             scheduleEvent(eventNames().playEvent);
+            scheduleNotifyAboutPlaying();
         } else if (success.value() == MediaPlaybackDenialReason::UserGestureRequired) {
             ALWAYS_LOG(LOGIDENTIFIER, "Autoplay blocked, user gesture required");
             setAutoplayEventPlaybackState(AutoplayEventPlaybackState::PreventedAutoplay);
@@ -3583,6 +3590,8 @@ void HTMLMediaElement::playInternal()
 #endif
         if (m_readyState <= HAVE_CURRENT_DATA)
             scheduleEvent(eventNames().waitingEvent);
+        else if (m_readyState >= HAVE_FUTURE_DATA)
+            scheduleNotifyAboutPlaying();
     } else if (m_readyState >= HAVE_FUTURE_DATA)
         scheduleResolvePendingPlayPromises();
 
@@ -4857,7 +4866,6 @@ void HTMLMediaElement::mediaPlayerTimeChanged()
                     addBehaviorRestrictionsOnEndIfNecessary();
                 setAutoplayEventPlaybackState(AutoplayEventPlaybackState::None);
             }
-            setPlaying(false);
             // If the media element has a current media controller, then report the controller state
             // for the media element's current media controller.
             updateMediaController();
@@ -5482,9 +5490,6 @@ void HTMLMediaElement::setPlaying(bool playing)
         return;
 
     m_playing = playing;
-
-    if (m_playing)
-        scheduleNotifyAboutPlaying();
 
 #if ENABLE(MEDIA_SESSION)
     document().updateIsPlayingMedia(m_elementID);
