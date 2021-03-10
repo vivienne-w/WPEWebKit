@@ -28,6 +28,7 @@
 
 #include "CallFrameClosure.h"
 #include "Exception.h"
+#include "FunctionExecutable.h"
 #include "Instruction.h"
 #include "Interpreter.h"
 #include "JSCPtrTag.h"

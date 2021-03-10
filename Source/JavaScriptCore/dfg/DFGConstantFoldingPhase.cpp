@@ -34,7 +34,6 @@
 #include "DFGBasicBlockInlines.h"
 #include "DFGGraph.h"
 #include "DFGInPlaceAbstractState.h"
-#include "DFGInferredTypeCheck.h"
 #include "DFGInsertionSet.h"
 #include "DFGPhase.h"
 #include "GetByIdStatus.h"
@@ -480,8 +479,7 @@ private:
                         && variant.oldStructure().onlyStructure() == variant.newStructure()) {
                         variant = PutByIdVariant::replace(
                             variant.oldStructure(),
-                            variant.offset(),
-                            variant.requiredType());
+                            variant.offset());
                         changed = true;
                     }
                 }
@@ -730,10 +728,6 @@ private:
                                         StorageAccessData* data = m_graph.m_storageAccessData.add();
                                         data->offset = knownPolyProtoOffset;
                                         data->identifierNumber = m_graph.identifiers().ensure(m_graph.m_vm.propertyNames->builtinNames().polyProtoName().impl());
-                                        InferredType::Descriptor inferredType = InferredType::Top;
-                                        data->inferredType = inferredType;
-                                        m_graph.registerInferredType(inferredType);
-
                                         NodeOrigin origin = node->origin.withInvalidExit();
                                         Node* prototypeNode = m_insertionSet.insertConstant(
                                             indexInBlock + 1, origin, m_graph.freeze(prototype));
@@ -1058,7 +1052,7 @@ private:
     
     void emitGetByOffset(
         unsigned indexInBlock, Node* node, Edge childEdge, unsigned identifierNumber,
-        PropertyOffset offset, const InferredType::Descriptor& inferredType = InferredType::Top)
+        PropertyOffset offset)
     {
         childEdge.setUseKind(KnownCellUse);
         
@@ -1074,7 +1068,6 @@ private:
         StorageAccessData& data = *m_graph.m_storageAccessData.add();
         data.offset = offset;
         data.identifierNumber = identifierNumber;
-        data.inferredType = inferredType;
         
         node->convertToGetByOffset(data, propertyStorage, childEdge);
     }
@@ -1085,8 +1078,6 @@ private:
         Edge childEdge = node->child1();
 
         addBaseCheck(indexInBlock, node, baseValue, variant.oldStructure());
-        insertInferredTypeCheck(
-            m_insertionSet, indexInBlock, origin, node->child2().node(), variant.requiredType());
 
         node->child1().setUseKind(KnownCellUse);
         childEdge.setUseKind(KnownCellUse);

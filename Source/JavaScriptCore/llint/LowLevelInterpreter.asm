@@ -204,23 +204,6 @@ else
     const LowestTag = DeletedValueTag
 end
 
-# PutByIdFlags data
-const PutByIdPrimaryTypeMask = constexpr PutByIdPrimaryTypeMask
-const PutByIdPrimaryTypeSecondary = constexpr PutByIdPrimaryTypeSecondary
-const PutByIdPrimaryTypeObjectWithStructure = constexpr PutByIdPrimaryTypeObjectWithStructure
-const PutByIdPrimaryTypeObjectWithStructureOrOther = constexpr PutByIdPrimaryTypeObjectWithStructureOrOther
-const PutByIdSecondaryTypeMask = constexpr PutByIdSecondaryTypeMask
-const PutByIdSecondaryTypeBottom = constexpr PutByIdSecondaryTypeBottom
-const PutByIdSecondaryTypeBoolean = constexpr PutByIdSecondaryTypeBoolean
-const PutByIdSecondaryTypeOther = constexpr PutByIdSecondaryTypeOther
-const PutByIdSecondaryTypeInt32 = constexpr PutByIdSecondaryTypeInt32
-const PutByIdSecondaryTypeNumber = constexpr PutByIdSecondaryTypeNumber
-const PutByIdSecondaryTypeString = constexpr PutByIdSecondaryTypeString
-const PutByIdSecondaryTypeSymbol = constexpr PutByIdSecondaryTypeSymbol
-const PutByIdSecondaryTypeObject = constexpr PutByIdSecondaryTypeObject
-const PutByIdSecondaryTypeObjectOrOther = constexpr PutByIdSecondaryTypeObjectOrOther
-const PutByIdSecondaryTypeTop = constexpr PutByIdSecondaryTypeTop
-
 const CallOpCodeSize = 9
 
 if X86_64 or ARM64 or ARM64E or C_LOOP

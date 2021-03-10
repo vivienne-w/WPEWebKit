@@ -1497,85 +1497,7 @@ _llint_op_put_by_id:
     # At this point, we have:
     # t2 -> currentStructureID
     # t0 -> object base
-    # We will lose currentStructureID in the shenanigans below.
 
-    loadi 12[PC], t1
-    loadConstantOrVariable(t1, t2, t3)
-    loadi 32[PC], t1
-
-    # At this point, we have:
-    # t0 -> object base
-    # t1 -> put by id flags
-    # t2 -> value tag
-    # t3 -> value payload
-
-    btinz t1, PutByIdPrimaryTypeMask, .opPutByIdTypeCheckObjectWithStructureOrOther
-
-    # We have one of the non-structure type checks. Find out which one.
-    andi PutByIdSecondaryTypeMask, t1
-    bilt t1, PutByIdSecondaryTypeString, .opPutByIdTypeCheckLessThanString
-
-    # We are one of the following: String, Symbol, Object, ObjectOrOther, Top
-    bilt t1, PutByIdSecondaryTypeObjectOrOther, .opPutByIdTypeCheckLessThanObjectOrOther
-
-    # We are either ObjectOrOther or Top.
-    bieq t1, PutByIdSecondaryTypeTop, .opPutByIdDoneCheckingTypes
-
-    # Check if we are ObjectOrOther.
-    bieq t2, CellTag, .opPutByIdTypeCheckObject
-.opPutByIdTypeCheckOther:
-    bieq t2, NullTag, .opPutByIdDoneCheckingTypes
-    bieq t2, UndefinedTag, .opPutByIdDoneCheckingTypes
-    jmp .opPutByIdSlow
-
-.opPutByIdTypeCheckLessThanObjectOrOther:
-    # We are either String, Symbol or Object.
-    bineq t2, CellTag, .opPutByIdSlow
-    bieq t1, PutByIdSecondaryTypeObject, .opPutByIdTypeCheckObject
-    bieq t1, PutByIdSecondaryTypeSymbol, .opPutByIdTypeCheckSymbol
-    bbeq JSCell::m_type[t3], StringType, .opPutByIdDoneCheckingTypes
-    jmp .opPutByIdSlow
-.opPutByIdTypeCheckObject:
-    bbaeq JSCell::m_type[t3], ObjectType, .opPutByIdDoneCheckingTypes
-    jmp .opPutByIdSlow
-.opPutByIdTypeCheckSymbol:
-    bbeq JSCell::m_type[t3], SymbolType, .opPutByIdDoneCheckingTypes
-    jmp .opPutByIdSlow
-
-.opPutByIdTypeCheckLessThanString:
-    # We are one of the following: Bottom, Boolean, Other, Int32, Number.
-    bilt t1, PutByIdSecondaryTypeInt32, .opPutByIdTypeCheckLessThanInt32
-
-    # We are either Int32 or Number.
-    bieq t1, PutByIdSecondaryTypeNumber, .opPutByIdTypeCheckNumber
-
-    bieq t2, Int32Tag, .opPutByIdDoneCheckingTypes
-    jmp .opPutByIdSlow
-
-.opPutByIdTypeCheckNumber:
-    bib t2, LowestTag + 1, .opPutByIdDoneCheckingTypes
-    jmp .opPutByIdSlow
-
-.opPutByIdTypeCheckLessThanInt32:
-    # We are one of the following: Bottom, Boolean, Other
-    bineq t1, PutByIdSecondaryTypeBoolean, .opPutByIdTypeCheckBottomOrOther
-    bieq t2, BooleanTag, .opPutByIdDoneCheckingTypes
-    jmp .opPutByIdSlow
-
-.opPutByIdTypeCheckBottomOrOther:
-    bieq t1, PutByIdSecondaryTypeOther, .opPutByIdTypeCheckOther
-    jmp .opPutByIdSlow
-
-.opPutByIdTypeCheckObjectWithStructureOrOther:
-    bieq t2, CellTag, .opPutByIdTypeCheckObjectWithStructure
-    btinz t1, PutByIdPrimaryTypeObjectWithStructureOrOther, .opPutByIdTypeCheckOther
-    jmp .opPutByIdSlow
-
-.opPutByIdTypeCheckObjectWithStructure:
-    andi PutByIdSecondaryTypeMask, t1
-    bineq t1, JSCell::m_structureID[t3], .opPutByIdSlow
-
-.opPutByIdDoneCheckingTypes:
     loadi 24[PC], t1
 
     btiz t1, .opPutByIdNotTransition
@@ -1585,7 +1507,6 @@ _llint_op_put_by_id:
     loadp 28[PC], t3
     btpz t3, .opPutByIdTransitionDirect
 
-    loadi 16[PC], t2 # Need old structure again.
     loadp StructureChain::m_vector[t3], t3
     assert(macro (ok) btpnz t3, ok end)
 

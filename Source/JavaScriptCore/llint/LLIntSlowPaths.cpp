@@ -894,18 +894,12 @@ LLINT_SLOW_PATH_DECL(slow_path_put_by_id)
                             ASSERT(chain);
                             pc[7].u.structureChain.set(vm, codeBlock, chain);
                         }
-                        pc[8].u.putByIdFlags = static_cast<PutByIdFlags>(
-                            pc[8].u.putByIdFlags |
-                            structure->inferredTypeDescriptorFor(ident.impl()).putByIdFlags());
                     }
                 }
             } else {
                 structure->didCachePropertyReplacement(vm, slot.cachedOffset());
                 pc[4].u.structureID = structure->id();
                 pc[5].u.operand = slot.cachedOffset();
-                pc[8].u.putByIdFlags = static_cast<PutByIdFlags>(
-                    pc[8].u.putByIdFlags |
-                    structure->inferredTypeDescriptorFor(ident.impl()).putByIdFlags());
             }
         }
     }

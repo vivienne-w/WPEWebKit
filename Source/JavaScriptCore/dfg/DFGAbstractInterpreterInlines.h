@@ -2799,8 +2799,9 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
 
                     result.merge(
                         m_graph.inferredValueForProperty(
-                            value, uid, status[i].offset(), m_state.structureClobberState()));
+                            value, status[i].offset(), m_state.structureClobberState()));
                 }
+            
                 m_state.setFoundConstants(true);
                 didFoldClobberWorld();
                 forNode(node) = result;
@@ -3173,7 +3174,6 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
         
     case GetByOffset: {
         StorageAccessData& data = node->storageAccessData();
-        UniquedStringImpl* uid = m_graph.identifiers()[data.identifierNumber];
 
         // FIXME: The part of this that handles inferred property types relies on AI knowing the structure
         // right now. That's probably not optimal. In some cases, we may perform an optimization (usually
@@ -3181,12 +3181,7 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
         // at the point where GetByOffset runs. Currently, when that happens, we'll have to rely entirely
         // on the type that ByteCodeParser was able to prove.
         AbstractValue value = m_graph.inferredValueForProperty(
-            forNode(node->child2()), uid, data.offset, m_state.structureClobberState());
-
-        // It's possible that the type that ByteCodeParser came up with is better.
-        AbstractValue typeFromParsing;
-        typeFromParsing.set(m_graph, data.inferredType, m_state.structureClobberState());
-        value.filter(typeFromParsing);
+            forNode(node->child2()), data.offset, m_state.structureClobberState());
 
         // If we decide that there does not exist any value that this can return, then it's probably
         // because the compilation was already invalidated.
@@ -3225,8 +3220,6 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
         // because of the effect on compile times, but this node is FTL-only.
         m_state.setFoundConstants(true);
         
-        UniquedStringImpl* uid = m_graph.identifiers()[node->multiGetByOffsetData().identifierNumber];
-
         AbstractValue base = forNode(node->child1());
         RegisteredStructureSet baseSet;
         AbstractValue result;
@@ -3245,13 +3238,6 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
                     *getCase.method().constant(),
                     m_state.structureClobberState());
                 result.merge(thisResult);
-                break;
-            }
-
-            case GetByOffsetMethod::Load: {
-                result.merge(
-                    m_graph.inferredValueForProperty(
-                        set, uid, m_state.structureClobberState()));
                 break;
             }
 
@@ -3295,7 +3281,6 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
                 continue;
 
             AbstractValue thisValue = originalValue;
-            thisValue.filter(m_graph, variant.requiredType());
             resultingValue.merge(thisValue);
             
             if (variant.kind() == PutByIdVariant::Transition) {
