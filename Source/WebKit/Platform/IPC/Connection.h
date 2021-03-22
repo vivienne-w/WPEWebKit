@@ -67,6 +67,7 @@ enum class SendSyncOption {
     // Use this to inform that this sync call will suspend this process until the user responds with input.
     InformPlatformProcessWillSuspend = 1 << 0,
     UseFullySynchronousModeForTesting = 1 << 1,
+    DispatchMessageEvenWhenWaitingForSyncReply = 1 << 2,
 };
 
 enum class WaitForOption {
@@ -440,6 +441,9 @@ template<typename T> bool Connection::sendSync(T&& message, typename T::Reply&& 
         encoder->setFullySynchronousModeForTesting();
         m_fullySynchronousModeIsAllowedForTesting = true;
     }
+
+    if (sendSyncOptions.contains(SendSyncOption::DispatchMessageEvenWhenWaitingForSyncReply))
+        encoder->setShouldDispatchMessageWhenWaitingForSyncReply(true);
 
     // Encode the rest of the input arguments.
     encoder->encode(message.arguments());
