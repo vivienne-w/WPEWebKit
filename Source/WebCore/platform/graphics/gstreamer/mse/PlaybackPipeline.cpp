@@ -312,12 +312,10 @@ void PlaybackPipeline::flush(AtomString trackId)
 {
     ASSERT(WTF::isMainThread());
 
-    GST_DEBUG("flush: trackId=%s", trackId.string().utf8().data());
-
     GST_OBJECT_LOCK(m_webKitMediaSrc.get());
     Stream* stream = getStreamByTrackId(m_webKitMediaSrc.get(), trackId);
 
-    if (!stream) {
+    if (!stream || stream->lastEnqueuedTime.isInvalid()) {
         GST_OBJECT_UNLOCK(m_webKitMediaSrc.get());
         return;
     }
@@ -329,12 +327,14 @@ void PlaybackPipeline::flush(AtomString trackId)
     if (!appsrc)
         return;
 
+    GST_DEBUG_OBJECT(appsrc, "flush: trackId=%s", trackId.string().utf8().data());
+
     gint64 position = GST_CLOCK_TIME_NONE;
     GRefPtr<GstQuery> query = adoptGRef(gst_query_new_position(GST_FORMAT_TIME));
     if (gst_element_query(pipeline(), query.get()))
         gst_query_parse_position(query.get(), 0, &position);
 
-    GST_TRACE("Position: %" GST_TIME_FORMAT, GST_TIME_ARGS(position));
+    GST_DEBUG_OBJECT(appsrc, "Position: %" GST_TIME_FORMAT, GST_TIME_ARGS(position));
 
     if (static_cast<guint64>(position) == GST_CLOCK_TIME_NONE) {
         GST_DEBUG("Can't determine position, avoiding flush");
@@ -350,7 +350,7 @@ void PlaybackPipeline::flush(AtomString trackId)
     if (gst_element_query(pipeline(), query.get()))
         gst_query_parse_segment(query.get(), &rate, &format, &start, &stop);
 
-    GST_TRACE("segment: [%" GST_TIME_FORMAT ", %" GST_TIME_FORMAT "], rate: %f",
+    GST_DEBUG_OBJECT(appsrc, "segment: [%" GST_TIME_FORMAT ", %" GST_TIME_FORMAT "], rate: %f",
         GST_TIME_ARGS(start), GST_TIME_ARGS(stop), rate);
 
     if (!gst_element_send_event(GST_ELEMENT(appsrc), gst_event_new_flush_start())) {
@@ -368,7 +368,7 @@ void PlaybackPipeline::flush(AtomString trackId)
     if (srcPad)
         gst_pad_add_probe(srcPad.get(), GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM, segmentFixerProbe, nullptr, nullptr);
 
-    GST_TRACE("Sending new seamless segment: [%" GST_TIME_FORMAT ", %" GST_TIME_FORMAT "], rate: %f",
+    GST_DEBUG_OBJECT(appsrc, "Sending new seamless segment: [%" GST_TIME_FORMAT ", %" GST_TIME_FORMAT "], rate: %f",
         GST_TIME_ARGS(segment->start), GST_TIME_ARGS(segment->stop), segment->rate);
 
     if (!gst_base_src_new_seamless_segment(GST_BASE_SRC(appsrc), segment->start, segment->stop, segment->start)) {
@@ -380,7 +380,7 @@ void PlaybackPipeline::flush(AtomString trackId)
         return;
     }
 
-    GST_DEBUG("trackId=%s flushed", trackId.string().utf8().data());
+    GST_DEBUG_OBJECT(appsrc, "trackId=%s flushed", trackId.string().utf8().data());
 }
 
 void PlaybackPipeline::enqueueSample(Ref<MediaSample>&& mediaSample)
