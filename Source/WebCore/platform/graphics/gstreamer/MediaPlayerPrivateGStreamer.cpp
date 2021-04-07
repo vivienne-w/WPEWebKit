@@ -668,12 +668,14 @@ void MediaPlayerPrivateGStreamer::updatePlaybackRate()
 
     GST_INFO(mute ? "Need to mute audio" : "Do not need to mute audio");
 
-    if (doSeek(playbackPosition(), m_playbackRate, static_cast<GstSeekFlags>(GST_SEEK_FLAG_FLUSH | hardwareDependantSeekFlags()))) {
-        g_object_set(m_pipeline.get(), "mute", mute, nullptr);
-        m_lastPlaybackRate = m_playbackRate;
-    } else {
-        m_playbackRate = m_lastPlaybackRate;
-        GST_ERROR("Set rate to %f failed", m_playbackRate);
+    if (m_lastPlaybackRate != m_playbackRate) {
+        if (doSeek(playbackPosition(), m_playbackRate, static_cast<GstSeekFlags>(GST_SEEK_FLAG_FLUSH | hardwareDependantSeekFlags()))) {
+            g_object_set(m_pipeline.get(), "mute", mute, nullptr);
+            m_lastPlaybackRate = m_playbackRate;
+        } else {
+            m_playbackRate = m_lastPlaybackRate;
+            GST_ERROR("Set rate to %f failed", m_playbackRate);
+        }
     }
 
     if (m_playbackRatePause) {

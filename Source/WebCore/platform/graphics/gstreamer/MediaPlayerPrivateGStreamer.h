@@ -251,6 +251,7 @@ private:
     GstStructure* m_mediaLocations;
     int m_mediaLocationCurrentIndex;
     MediaTime m_timeOfOverlappingSeek;
+    // Last playback rate sent through a GStreamer seek.
     float m_lastPlaybackRate;
     Timer m_fillTimer;
     MediaTime m_maxTimeLoaded;
