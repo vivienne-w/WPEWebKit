@@ -321,6 +321,7 @@ protected:
 
     void ensureAudioSourceProvider();
     void setAudioStreamProperties(GObject*);
+    void checkPlayingConsitency();
 
     static void setAudioStreamPropertiesCallback(MediaPlayerPrivateGStreamer*, GObject*);
 
@@ -569,6 +570,7 @@ private:
 #endif
 
     String m_errorMessage;
+    bool m_didTryToRecoverPlayingState { false };
 };
 
 }
