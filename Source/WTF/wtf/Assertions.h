@@ -509,6 +509,7 @@ constexpr bool assertionFailureDueToUnreachableCode = false;
 
 #if RELEASE_LOG_DISABLED
 #define PUBLIC_LOG_STRING "s"
+#define PRIVATE_LOG_STRING "s"
 #define RELEASE_LOG(channel, ...) ((void)0)
 #define RELEASE_LOG_ERROR(channel, ...) LOG_ERROR(__VA_ARGS__)
 #define RELEASE_LOG_FAULT(channel, ...) LOG_ERROR(__VA_ARGS__)
@@ -524,6 +525,7 @@ constexpr bool assertionFailureDueToUnreachableCode = false;
 #define RELEASE_LOG_STACKTRACE(channel) ((void)0)
 #elif USE(OS_LOG)
 #define PUBLIC_LOG_STRING "{public}s"
+#define PRIVATE_LOG_STRING "{private}s"
 #define RELEASE_LOG(channel, ...) os_log(LOG_CHANNEL(channel).osLogChannel, __VA_ARGS__)
 #define RELEASE_LOG_ERROR(channel, ...) os_log_error(LOG_CHANNEL(channel).osLogChannel, __VA_ARGS__)
 #define RELEASE_LOG_FAULT(channel, ...) os_log_fault(LOG_CHANNEL(channel).osLogChannel, __VA_ARGS__)
@@ -542,6 +544,7 @@ constexpr bool assertionFailureDueToUnreachableCode = false;
 #elif USE(JOURNALD)
 
 #define PUBLIC_LOG_STRING "s"
+#define PRIVATE_LOG_STRING "s"
 #define SD_JOURNAL_SEND(channel, priority, file, line, function, ...) sd_journal_send_with_location("CODE_FILE=" file, "CODE_LINE=" line, function, "WEBKIT_SUBSYSTEM=%s", LOG_CHANNEL(channel).subsystem, "WEBKIT_CHANNEL=%s", LOG_CHANNEL(channel).name, "PRIORITY=%i", priority, "MESSAGE=" __VA_ARGS__, nullptr)
 
 #define _XSTRINGIFY(line) #line
