@@ -648,7 +648,7 @@ static gboolean webKitWebSrcQueryWithParent(GstPad* pad, GstObject* parent, GstQ
             result = TRUE;
             break;
         }
-    }
+    } //fallthrough
     default: {
         GRefPtr<GstPad> target = adoptGRef(gst_ghost_pad_get_target(GST_GHOST_PAD_CAST(pad)));
 

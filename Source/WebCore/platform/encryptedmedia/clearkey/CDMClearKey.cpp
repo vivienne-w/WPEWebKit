@@ -467,6 +467,7 @@ CDMInstance::SuccessValue CDMInstanceClearKey::setStorageDirectory(const String&
 
 void CDMInstanceClearKey::requestLicense(LicenseType, const AtomicString& initDataType, Ref<SharedBuffer>&& initData, Ref<SharedBuffer>&& customData, LicenseCallback callback)
 {
+    UNUSED_PARAM(customData);
     static uint32_t s_sessionIdValue = 0;
     ++s_sessionIdValue;
 

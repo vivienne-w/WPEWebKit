@@ -509,7 +509,6 @@ static gboolean webkitMediaCommonEncryptionDecryptSinkEventHandler(GstBaseTransf
 {
     WebKitMediaCommonEncryptionDecrypt* self = WEBKIT_MEDIA_CENC_DECRYPT(trans);
     WebKitMediaCommonEncryptionDecryptPrivate* priv = WEBKIT_MEDIA_CENC_DECRYPT_GET_PRIVATE(self);
-    WebKitMediaCommonEncryptionDecryptClass* klass = WEBKIT_MEDIA_CENC_DECRYPT_GET_CLASS(self);
     gboolean result = FALSE;
 
     switch (GST_EVENT_TYPE(event)) {

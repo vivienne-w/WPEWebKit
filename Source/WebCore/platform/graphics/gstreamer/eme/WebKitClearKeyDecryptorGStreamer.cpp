@@ -164,6 +164,7 @@ static bool webKitMediaClearKeyDecryptorSetupCipher(WebKitMediaCommonEncryptionD
 
 static bool webKitMediaClearKeyDecryptorDecrypt(WebKitMediaCommonEncryptionDecrypt* self, GstBuffer* keyIDBuffer, GstBuffer* ivBuffer, GstBuffer* buffer, unsigned subSampleCount, GstBuffer* subSamplesBuffer)
 {
+    UNUSED_PARAM(keyIDBuffer);
     // Check ivBuffer isn't null.
     if (!ivBuffer) {
         GST_ERROR_OBJECT(self, "Error, the ivBuffer is null");
