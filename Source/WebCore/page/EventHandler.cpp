@@ -2561,8 +2561,8 @@ void EventHandler::updateMouseEventTargetNode(Node* targetNode, const PlatformMo
             }
 
             // Send mouseout event to the old node.
-            if (m_lastElementUnderMouse)
-                m_lastElementUnderMouse->dispatchMouseEvent(platformMouseEvent, eventNames().mouseoutEvent, 0, m_elementUnderMouse.get());
+            if (auto lastElementUnderMouse = m_lastElementUnderMouse)
+                lastElementUnderMouse->dispatchMouseEvent(platformMouseEvent, eventNames().mouseoutEvent, 0, m_elementUnderMouse.get());
 
             // Send mouseleave to the node hierarchy no longer under the mouse.
             for (auto& chain : leftElementsChain) {
@@ -2571,8 +2571,8 @@ void EventHandler::updateMouseEventTargetNode(Node* targetNode, const PlatformMo
             }
 
             // Send mouseover event to the new node.
-            if (m_elementUnderMouse)
-                m_elementUnderMouse->dispatchMouseEvent(platformMouseEvent, eventNames().mouseoverEvent, 0, m_lastElementUnderMouse.get());
+            if (auto elementUnderMouse = m_elementUnderMouse)
+                elementUnderMouse->dispatchMouseEvent(platformMouseEvent, eventNames().mouseoverEvent, 0, m_lastElementUnderMouse.get());
 
             // Send mouseleave event to the nodes hierarchy under the mouse.
             for (auto& chain : enteredElementsChain) {
@@ -2593,8 +2593,10 @@ bool EventHandler::dispatchMouseEvent(const AtomicString& eventType, Node* targe
 
     updateMouseEventTargetNode(targetNode, platformMouseEvent, setUnder);
 
-    if (m_elementUnderMouse && !m_elementUnderMouse->dispatchMouseEvent(platformMouseEvent, eventType, clickCount))
-        return false;
+    if (auto elementUnderMouse = m_elementUnderMouse) {
+        if (!elementUnderMouse->dispatchMouseEvent(platformMouseEvent, eventType, clickCount))
+            return false;
+    }
 
     if (eventType != eventNames().mousedownEvent)
         return true;

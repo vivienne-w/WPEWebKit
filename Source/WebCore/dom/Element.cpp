@@ -286,6 +286,7 @@ bool Element::dispatchMouseEvent(const PlatformMouseEvent& platformEvent, const 
     if (mouseEvent->type().isEmpty())
         return true; // Shouldn't happen.
 
+    Ref<Element> protectedThis(*this);
     ASSERT(!mouseEvent->target() || mouseEvent->target() != relatedTarget);
     dispatchEvent(mouseEvent);
     bool didNotSwallowEvent = !mouseEvent->defaultPrevented() && !mouseEvent->defaultHandled();
