@@ -317,6 +317,8 @@ void StorageProcess::fetchWebsiteData(PAL::SessionID sessionID, OptionSet<Websit
 
 #if ENABLE(SERVICE_WORKER) || ENABLE(INDEXED_DATABASE)
     String path;
+#else
+    UNUSED_PARAM(rawWebsiteData);
 #endif // ENABLE(SERVICE_WORKER) || ENABLE(INDEXED_DATABASE)
 #if ENABLE(SERVICE_WORKER)
     path = m_swDatabasePaths.get(sessionID);
