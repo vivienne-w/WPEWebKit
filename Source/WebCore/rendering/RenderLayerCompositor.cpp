@@ -759,8 +759,10 @@ bool RenderLayerCompositor::updateCompositingLayers(CompositingUpdateType update
 
         auto& frame = m_renderView.frameView().frame();
         bool isMainFrame = isMainFrameCompositor();
+#if LOG_DISABLED
         UNUSED_PARAM(frame);
         UNUSED_PARAM(isMainFrame);
+#endif // LOG_DISABLED
         LOG_WITH_STREAM(Compositing, stream << "\nUpdate " << m_rootLayerUpdateCount << " of " << (isMainFrame ? "main frame" : frame.tree().uniqueName().string().utf8().data()) << " - compositing policy is " << m_compositingPolicy);
     }
 #endif
@@ -793,7 +795,9 @@ bool RenderLayerCompositor::updateCompositingLayers(CompositingUpdateType update
 #if !LOG_DISABLED || ENABLE(RESOURCE_USAGE)
     if (compositingLogEnabled() && isFullUpdate && (needHierarchyUpdate || needGeometryUpdate)) {
         MonotonicTime endTime = MonotonicTime::now();
+#if LOG_DISABLED
         UNUSED_PARAM(endTime);
+#endif // LOG_DISABLED
         LOG(Compositing, "Total layers   primary   secondary   obligatory backing (KB)   secondary backing(KB)   total backing (KB)  update time (ms)\n");
 
         LOG(Compositing, "%8d %11d %9d %20.2f %22.2f %22.2f %18.2f\n",
