@@ -310,11 +310,16 @@ void StorageProcess::fetchWebsiteData(PAL::SessionID sessionID, OptionSet<Websit
 {
     auto websiteData = std::make_unique<WebsiteData>();
     WebsiteData* rawWebsiteData = websiteData.get();
+    UNUSED_PARAM(rawWebsiteData);
     auto callbackAggregator = CallbackAggregator::create([this, websiteData = WTFMove(websiteData), callbackID]() {
         parentProcessConnection()->send(Messages::StorageProcessProxy::DidFetchWebsiteData(callbackID, *websiteData), 0);
     });
 
+#if ENABLE(SERVICE_WORKER) || ENABLE(INDEXED_DATABASE)
     String path;
+#else
+    UNUSED_PARAM(rawWebsiteData);
+#endif // ENABLE(SERVICE_WORKER) || ENABLE(INDEXED_DATABASE)
 #if ENABLE(SERVICE_WORKER)
     path = m_swDatabasePaths.get(sessionID);
     if (!path.isEmpty() && websiteDataTypes.contains(WebsiteDataType::ServiceWorkerRegistrations)) {

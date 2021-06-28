@@ -240,6 +240,10 @@ class GstVideoFrameHolder : public TextureMapperPlatformLayerBuffer::UnmanagedBu
 public:
     explicit GstVideoFrameHolder(GstSample* sample, TextureMapperGL::Flags flags, bool gstGLEnabled)
     {
+#if !USE(GSTREAMER_GL)
+        UNUSED_PARAM(flags);
+        UNUSED_PARAM(gstGLEnabled);
+#endif // !USE(GSTREAMER_GL)
         RELEASE_ASSERT(GST_IS_SAMPLE(sample));
 
         GstVideoInfo videoInfo;

@@ -187,6 +187,10 @@ static gchar** g_wildcard_proxy_resolver_lookup(GProxyResolver *proxy_resolver,
                                                 GCancellable *cancellable,
                                                 GError **error)
 {
+    // unused parameters
+    (void)(cancellable);
+    (void)(error);
+
     GWildcardProxyResolver *resolver = G_WILDCARD_PROXY_RESOLVER(proxy_resolver);
     GWildcardProxyResolverPrivate *priv = resolver->priv;
     const gchar *proxy = NULL;

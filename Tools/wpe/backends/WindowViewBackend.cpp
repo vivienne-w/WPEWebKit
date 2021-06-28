@@ -378,6 +378,12 @@ const struct wl_touch_listener WindowViewBackend::s_touchListener = {
     [](void*, struct wl_touch*) { },
     // cancel
     [](void*, struct wl_touch*) { },
+#if WAYLAND_VERSION_MAJOR > 1 || (WAYLAND_VERSION_MAJOR == 1 && WAYLAND_VERSION_MINOR >= 13)
+    // shape
+    [](void *, struct wl_touch*, int32_t, wl_fixed_t, wl_fixed_t) { },
+    // orientation
+    [](void *, struct wl_touch*, int32_t, wl_fixed_t) { },
+#endif // wayland 1.13+
 };
 
 const struct wl_seat_listener WindowViewBackend::s_seatListener = {
