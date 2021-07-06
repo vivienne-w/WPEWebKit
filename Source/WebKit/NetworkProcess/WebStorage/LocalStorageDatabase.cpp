@@ -169,14 +169,17 @@ void LocalStorageDatabase::importItems(StorageMap& storageMap)
         return;
 
     SQLiteStatement query(m_database, "SELECT key, value FROM ItemTable"_str);
-    if (query.prepare() != SQLITE_OK) {
-        LOG_ERROR("Unable to select items from ItemTable for local storage");
+    int result = query.prepare();
+    if (result != SQLITE_OK) {
+        LOG_ERROR("Unable to select items from ItemTable for local storage - %i", result);
+        if (result == SQLITE_CORRUPT || result == SQLITE_NOTADB)
+            handleDatabaseCorruption();
         return;
     }
 
     HashMap<String, String> items;
 
-    int result = query.step();
+    result = query.step();
     while (result == SQLITE_ROW) {
         String key = query.getColumnText(0);
         String value = query.getColumnBlobAsString(1);
@@ -186,7 +189,9 @@ void LocalStorageDatabase::importItems(StorageMap& storageMap)
     }
 
     if (result != SQLITE_DONE) {
-        LOG_ERROR("Error reading items from ItemTable for local storage");
+        LOG_ERROR("Error reading items from ItemTable for local storage - %i", result);
+        if (result == SQLITE_CORRUPT || result == SQLITE_NOTADB)
+            handleDatabaseCorruption();
         return;
     }
 
@@ -207,6 +212,7 @@ void LocalStorageDatabase::clear()
 {
     m_changedItems.clear();
     m_shouldClearItems = true;
+    m_restoreHandler = nullptr;
 
     scheduleDatabaseUpdate();
 }
@@ -215,6 +221,7 @@ void LocalStorageDatabase::close()
 {
     ASSERT(!m_isClosed);
     m_isClosed = true;
+    m_restoreHandler = nullptr;
 
     if (m_didScheduleDatabaseUpdate) {
         updateDatabaseWithChangedItems(m_changedItems);
@@ -287,31 +294,40 @@ void LocalStorageDatabase::updateDatabaseWithChangedItems(const HashMap<String, 
     if (!m_database.isOpen())
         return;
 
+    int result;
     if (m_shouldClearItems) {
         m_shouldClearItems = false;
 
         SQLiteStatement clearStatement(m_database, "DELETE FROM ItemTable");
-        if (clearStatement.prepare() != SQLITE_OK) {
-            LOG_ERROR("Failed to prepare clear statement - cannot write to local storage database");
+        if ((result = clearStatement.prepare()) != SQLITE_OK) {
+            LOG_ERROR("Failed to prepare clear statement - cannot write to local storage database - %i", result);
+            if (result == SQLITE_CORRUPT)
+                handleDatabaseCorruption();
             return;
         }
 
-        int result = clearStatement.step();
+        result = clearStatement.step();
         if (result != SQLITE_DONE) {
             LOG_ERROR("Failed to clear all items in the local storage database - %i", result);
+            if (result == SQLITE_CORRUPT)
+                handleDatabaseCorruption();
             return;
         }
     }
 
     SQLiteStatement insertStatement(m_database, "INSERT INTO ItemTable VALUES (?, ?)");
-    if (insertStatement.prepare() != SQLITE_OK) {
-        LOG_ERROR("Failed to prepare insert statement - cannot write to local storage database");
+    if ((result = insertStatement.prepare()) != SQLITE_OK) {
+        LOG_ERROR("Failed to prepare insert statement - cannot write to local storage database - %i", result);
+        if (result == SQLITE_CORRUPT)
+            handleDatabaseCorruption();
         return;
     }
 
     SQLiteStatement deleteStatement(m_database, "DELETE FROM ItemTable WHERE key=?");
-    if (deleteStatement.prepare() != SQLITE_OK) {
-        LOG_ERROR("Failed to prepare delete statement - cannot write to local storage database");
+    if ((result = deleteStatement.prepare()) != SQLITE_OK) {
+        LOG_ERROR("Failed to prepare delete statement - cannot write to local storage database - %i", result);
+        if (result == SQLITE_CORRUPT)
+            handleDatabaseCorruption();
         return;
     }
 
@@ -331,6 +347,12 @@ void LocalStorageDatabase::updateDatabaseWithChangedItems(const HashMap<String, 
         int result = statement.step();
         if (result != SQLITE_DONE) {
             LOG_ERROR("Failed to update item in the local storage database - %i", result);
+            if (result == SQLITE_CORRUPT) {
+                statement.finalize();
+                transaction.stop();
+                handleDatabaseCorruption();
+                return;
+            }
             break;
         }
 
@@ -358,6 +380,23 @@ bool LocalStorageDatabase::databaseIsEmpty()
     }
 
     return !query.getColumnInt(0);
+}
+
+void LocalStorageDatabase::setRestoreHandler(Function<void()>&& restoreHandler)
+{
+    m_restoreHandler = WTFMove(restoreHandler);
+}
+
+void LocalStorageDatabase::handleDatabaseCorruption()
+{
+    if (m_database.isOpen())
+        m_database.close();
+    m_changedItems.clear();
+    m_tracker->deleteDatabaseWithOrigin(m_securityOrigin);
+    LOG_ERROR("Deleted corrupted local storage database - '%s'", m_databasePath.utf8().data());
+    auto restoreHandler = WTFMove(m_restoreHandler);
+    if (restoreHandler)
+        restoreHandler();
 }
 
 } // namespace WebKit
