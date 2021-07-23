@@ -115,6 +115,7 @@ my (
     $readableStreamAPISupport,
     $readableByteStreamAPISupport,
     $registerProtocolHandlerSupport,
+    $resizeObserverSupport,
     $resolutionMediaQuerySupport,
     $scriptedSpeechSupport,
     $serviceWorkerSupport,
@@ -168,6 +169,9 @@ my @features = (
 
     { option => "css-image-resolution", desc => "Toggle CSS image-resolution support",
       define => "ENABLE_CSS_IMAGE_RESOLUTION", value => \$cssImageResolutionSupport },
+
+    { option => "resize-observer", desc => "Enable Resize Observer support",
+      define => "ENABLE_RESIZE_OBSERVER", value => \$resizeObserverSupport },
 
     { option => "css-image-set", desc => "Toggle CSS image-set support",
       define => "ENABLE_CSS_IMAGE_SET", value => \$cssImageSetSupport },

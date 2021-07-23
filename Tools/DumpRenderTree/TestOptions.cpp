@@ -103,6 +103,8 @@ TestOptions::TestOptions(const std::string& pathOrURL, const std::string& absolu
             enableWebAnimationsCSSIntegration = parseBooleanTestHeaderValue(value);
         else if (key == "enableColorFilter")
             enableColorFilter = parseBooleanTestHeaderValue(value);
+        else if (key == "experimental:ResizeObserverEnabled")
+            enableResizeObserver = parseBooleanTestHeaderValue(value);
         else if (key == "jscOptions")
             jscOptions = value;
         pairStart = pairEnd + 1;

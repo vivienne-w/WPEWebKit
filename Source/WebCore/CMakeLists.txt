@@ -847,6 +847,9 @@ set(WebCore_NON_SVG_IDL_FILES
     page/PerformanceServerTiming.idl
     page/PerformanceTiming.idl
     page/RemoteDOMWindow.idl
+    page/ResizeObserver.idl
+    page/ResizeObserverCallback.idl
+    page/ResizeObserverEntry.idl
     page/Screen.idl
     page/ScrollToOptions.idl
     page/VisualViewport.idl

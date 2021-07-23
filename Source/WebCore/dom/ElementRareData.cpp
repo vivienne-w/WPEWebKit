@@ -47,6 +47,9 @@ struct SameSizeAsElementRareData : NodeRareData {
 #if ENABLE(INTERSECTION_OBSERVER)
     void* intersectionObserverData;
 #endif
+#if ENABLE(RESIZE_OBSERVER)
+    void* resizeObserverData;
+#endif
 
 };
 
