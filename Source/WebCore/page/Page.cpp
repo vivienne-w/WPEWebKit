@@ -90,6 +90,7 @@
 #include "RenderTheme.h"
 #include "RenderView.h"
 #include "RenderWidget.h"
+#include "ResizeObserver.h"
 #include "ResourceUsageOverlay.h"
 #include "RuntimeEnabledFeatures.h"
 #include "SVGDocumentExtensions.h"
@@ -117,6 +118,9 @@
 #include "WebGLStateTracker.h"
 #include "WheelEventDeltaFilter.h"
 #include "Widget.h"
+#if ENABLE(RESIZE_OBSERVER)
+#include <JavaScriptCore/ScriptCallStack.h>
+#endif
 #include <wtf/RefCountedLeakCounter.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/text/Base64.h>
@@ -244,6 +248,9 @@ Page::Page(PageConfiguration&& pageConfiguration)
     , m_sessionID(PAL::SessionID::defaultSessionID())
 #if ENABLE(VIDEO)
     , m_playbackControlsManagerUpdateTimer(*this, &Page::playbackControlsManagerUpdateTimerFired)
+#endif
+#if ENABLE(RESIZE_OBSERVER)
+    , m_resizeObserverTimer(*this, &Page::checkResizeObservations)
 #endif
     , m_isUtilityPage(isUtilityPageChromeClient(chrome().client()))
     , m_performanceMonitor(isUtilityPage() ? nullptr : std::make_unique<PerformanceMonitor>(*this))
@@ -977,6 +984,13 @@ void Page::didFinishLoad()
         m_performanceMonitor->didFinishLoad();
 }
 
+void Page::willDisplayPage()
+{
+#if ENABLE(RESIZE_OBSERVER)
+    checkResizeObservations();
+#endif
+}
+
 bool Page::isOnlyNonUtilityPage() const
 {
     return !isUtilityPage() && nonUtilityPageCount == 1;
@@ -1117,6 +1131,80 @@ void Page::removeActivityStateChangeObserver(ActivityStateChangeObserver& observ
 {
     m_activityStateChangeObservers.remove(&observer);
 }
+
+#if ENABLE(RESIZE_OBSERVER)
+bool Page::hasResizeObservers() const
+{
+    for (const Frame* frame = &mainFrame(); frame; frame = frame->tree().traverseNext()) {
+        auto doc = frame->document();
+        if (doc && doc->hasResizeObservers())
+            return true;
+    }
+    return false;
+}
+
+void Page::gatherDocumentsNeedingResizeObservationCheck(Vector<WeakPtr<Document>>& documentsNeedingResizeObservationCheck)
+{
+    forEachDocument([&] (Document& document) {
+        if (document.hasResizeObservers())
+            documentsNeedingResizeObservationCheck.append(makeWeakPtr(document));
+    });
+}
+
+void Page::checkResizeObservations()
+{
+    if (!needsCheckResizeObservations())
+        return;
+    setNeedsCheckResizeObservations(false);
+    m_resizeObserverTimer.stop();
+
+    Vector<WeakPtr<Document>> documentsNeedingResizeObservationCheck;
+    gatherDocumentsNeedingResizeObservationCheck(documentsNeedingResizeObservationCheck);
+    for (const auto& document : documentsNeedingResizeObservationCheck)
+        notifyResizeObservers(document);
+    documentsNeedingResizeObservationCheck.clear();
+}
+
+void Page::scheduleResizeObservations()
+{
+    setNeedsCheckResizeObservations(true);
+    if (m_resizeObserverTimer.isActive())
+        return;
+    m_resizeObserverTimer.startOneShot(0_s);
+}
+
+void Page::notifyResizeObservers(WeakPtr<Document> document)
+{
+    if (!document)
+        return;
+
+    // We need layout the whole frame tree here. Because ResizeObserver could observe element in other frame,
+    // and it could change other frame in deliverResizeObservations().
+    if (mainFrame().view())
+        mainFrame().view()->updateLayoutAndStyleIfNeededRecursive();
+
+    // Start check resize obervers;
+    for (size_t depth = document->gatherResizeObservations(0); depth != ResizeObserver::maxElementDepth(); depth = document->gatherResizeObservations(depth)) {
+        document->deliverResizeObservations();
+        if (!document)
+            return;
+        if (mainFrame().view())
+            mainFrame().view()->updateLayoutAndStyleIfNeededRecursive();
+    }
+
+    if (document->hasSkippedResizeObservations()) {
+        document->setHasSkippedResizeObservations(false);
+        String url;
+        unsigned line = 0;
+        unsigned column = 0;
+        document->getParserLocation(url, line, column);
+        document->reportException("ResizeObserver loop completed with undelivered notifications.", line, column, url, nullptr, nullptr);
+        // TODO: We are starting a timer to schedule the next round of notify.
+        // However, this should be in synchrony with the next requestAnimationFrame.
+        scheduleResizeObservations();
+    }
+}
+#endif
 
 void Page::suspendScriptedAnimations()
 {

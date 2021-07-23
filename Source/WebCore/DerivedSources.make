@@ -807,6 +807,9 @@ JS_BINDING_IDLS = \
     $(WebCore)/page/PerformanceServerTiming.idl \
     $(WebCore)/page/PerformanceTiming.idl \
     $(WebCore)/page/RemoteDOMWindow.idl \
+    $(WebCore)/page/ResizeObserver.idl \
+    $(WebCore)/page/ResizeObserverCallback.idl \
+    $(WebCore)/page/ResizeObserverEntry.idl \
     $(WebCore)/page/Screen.idl \
     $(WebCore)/page/ScrollToOptions.idl \
     $(WebCore)/page/UserMessageHandler.idl \

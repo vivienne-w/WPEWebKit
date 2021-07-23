@@ -47,6 +47,7 @@
 #include <wtf/Ref.h>
 #include <wtf/UniqueRef.h>
 #include <wtf/text/WTFString.h>
+#include <wtf/WeakPtr.h>
 
 #if PLATFORM(COCOA)
 #include <wtf/SchedulePair.h>
@@ -321,6 +322,8 @@ public:
     void didStartProvisionalLoad();
     void didFinishLoad(); // Called when the load has been committed in the main frame.
 
+    WEBCORE_EXPORT void willDisplayPage();
+
     // The view scale factor is multiplied into the page scale factor by all
     // callers of setPageScaleFactor.
     WEBCORE_EXPORT void setViewScaleFactor(float);
@@ -436,6 +439,16 @@ public:
 
     WEBCORE_EXPORT void addActivityStateChangeObserver(ActivityStateChangeObserver&);
     WEBCORE_EXPORT void removeActivityStateChangeObserver(ActivityStateChangeObserver&);
+
+#if ENABLE(RESIZE_OBSERVER)
+    WEBCORE_EXPORT void checkResizeObservations();
+    bool hasResizeObservers() const;
+    void gatherDocumentsNeedingResizeObservationCheck(Vector<WeakPtr<Document>>&);
+    void scheduleResizeObservations();
+    void notifyResizeObservers(WeakPtr<Document>);
+    void setNeedsCheckResizeObservations(bool check) { m_needsCheckResizeObservations = check; }
+    bool needsCheckResizeObservations() const { return m_needsCheckResizeObservations; }
+#endif
 
     WEBCORE_EXPORT void suspendScriptedAnimations();
     WEBCORE_EXPORT void resumeScriptedAnimations();
@@ -601,6 +614,11 @@ public:
     WEBCORE_EXPORT WheelEventTestTrigger& ensureTestTrigger();
     void clearTrigger() { m_testTrigger = nullptr; }
     bool expectsWheelEventTriggers() const { return !!m_testTrigger; }
+
+#if ENABLE(RESIZE_OBSERVER)
+    Timer m_resizeObserverTimer;
+    bool m_needsCheckResizeObservations { false };
+#endif
 
 #if ENABLE(VIDEO)
     bool allowsMediaDocumentInlinePlayback() const { return m_allowsMediaDocumentInlinePlayback; }

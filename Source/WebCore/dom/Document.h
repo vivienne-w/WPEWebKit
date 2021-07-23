@@ -239,6 +239,10 @@ class HTMLAttachmentElement;
 class IntersectionObserver;
 #endif
 
+#if ENABLE(RESIZE_OBSERVER)
+class ResizeObserver;
+#endif
+
 namespace Style {
 class Scope;
 };
@@ -1313,6 +1317,10 @@ public:
     void addDisabledFieldsetElement() { m_disabledFieldsetElementsCount++; }
     void removeDisabledFieldsetElement() { ASSERT(m_disabledFieldsetElementsCount); m_disabledFieldsetElementsCount--; }
 
+#if ENABLE(RESIZE_OBSERVER)
+    void getParserLocation(String& url, unsigned& line, unsigned& column) const;
+#endif
+
     WEBCORE_EXPORT void addConsoleMessage(std::unique_ptr<Inspector::ConsoleMessage>&&) final;
 
     // The following addConsoleMessage function is deprecated.
@@ -1368,6 +1376,18 @@ public:
     RefPtr<IntersectionObserver> removeIntersectionObserver(IntersectionObserver&);
     unsigned numberOfIntersectionObservers() const { return m_intersectionObservers.size(); }
     void updateIntersectionObservations();
+#endif
+
+#if ENABLE(RESIZE_OBSERVER)
+    void addResizeObserver(ResizeObserver&);
+    void removeResizeObserver(ResizeObserver&);
+    bool hasResizeObservers();
+    // Return the minDepth of the active observations.
+    size_t gatherResizeObservations(size_t deeperThan);
+    void deliverResizeObservations();
+    bool hasSkippedResizeObservations() const;
+    void setHasSkippedResizeObservations(bool);
+    void scheduleResizeObservations();
 #endif
 
 #if ENABLE(MEDIA_STREAM)
@@ -1779,6 +1799,10 @@ private:
     Vector<RefPtr<IntersectionObserver>> m_intersectionObservers;
     Vector<WeakPtr<IntersectionObserver>> m_intersectionObserversWithPendingNotifications;
     Timer m_intersectionObserversNotifyTimer;
+#endif
+
+#if ENABLE(RESIZE_OBSERVER)
+    Vector<WeakPtr<ResizeObserver>> m_resizeObservers;
 #endif
 
     Timer m_loadEventDelayTimer;

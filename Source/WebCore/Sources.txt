@@ -443,6 +443,7 @@ bindings/js/JSReadableStreamPrivateConstructors.cpp
 bindings/js/JSReadableStreamSourceCustom.cpp
 bindings/js/JSRemoteDOMWindowBase.cpp
 bindings/js/JSRemoteDOMWindowCustom.cpp
+bindings/js/JSResizeObserverEntryCustom.cpp
 bindings/js/JSSVGPathSegCustom.cpp
 bindings/js/JSStyleSheetCustom.cpp
 bindings/js/JSServiceWorkerClientCustom.cpp
@@ -820,6 +821,7 @@ dom/SpectreGadget.cpp
 dom/StaticNodeList.cpp
 dom/StaticRange.cpp
 dom/StringCallback.cpp
+dom/GCReachableRef.cpp
 dom/StyledElement.cpp
 dom/TagCollection.cpp
 dom/TemplateContentDocumentFragment.cpp
@@ -1421,6 +1423,8 @@ page/PointerLockController.cpp
 page/PrintContext.cpp
 page/RemoteDOMWindow.cpp
 page/RemoteFrame.cpp
+page/ResizeObservation.cpp
+page/ResizeObserver.cpp
 page/ResourceUsageOverlay.cpp
 page/ResourceUsageThread.cpp
 page/RuntimeEnabledFeatures.cpp
@@ -2908,6 +2912,9 @@ JSReadableStreamSink.cpp
 JSReadableStreamSource.cpp
 JSRemoteDOMWindow.cpp
 JSRequestAnimationFrameCallback.cpp
+JSResizeObserver.cpp
+JSResizeObserverCallback.cpp
+JSResizeObserverEntry.cpp
 JSRsaHashedImportParams.cpp
 JSRsaHashedKeyGenParams.cpp
 JSRsaKeyGenParams.cpp

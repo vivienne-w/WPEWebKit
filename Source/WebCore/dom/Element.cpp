@@ -191,6 +191,10 @@ Element::~Element()
     disconnectFromIntersectionObservers();
 #endif
 
+#if ENABLE(RESIZE_OBSERVER)
+    disconnectFromResizeObservers();
+#endif
+
     removeShadowRoot();
 
     if (hasSyntheticAttrChildNodes())
@@ -3275,6 +3279,32 @@ IntersectionObserverData& Element::ensureIntersectionObserverData()
 IntersectionObserverData* Element::intersectionObserverData()
 {
     return hasRareData() ? elementRareData()->intersectionObserverData() : nullptr;
+}
+#endif
+
+#if ENABLE(RESIZE_OBSERVER)
+void Element::disconnectFromResizeObservers()
+{
+    auto* observerData = resizeObserverData();
+    if (!observerData)
+        return;
+
+    for (const auto& observer : observerData->observers)
+        observer->targetDestroyed(*this);
+    observerData->observers.clear();
+}
+
+ResizeObserverData& Element::ensureResizeObserverData()
+{
+    auto& rareData = ensureElementRareData();
+    if (!rareData.resizeObserverData())
+        rareData.setResizeObserverData(std::make_unique<ResizeObserverData>());
+    return *rareData.resizeObserverData();
+}
+
+ResizeObserverData* Element::resizeObserverData()
+{
+    return hasRareData() ? elementRareData()->resizeObserverData() : nullptr;
 }
 #endif
 

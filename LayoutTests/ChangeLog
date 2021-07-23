@@ -1,3 +1,56 @@
+2020-04-06  Cathie Chen  <cathiechen@igalia.com>
+
+        The change of zoom shouldn't affect ResizeObserverSize
+        https://bugs.webkit.org/show_bug.cgi?id=209947
+
+        Reviewed by Simon Fraser.
+
+        Add test for resizeObserver with zoom. The ResizeObserverSize shouldn't be effected by zooms.
+
+        * resize-observer/resize-observer-with-zoom-expected.txt: Added.
+        * resize-observer/resize-observer-with-zoom.html: Added.
+
+2019-08-18  Cathie Chen  <cathiechen@igalia.com>
+
+        Crash in Document::deliverResizeObservations
+        https://bugs.webkit.org/show_bug.cgi?id=200635
+
+        Reviewed by Simon Fraser.
+
+        Test deleting the next/previous sibling of observer list in callbacks, and the order of notifications.
+
+        * resize-observer/delete-observers-in-callbacks-expected.txt: Added.
+        * resize-observer/delete-observers-in-callbacks.html: Added.
+
+2019-06-04  Cathie Chen  <cathiechen@igalia.com>
+
+        JS wrapper of target in ResizeObserverEntry/ResizeObserver shouldn't get collected ahead
+        https://bugs.webkit.org/show_bug.cgi?id=197457
+
+        Reviewed by Ryosuke Niwa.
+
+        * platform/win/TestExpectations:
+        * resize-observer/element-leak-expected.txt: Added.
+        * resize-observer/element-leak.html: Added.
+        * resize-observer/resize-observer-entry-keeps-js-wrapper-of-target-alive-expected.txt: Added.
+        * resize-observer/resize-observer-entry-keeps-js-wrapper-of-target-alive.html: Added.
+        * resize-observer/resize-observer-keeps-js-wrapper-of-target-alive-expected.txt: Added.
+        * resize-observer/resize-observer-keeps-js-wrapper-of-target-alive.html: Added.
+        * resize-observer/resources/element-leak-frame.html: Added.
+
+2018-09-21  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Custom elements in a reaction queue can lose its JS wrapper and become HTMLUnknownElement
+        https://bugs.webkit.org/show_bug.cgi?id=184307
+
+        Reviewed by Keith Miller.
+
+        Added a test for enqueuing a lot of custom elements into the reaction queue via innerHTML setter.
+        WebKit should retain the JS wrappers of all custom elements.
+
+        * fast/custom-elements/custom-elements-reaction-queue-retains-js-wrapper-expected.txt: Added.
+        * fast/custom-elements/custom-elements-reaction-queue-retains-js-wrapper.html: Added.
+
 2020-11-20  Youenn Fablet  <youenn@apple.com>
 
         Add support for RTCPeerConnection.onicecandidateerror event

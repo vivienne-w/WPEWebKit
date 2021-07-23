@@ -692,6 +692,10 @@ shouldAllowUserInstalledFonts:
   initial: true
   onChange: setNeedsRecalcStyleInAllFrames
 
+resizeObserverEnabled:
+  initial: true
+  conditional: RESIZE_OBSERVER
+
 # Only set by Layout Tests.
 mediaTypeOverride:
   type: String
