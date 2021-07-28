@@ -984,6 +984,13 @@ void Page::didFinishLoad()
         m_performanceMonitor->didFinishLoad();
 }
 
+void Page::willDisplayPage()
+{
+#if ENABLE(RESIZE_OBSERVER)
+    checkResizeObservations();
+#endif
+}
+
 bool Page::isOnlyNonUtilityPage() const
 {
     return !isUtilityPage() && nonUtilityPageCount == 1;
