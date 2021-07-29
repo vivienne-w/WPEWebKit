@@ -30,6 +30,7 @@
 #include "GStreamerEMEUtilities.h"
 #include "MediaKeyStatus.h"
 #include <open_cdm.h>
+#include <wtf/Condition.h>
 #include <wtf/HashMap.h>
 #include <wtf/text/StringHash.h>
 
@@ -116,6 +117,8 @@ private:
     // the GStreamer decryptor elements running in the streaming threads have a need to
     // lookup values in this map.
     mutable Lock m_sessionMapMutex;
+    mutable Condition m_sessionMapCondition;
+    unsigned n_numberOfCurrentUpdates { 0 };
     HashMap<String, RefPtr<Session>> m_sessionsMap;
     CDMInstanceClient* m_client { nullptr };
     KeyStatusVector m_keyStatuses;

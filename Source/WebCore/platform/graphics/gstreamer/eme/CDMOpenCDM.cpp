@@ -402,6 +402,8 @@ void CDMInstanceOpenCDM::Session::errorCallback(RefPtr<SharedBuffer>&& message)
     for (auto& sessionChangedCallback : m_sessionChangedCallbacks)
         sessionChangedCallback(this, false, WTFMove(message), m_keyStatuses);
     m_sessionChangedCallbacks.clear();
+
+    m_parent->m_sessionMapCondition.notifyAll();
 }
 
 void CDMInstanceOpenCDM::Session::generateChallenge(ChallengeGeneratedCallback&& callback)
@@ -515,8 +517,10 @@ void CDMInstanceOpenCDM::updateLicense(const String& sessionId, LicenseType, con
         return;
     }
 
-    session->update(reinterpret_cast<const uint8_t*>(response.data()), response.size(), [callback = WTFMove(callback), locker = WTFMove(locker)](Session* session, bool success, RefPtr<SharedBuffer>&& buffer, KeyStatusVector& keyStatuses) {
-        UNUSED_PARAM(session);
+    n_numberOfCurrentUpdates++;
+    session->update(reinterpret_cast<const uint8_t*>(response.data()), response.size(), [this, callback = WTFMove(callback)](Session*, bool success, RefPtr<SharedBuffer>&& buffer, KeyStatusVector& keyStatuses) {
+        LockHolder locker(m_sessionMapMutex);
+        ASSERT(n_numberOfCurrentUpdates);
         if (success) {
             if (!buffer) {
                 ASSERT(!keyStatuses.isEmpty());
@@ -539,6 +543,8 @@ void CDMInstanceOpenCDM::updateLicense(const String& sessionId, LicenseType, con
             GST_ERROR("update license reported error state");
             callback(false, std::nullopt, std::nullopt, std::nullopt, SuccessValue::Failed);
         }
+        n_numberOfCurrentUpdates--;
+        m_sessionMapCondition.notifyAll();
     });
 }
 
@@ -636,6 +642,13 @@ void CDMInstanceOpenCDM::closeSession(const String& sessionId, CloseSessionCallb
 String CDMInstanceOpenCDM::sessionIdByKeyId(const SharedBuffer& keyId) const
 {
     LockHolder locker(m_sessionMapMutex);
+    if (!m_sessionMapCondition.waitFor(m_sessionMapMutex, WEBCORE_GSTREAMER_EME_LICENSE_KEY_RESPONSE_TIMEOUT, [this] {
+        return !n_numberOfCurrentUpdates;
+    })) {
+        GST_ERROR("session not found because timeout is gone");
+        ASSERT_NOT_REACHED();
+        return { };
+    }
 
     GST_MEMDUMP("kid", reinterpret_cast<const uint8_t*>(keyId.data()), keyId.size());
     if (!m_sessionsMap.size() || !keyId.data()) {
