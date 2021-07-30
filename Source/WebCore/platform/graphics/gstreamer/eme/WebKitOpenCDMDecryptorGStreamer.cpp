@@ -195,24 +195,33 @@ static bool webKitMediaOpenCDMDecryptorAttemptToDecryptWithLocalInstance(WebKitM
 
 static bool webKitMediaOpenCDMDecryptorDecrypt(WebKitMediaCommonEncryptionDecrypt* self, GstBuffer* keyIDBuffer, GstBuffer* ivBuffer, GstBuffer* buffer, unsigned subSampleCount, GstBuffer* subSamplesBuffer)
 {
+    GST_TRACE_OBJECT(self, "step");
     WebKitOpenCDMDecryptPrivate* priv = GST_WEBKIT_OPENCDM_DECRYPT_GET_PRIVATE(self);
 
+    GST_TRACE_OBJECT(self, "step");
     GstMappedBuffer mappedKeyID(keyIDBuffer, GST_MAP_READ);
     if (!mappedKeyID) {
         GST_ELEMENT_ERROR (self, STREAM, DECRYPT, ("Failed to map key ID buffer."), (NULL));
         return false;
     }
+    GST_TRACE_OBJECT(self, "step");
 
     if (!priv->m_openCdmSession) {
+    GST_TRACE_OBJECT(self, "step");
         LockHolder locker(priv->m_mutex);
+    GST_TRACE_OBJECT(self, "step");
         RefPtr<WebCore::CDMInstance> cdmInstance = webKitMediaCommonEncryptionDecryptCDMInstance(self);
+    GST_TRACE_OBJECT(self, "step");
         ASSERT(cdmInstance && is<WebCore::CDMInstanceOpenCDM>(*cdmInstance));
         auto& cdmInstanceOpenCDM = downcast<WebCore::CDMInstanceOpenCDM>(*cdmInstance);
+    GST_TRACE_OBJECT(self, "step");
         priv->m_openCdmSession.reset(opencdm_get_system_session(cdmInstanceOpenCDM.ocdmSystem(), mappedKeyID.data(), mappedKeyID.size(), WEBCORE_GSTREAMER_EME_LICENSE_KEY_RESPONSE_TIMEOUT.millisecondsAs<uint32_t>()));
+    GST_TRACE_OBJECT(self, "step");
         if (!priv->m_openCdmSession) {
             GST_ELEMENT_ERROR (self, STREAM, DECRYPT, ("Session is empty or unusable."), (NULL));
             return false;
         }
+    GST_TRACE_OBJECT(self, "step");
     }
 
     // Decrypt cipher.
@@ -229,6 +238,7 @@ static bool webKitMediaOpenCDMDecryptorDecrypt(WebKitMediaCommonEncryptionDecryp
         return false;
     }
 
+    GST_TRACE_OBJECT(self, "step");
     return true;
 }
 #endif // ENABLE(ENCRYPTED_MEDIA) && USE(GSTREAMER) && USE(OPENCDM)

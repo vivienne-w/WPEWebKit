@@ -361,9 +361,11 @@ static GstFlowReturn webkitMediaCommonEncryptionDecryptTransformInPlace(GstBaseT
         gst_buffer_remove_meta(buffer, reinterpret_cast<GstMeta*>(protectionMeta));
         return GST_FLOW_NOT_SUPPORTED;
     }
+    GST_TRACE_OBJECT(self, "decrypted");
 
     klass->releaseCipher(self);
     gst_buffer_remove_meta(buffer, reinterpret_cast<GstMeta*>(protectionMeta));
+    GST_TRACE_OBJECT(self, "cipher released, returning flow ok");
     return GST_FLOW_OK;
 }
 

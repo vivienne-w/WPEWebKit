@@ -1505,7 +1505,7 @@ void MediaPlayerPrivateGStreamerBase::cdmInstanceAttached(CDMInstance& instance)
     gst_structure_set(contextStructure, "cdm-instance", G_TYPE_POINTER, m_cdmInstance.get(), nullptr);
     gst_element_set_context(GST_ELEMENT(m_pipeline.get()), context.get());
 
-    GST_LOG("CDM instance %p dispatched as context", m_cdmInstance.get());
+    GST_DEBUG("CDM proxy instance %p for %s dispatched as context", m_cdmInstance.get(), m_cdmInstance->keySystem().utf8().data());
 }
 
 void MediaPlayerPrivateGStreamerBase::cdmInstanceDetached(CDMInstance& instance)

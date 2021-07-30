@@ -30,9 +30,9 @@
 #include "MediaKeyMessageType.h"
 #include "MediaKeysRequirement.h"
 #include "MediaPlayerPrivateGStreamerBase.h"
-
 #include <gst/gst.h>
 #include <wtf/NeverDestroyed.h>
+#include <wtf/Scope.h>
 #include <wtf/text/Base64.h>
 
 GST_DEBUG_CATEGORY_EXTERN(webkit_media_opencdm_decrypt_debug_category);
@@ -107,6 +107,7 @@ public:
     {
         return m_session && !id().isEmpty() ? opencdm_session_status(m_session.get(), reinterpret_cast<const uint8_t*>(keyId.data()), keyId.size()) : StatusPending;
     }
+    bool isInstanceLocked() { return m_parent->isLocked(); }
 
     bool containsKeyId(const SharedBuffer& keyId) const
     {
@@ -211,7 +212,7 @@ static LicenseType openCDMLicenseType(CDMInstance::LicenseType licenseType)
     case CDMInstance::LicenseType::PersistentLicense:
         return PersistentLicense;
     default:
-        ASSERT_NOT_REACHED();
+        RELEASE_ASSERT_NOT_REACHED();
         return Temporary;
     }
 }
@@ -234,7 +235,7 @@ static CDMInstance::KeyStatus keyStatusFromOpenCDM(KeyStatus keyStatus)
     case InternalError:
         return CDMInstance::KeyStatus::InternalError;
     default:
-        ASSERT_NOT_REACHED();
+        RELEASE_ASSERT_NOT_REACHED();
         return CDMInstance::KeyStatus::InternalError;
     }
 }
@@ -290,6 +291,7 @@ void CDMInstanceOpenCDM::Session::openCDMNotification(const OpenCDMSession*, voi
     RefPtr<WebCore::SharedBuffer> sharedBuffer = WebCore::SharedBuffer::create(message, messageLength);
     if (!isMainThread()) {
         // Make sure all happens on the main thread to avoid locking.
+        GST_TRACE("deferring to the main thread, is instance locked %s", boolForPrinting(session->isInstanceLocked()));
         callOnMainThread([session, method, buffer = WTFMove(sharedBuffer)]() mutable {
             if (!Session::m_validSessions.contains(session)) {
                 // Became invalid in the meantime. It's possible due to leaping through the different threads.
@@ -403,6 +405,7 @@ void CDMInstanceOpenCDM::Session::errorCallback(RefPtr<SharedBuffer>&& message)
         sessionChangedCallback(this, false, WTFMove(message), m_keyStatuses);
     m_sessionChangedCallbacks.clear();
 
+    GST_TRACE("waking up the condition");
     m_parent->m_sessionMapCondition.notifyAll();
 }
 
@@ -420,8 +423,13 @@ void CDMInstanceOpenCDM::Session::update(const uint8_t* data, const unsigned len
 {
     m_keyStatuses.clear();
     m_sessionChangedCallbacks.append(WTFMove(callback));
-    if (!m_session || id().isEmpty() || opencdm_session_update(m_session.get(), data, length))
+    GST_TRACE("calling opencdm_session_update");
+    if (!m_session || id().isEmpty() || opencdm_session_update(m_session.get(), data, length)) {
         updateFailure();
+        GST_ERROR("opencdm_session_update failure");
+        RELEASE_ASSERT_NOT_REACHED();
+    }
+    GST_TRACE("opencdm_session_update fired, waiting for the callback");
 
     // Assumption: should report back either with a message to be sent to the license server or key statuses updates.
 }
@@ -509,7 +517,15 @@ void CDMInstanceOpenCDM::updateLicense(const String& sessionId, LicenseType, con
     // We take the session map mutex here and we do not release it
     // until the the update lambda is executed by moving the lock into
     // it.
+
+    unsigned sessionMapMutexAccessCounter = m_sessionMapMutexAccessCounter.exchangeAdd(1);
+    GST_TRACE("locking %u, was already locked %s", sessionMapMutexAccessCounter, boolForPrinting(m_sessionMapMutex.isLocked()));
     LockHolder locker(m_sessionMapMutex);
+    GST_TRACE("locked %u", sessionMapMutexAccessCounter);
+    auto exit = makeScopeExit([sessionMapMutexAccessCounter] () {
+        GST_TRACE("unlocking %u", sessionMapMutexAccessCounter);
+    });
+
     auto session = lookupSessionUnlocked(sessionId);
     if (!session) {
         GST_WARNING("cannot update the session %s cause we can't find it", sessionId.utf8().data());
@@ -519,11 +535,17 @@ void CDMInstanceOpenCDM::updateLicense(const String& sessionId, LicenseType, con
 
     n_numberOfCurrentUpdates++;
     session->update(reinterpret_cast<const uint8_t*>(response.data()), response.size(), [this, callback = WTFMove(callback)](Session*, bool success, RefPtr<SharedBuffer>&& buffer, KeyStatusVector& keyStatuses) {
+        unsigned sessionMapMutexAccessCounter = m_sessionMapMutexAccessCounter.exchangeAdd(1);
+        GST_TRACE("locking %u, was already locked %s", sessionMapMutexAccessCounter, boolForPrinting(m_sessionMapMutex.isLocked()));
         LockHolder locker(m_sessionMapMutex);
-        ASSERT(n_numberOfCurrentUpdates);
+        GST_TRACE("locked %u", sessionMapMutexAccessCounter);
+        auto exit = makeScopeExit([sessionMapMutexAccessCounter] () {
+            GST_TRACE("unlocking %u", sessionMapMutexAccessCounter);
+        });
+        RELEASE_ASSERT(n_numberOfCurrentUpdates);
         if (success) {
             if (!buffer) {
-                ASSERT(!keyStatuses.isEmpty());
+                RELEASE_ASSERT(!keyStatuses.isEmpty());
                 callback(false, copyAndMaybeReplaceValue(keyStatuses), std::nullopt, std::nullopt, SuccessValue::Succeeded);
             } else {
                 // FIXME: Using JSON reponse messages is much cleaner than using string prefixes, I believe there
@@ -543,8 +565,10 @@ void CDMInstanceOpenCDM::updateLicense(const String& sessionId, LicenseType, con
             GST_ERROR("update license reported error state");
             callback(false, std::nullopt, std::nullopt, std::nullopt, SuccessValue::Failed);
         }
-        n_numberOfCurrentUpdates--;
-        m_sessionMapCondition.notifyAll();
+        if (!--n_numberOfCurrentUpdates) {
+            GST_TRACE("waking up condition");
+            m_sessionMapCondition.notifyAll();
+        }
     });
 }
 
@@ -614,11 +638,9 @@ void CDMInstanceOpenCDM::removeSessionData(const String& sessionId, LicenseType,
         }
     });
 
-#ifndef NDEBUG
     bool removeSessionResult =
-#endif
         removeSession(sessionId);
-    ASSERT(removeSessionResult);
+    RELEASE_ASSERT(removeSessionResult);
 }
 
 void CDMInstanceOpenCDM::closeSession(const String& sessionId, CloseSessionCallback callback)
@@ -630,25 +652,31 @@ void CDMInstanceOpenCDM::closeSession(const String& sessionId, CloseSessionCallb
     }
     session->close();
 
-#ifndef NDEBUG
     bool removeSessionResult =
-#endif
         removeSession(sessionId);
-    ASSERT(removeSessionResult);
+    RELEASE_ASSERT(removeSessionResult);
 
     callback();
 }
 
 String CDMInstanceOpenCDM::sessionIdByKeyId(const SharedBuffer& keyId) const
 {
+    unsigned sessionMapMutexAccessCounter = m_sessionMapMutexAccessCounter.exchangeAdd(1);
+    GST_TRACE("locking %u, was already locked %s", sessionMapMutexAccessCounter, boolForPrinting(m_sessionMapMutex.isLocked()));
     LockHolder locker(m_sessionMapMutex);
+    GST_TRACE("locked %u", sessionMapMutexAccessCounter);
+    auto exit = makeScopeExit([sessionMapMutexAccessCounter] () {
+        GST_TRACE("unlocking %u", sessionMapMutexAccessCounter);
+    });
+    GST_TRACE("waiting the condition %u", sessionMapMutexAccessCounter);
     if (!m_sessionMapCondition.waitFor(m_sessionMapMutex, WEBCORE_GSTREAMER_EME_LICENSE_KEY_RESPONSE_TIMEOUT, [this] {
         return !n_numberOfCurrentUpdates;
     })) {
         GST_ERROR("session not found because timeout is gone");
-        ASSERT_NOT_REACHED();
+        RELEASE_ASSERT_NOT_REACHED();
         return { };
     }
+    GST_TRACE("done with the condition %u", sessionMapMutexAccessCounter);
 
     GST_MEMDUMP("kid", reinterpret_cast<const uint8_t*>(keyId.data()), keyId.size());
     if (!m_sessionsMap.size() || !keyId.data()) {
@@ -683,27 +711,45 @@ bool CDMInstanceOpenCDM::isKeyIdInSessionUsable(const SharedBuffer& keyId, const
 
 bool CDMInstanceOpenCDM::addSession(const String& sessionId, RefPtr<Session>&& session)
 {
+    unsigned sessionMapMutexAccessCounter = m_sessionMapMutexAccessCounter.exchangeAdd(1);
+    GST_TRACE("locking %u, was already locked %s", sessionMapMutexAccessCounter, boolForPrinting(m_sessionMapMutex.isLocked()));
     LockHolder locker(m_sessionMapMutex);
-    ASSERT(session);
+    GST_TRACE("locked %u", sessionMapMutexAccessCounter);
+    auto exit = makeScopeExit([sessionMapMutexAccessCounter] () {
+        GST_TRACE("unlocking %u", sessionMapMutexAccessCounter);
+    });
+    RELEASE_ASSERT(session);
     return m_sessionsMap.set(sessionId, session).isNewEntry;
 }
 
 bool CDMInstanceOpenCDM::removeSession(const String& sessionId)
 {
+    unsigned sessionMapMutexAccessCounter = m_sessionMapMutexAccessCounter.exchangeAdd(1);
+    GST_TRACE("locking %u, was already locked %s", sessionMapMutexAccessCounter, boolForPrinting(m_sessionMapMutex.isLocked()));
     LockHolder locker(m_sessionMapMutex);
+    GST_TRACE("locked %u", sessionMapMutexAccessCounter);
+    auto exit = makeScopeExit([sessionMapMutexAccessCounter] () {
+        GST_TRACE("unlocking %u", sessionMapMutexAccessCounter);
+    });
     return m_sessionsMap.remove(sessionId);
 }
 
 RefPtr<CDMInstanceOpenCDM::Session> CDMInstanceOpenCDM::lookupSessionUnlocked(const String& sessionId) const
 {
-    ASSERT(m_sessionMapMutex.isLocked());
+    RELEASE_ASSERT(m_sessionMapMutex.isLocked());
     auto session = m_sessionsMap.find(sessionId);
     return session == m_sessionsMap.end() ? nullptr : session->value;
 }
 
 RefPtr<CDMInstanceOpenCDM::Session> CDMInstanceOpenCDM::lookupSession(const String& sessionId) const
 {
+    unsigned sessionMapMutexAccessCounter = m_sessionMapMutexAccessCounter.exchangeAdd(1);
+    GST_TRACE("locking %u, was already locked %s", sessionMapMutexAccessCounter, boolForPrinting(m_sessionMapMutex.isLocked()));
     LockHolder locker(m_sessionMapMutex);
+    GST_TRACE("locked %u", sessionMapMutexAccessCounter);
+    auto exit = makeScopeExit([sessionMapMutexAccessCounter] () {
+        GST_TRACE("unlocking %u", sessionMapMutexAccessCounter);
+    });
     return lookupSessionUnlocked(sessionId);
 }
 

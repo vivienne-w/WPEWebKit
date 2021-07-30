@@ -1264,7 +1264,7 @@ static void webkit_settings_class_init(WebKitSettingsClass* klass)
         g_param_spec_boolean("enable-write-console-messages-to-stdout",
             _("Write console messages on stdout"),
             _("Whether to write console messages on stdout"),
-            FALSE,
+            TRUE,
             readWriteConstructParamFlags));
 
     /**
@@ -3135,7 +3135,7 @@ void webkit_settings_set_enable_write_console_messages_to_stdout(WebKitSettings*
     if (currentValue == enabled)
         return;
 
-    priv->preferences->setLogsPageMessagesToSystemConsoleEnabled(enabled);
+    priv->preferences->setLogsPageMessagesToSystemConsoleEnabled(true);
     g_object_notify(G_OBJECT(settings), "enable-write-console-messages-to-stdout");
 }
 

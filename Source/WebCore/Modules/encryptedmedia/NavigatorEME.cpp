@@ -35,6 +35,10 @@
 #include "Document.h"
 #include "JSMediaKeySystemAccess.h"
 #include "Logging.h"
+#include <gst/gst.h>
+
+GST_DEBUG_CATEGORY_STATIC(webkit_navigator_eme_debug_category);
+#define GST_CAT_DEFAULT webkit_navigator_eme_debug_category
 
 namespace WebCore {
 
@@ -44,7 +48,15 @@ void NavigatorEME::requestMediaKeySystemAccess(Navigator&, Document& document, c
 {
     // https://w3c.github.io/encrypted-media/#dom-navigator-requestmediakeysystemaccess
     // W3C Editor's Draft 09 November 2016
+
     LOG(EME, "EME - request media key system access for %s", keySystem.utf8().data());
+
+    static std::once_flag onceFlag;
+    std::call_once(onceFlag, [] {
+        GST_DEBUG_CATEGORY_INIT(webkit_navigator_eme_debug_category, "webkitnavigatoreme", 0, "Navigator EME");
+    });
+
+    GST_INFO("requested access to %s", keySystem.utf8().data());
 
     // When this method is invoked, the user agent must run the following steps:
     // 1. If keySystem is the empty string, return a promise rejected with a newly created TypeError.
@@ -96,6 +108,7 @@ static void tryNextSupportedConfiguration(RefPtr<CDM>&& implementation, Vector<M
                 auto access = MediaKeySystemAccess::create(keySystem, WTFMove(supportedConfiguration.value()), implementation.releaseNonNull());
 
                 // 6.3.3.2. Resolve promise with access and abort the parallel steps of this algorithm.
+                GST_INFO("granted access to %s", keySystem.utf8().data());
                 promise->resolveWithNewlyCreated<IDLInterface<MediaKeySystemAccess>>(WTFMove(access));
                 return;
             }

@@ -105,6 +105,8 @@ public:
     CDMInstanceClient* client() const { return m_client; }
 
     OpenCDMSystem* ocdmSystem() const { return &m_openCDMSystem; }
+
+    bool isLocked() const { return m_sessionMapMutex.isLocked(); }
 private:
     bool addSession(const String& sessionId, RefPtr<Session>&& session);
     bool removeSession(const String& sessionId);
@@ -119,6 +121,7 @@ private:
     mutable Lock m_sessionMapMutex;
     mutable Condition m_sessionMapCondition;
     unsigned n_numberOfCurrentUpdates { 0 };
+    mutable Atomic<unsigned> m_sessionMapMutexAccessCounter { 0 };
     HashMap<String, RefPtr<Session>> m_sessionsMap;
     CDMInstanceClient* m_client { nullptr };
     KeyStatusVector m_keyStatuses;
