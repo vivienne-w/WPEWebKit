@@ -563,7 +563,7 @@ void WebSocket::didConnect()
     m_state = OPEN;
     m_subprotocol = m_channel->subprotocol();
     m_extensions = m_channel->extensions();
-    dispatchEvent(Event::create(eventNames().openEvent, Event::CanBubble::No, Event::IsCancelable::No));
+    dispatchOrQueueEvent(Event::create(eventNames().openEvent, Event::CanBubble::No, Event::IsCancelable::No));
 }
 
 void WebSocket::didReceiveMessage(const String& msg)
@@ -572,7 +572,7 @@ void WebSocket::didReceiveMessage(const String& msg)
     if (m_state != OPEN)
         return;
     ASSERT(scriptExecutionContext());
-    dispatchEvent(MessageEvent::create(msg, SecurityOrigin::create(m_url)->toString()));
+    dispatchOrQueueEvent(MessageEvent::create(msg, SecurityOrigin::create(m_url)->toString()));
 }
 
 void WebSocket::didReceiveBinaryData(Vector<uint8_t>&& binaryData)
@@ -581,10 +581,10 @@ void WebSocket::didReceiveBinaryData(Vector<uint8_t>&& binaryData)
     switch (m_binaryType) {
     case BinaryType::Blob:
         // FIXME: We just received the data from NetworkProcess, and are sending it back. This is inefficient.
-        dispatchEvent(MessageEvent::create(Blob::create(WTFMove(binaryData), emptyString()), SecurityOrigin::create(m_url)->toString()));
+        dispatchOrQueueEvent(MessageEvent::create(Blob::create(WTFMove(binaryData), emptyString()), SecurityOrigin::create(m_url)->toString()));
         break;
     case BinaryType::ArrayBuffer:
-        dispatchEvent(MessageEvent::create(ArrayBuffer::create(binaryData.data(), binaryData.size()), SecurityOrigin::create(m_url)->toString()));
+        dispatchOrQueueEvent(MessageEvent::create(ArrayBuffer::create(binaryData.data(), binaryData.size()), SecurityOrigin::create(m_url)->toString()));
         break;
     }
 }
