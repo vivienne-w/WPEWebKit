@@ -175,6 +175,19 @@ static inline void dirtyLineBoxesForRenderer(RenderObject& renderer, bool fullLa
         downcast<RenderInline>(renderer).dirtyLineBoxes(fullLayout);
 }
 
+static inline void requestRepaintForRendererIfNeeded(RenderObject* container, RenderObject& renderer)
+{
+    if (!container->enclosingLayer() || !renderer.enclosingLayer())
+        return;
+
+    // It can happen that this RenderBlock is doing the layout for a renderer that is not in the same RenderLayer. Due to
+    // this, the layout will invalidate its layer instead of the renderer's layer. If the layout doesn't change the size
+    // or position of the renderer, then it won't be repainted when repainting its layer. To avoid this, request a repaint
+    // of the renderer so its layer is always repainted.
+
+    if (renderer.enclosingLayer() != container->enclosingLayer())
+        renderer.repaint();
+}
 static bool parentIsConstructedOrHaveNext(InlineFlowBox* parentBox)
 {
     do {
@@ -1710,8 +1723,10 @@ void RenderBlockFlow::layoutLineBoxes(bool relayoutChildren, LayoutUnit& repaint
             } else if (o.isTextOrLineBreak() || (is<RenderInline>(o) && !walker.atEndOfInline())) {
                 if (is<RenderInline>(o))
                     downcast<RenderInline>(o).updateAlwaysCreateLineBoxes(layoutState.isFullLayout());
-                if (layoutState.isFullLayout() || o.selfNeedsLayout())
+                if (layoutState.isFullLayout() || o.selfNeedsLayout()) {
+                    requestRepaintForRendererIfNeeded(this, o);
                     dirtyLineBoxesForRenderer(o, layoutState.isFullLayout());
+                }
                 o.clearNeedsLayout();
             }
         }
