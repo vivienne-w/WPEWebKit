@@ -257,16 +257,17 @@ GLContextEGL::~GLContextEGL()
     if (m_cairoDevice)
         cairo_device_destroy(m_cairoDevice);
 #endif
-
     EGLDisplay display = m_display.eglDisplay();
-    if (m_context) {
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        eglMakeCurrent(display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
-        eglDestroyContext(display, m_context);
-    }
+    if (display != EGL_NO_DISPLAY) {
+        if (m_context) {
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            eglMakeCurrent(display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+            eglDestroyContext(display, m_context);
+        }
 
-    if (m_surface)
-        eglDestroySurface(display, m_surface);
+        if (m_surface)
+            eglDestroySurface(display, m_surface);
+        }
 
 #if PLATFORM(WAYLAND)
     destroyWaylandWindow();
