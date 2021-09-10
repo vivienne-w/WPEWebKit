@@ -517,10 +517,10 @@ void CDMInstanceOpenCDM::updateLicense(const String& sessionId, LicenseType, con
         return;
     }
 
-    n_numberOfCurrentUpdates++;
+    m_numberOfCurrentUpdates++;
     session->update(reinterpret_cast<const uint8_t*>(response.data()), response.size(), [this, callback = WTFMove(callback)](Session*, bool success, RefPtr<SharedBuffer>&& buffer, KeyStatusVector& keyStatuses) {
         LockHolder locker(m_sessionMapMutex);
-        ASSERT(n_numberOfCurrentUpdates);
+        ASSERT(m_numberOfCurrentUpdates);
         if (success) {
             if (!buffer) {
                 ASSERT(!keyStatuses.isEmpty());
@@ -543,7 +543,7 @@ void CDMInstanceOpenCDM::updateLicense(const String& sessionId, LicenseType, con
             GST_ERROR("update license reported error state");
             callback(false, std::nullopt, std::nullopt, std::nullopt, SuccessValue::Failed);
         }
-        n_numberOfCurrentUpdates--;
+        m_numberOfCurrentUpdates--;
         m_sessionMapCondition.notifyAll();
     });
 }
@@ -643,7 +643,7 @@ String CDMInstanceOpenCDM::sessionIdByKeyId(const SharedBuffer& keyId) const
 {
     LockHolder locker(m_sessionMapMutex);
     if (!m_sessionMapCondition.waitFor(m_sessionMapMutex, WEBCORE_GSTREAMER_EME_LICENSE_KEY_RESPONSE_TIMEOUT, [this] {
-        return !n_numberOfCurrentUpdates;
+        return !m_numberOfCurrentUpdates;
     })) {
         GST_ERROR("session not found because timeout is gone");
         ASSERT_NOT_REACHED();

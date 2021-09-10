@@ -118,7 +118,7 @@ private:
     // lookup values in this map.
     mutable Lock m_sessionMapMutex;
     mutable Condition m_sessionMapCondition;
-    unsigned n_numberOfCurrentUpdates { 0 };
+    unsigned m_numberOfCurrentUpdates { 0 };
     HashMap<String, RefPtr<Session>> m_sessionsMap;
     CDMInstanceClient* m_client { nullptr };
     KeyStatusVector m_keyStatuses;
