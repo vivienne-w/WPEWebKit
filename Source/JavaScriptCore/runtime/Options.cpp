@@ -365,6 +365,11 @@ static void overrideDefaults()
 #if !HAVE(MACH_EXCEPTIONS)
     Options::useMachForExceptions() = false;
 #endif
+
+#if OS(LINUX) && (CPU(ARM) || CPU(MIPS))
+    Options::maximumFunctionForCallInlineCandidateInstructionCount() = 90;
+    Options::maximumInliningCallerSize() = 500;
+#endif
 }
 
 static void recomputeDependentOptions()
