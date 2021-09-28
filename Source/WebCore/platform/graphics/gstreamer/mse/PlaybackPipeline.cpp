@@ -343,7 +343,12 @@ void PlaybackPipeline::flush(AtomicString trackId)
         GST_WARNING("Failed to send flush-stop event for trackId=%s", trackId.string().utf8().data());
     }
 
-    GST_DEBUG("trackId=%s flushed", trackId.string().utf8().data());
+#ifndef GST_DISABLE_GST_DEBUG
+    {
+         MediaTime positionAsMediaTime { position, GST_SECOND };
+         GST_DEBUG("trackId=%s flushed at %s", trackId.string().utf8().data(), positionAsMediaTime.toString().utf8().data());
+    }
+#endif
 }
 
 void PlaybackPipeline::enqueueSample(Ref<MediaSample>&& mediaSample)
