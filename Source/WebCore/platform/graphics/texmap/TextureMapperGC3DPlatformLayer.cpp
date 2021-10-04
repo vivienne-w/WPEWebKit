@@ -33,6 +33,11 @@ namespace WebCore {
 
 static std::unique_ptr<GLContext> s_windowContext;
 
+static void terminateWindowContext()
+{
+    s_windowContext = nullptr;
+}
+
 TextureMapperGC3DPlatformLayer::TextureMapperGC3DPlatformLayer(GraphicsContext3D& context, GraphicsContext3D::RenderStyle renderStyle, HostWindow* hostWindow)
     : m_context(context)
     , m_renderStyle(renderStyle)
@@ -42,8 +47,10 @@ TextureMapperGC3DPlatformLayer::TextureMapperGC3DPlatformLayer(GraphicsContext3D
         m_glContext = GLContext::createOffscreenContext(&PlatformDisplay::sharedDisplayForCompositing());
         break;
     case GraphicsContext3D::RenderDirectlyToHostWindow:
-        if (!s_windowContext)
+        if (!s_windowContext) {
             s_windowContext = GLContext::createContextForWindow(reinterpret_cast<GLNativeWindowType>(hostWindow->nativeWindowID()), &PlatformDisplay::sharedDisplayForCompositing());
+            std::atexit(terminateWindowContext);
+        }
         break;
     }
 
