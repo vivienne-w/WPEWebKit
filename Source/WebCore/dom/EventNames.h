@@ -141,7 +141,6 @@ namespace WebCore {
     macro(gesturetapdown) \
     macro(hashchange) \
     macro(icecandidate) \
-    macro(icecandidateerror) \
     macro(iceconnectionstatechange) \
     macro(icegatheringstatechange) \
     macro(inactive) \

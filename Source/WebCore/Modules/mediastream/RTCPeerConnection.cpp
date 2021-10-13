@@ -50,9 +50,6 @@
 #include "RTCController.h"
 #include "RTCDataChannel.h"
 #include "RTCIceCandidate.h"
-#include "RTCIceCandidateInit.h"
-#include "RTCOfferOptions.h"
-#include "RTCPeerConnectionIceErrorEvent.h"
 #include "RTCPeerConnectionIceEvent.h"
 #include "RTCSessionDescription.h"
 #include "RTCTrackEvent.h"
@@ -266,7 +263,7 @@ void RTCPeerConnection::queuedAddIceCandidate(RTCIceCandidate* rtcCandidate, DOM
 }
 
 // Implementation of https://w3c.github.io/webrtc-pc/#set-pc-configuration
-ExceptionOr<Vector<MediaEndpointConfiguration::IceServerInfo>> RTCPeerConnection::iceServersFromConfiguration(RTCConfiguration& newConfiguration, const RTCConfiguration* existingConfiguration, bool isLocalDescriptionSet)
+static inline ExceptionOr<Vector<MediaEndpointConfiguration::IceServerInfo>> iceServersFromConfiguration(RTCConfiguration& newConfiguration, const RTCConfiguration* existingConfiguration, bool isLocalDescriptionSet)
 {
     if (existingConfiguration && newConfiguration.bundlePolicy != existingConfiguration->bundlePolicy)
         return Exception { InvalidModificationError, "BundlePolicy does not match existing policy" };
@@ -290,16 +287,6 @@ ExceptionOr<Vector<MediaEndpointConfiguration::IceServerInfo>> RTCPeerConnection
                 for (auto& string : vector)
                     serverURLs.uncheckedAppend(URL { URL { }, string });
             });
-
-            urls.removeAllMatching([&](auto& urlString) {
-                URL url { URL { }, urlString };
-                if (url.path().endsWithIgnoringASCIICase(".local") || !portAllowed(url)) {
-                    queueTaskToDispatchEvent(*this, TaskSource::MediaElement, RTCPeerConnectionIceErrorEvent::create(Event::CanBubble::No, Event::IsCancelable::No, { }, { }, WTFMove(urlString), 701, "URL is not allowed"_s));
-                    return true;
-                }
-                return false;
-            });
-
             for (auto& serverURL : serverURLs) {
                 if (serverURL.isNull())
                     return Exception { TypeError, "Bad ICE server URL" };
