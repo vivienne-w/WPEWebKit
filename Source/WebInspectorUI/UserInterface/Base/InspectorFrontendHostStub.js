@@ -140,6 +140,19 @@ if (!window.InspectorFrontendHost) {
 
         save(url, content, base64Encoded, forceSaveAs)
         {
+            var blob = new Blob([content], {type: "octet/stream"});
+            var blobURL = window.URL.createObjectURL(blob);
+
+            var link = document.createElement("a");
+            link.style.display = "none";
+            link.href = blobURL;
+            link.download = url;
+            document.body.appendChild(link);
+            link.click();
+            setTimeout(() => {
+                window.URL.revokeObjectURL(blobURL);
+                document.body.removeChild(link);
+            }, 0);
         }
 
         sendMessageToBackend(message)
