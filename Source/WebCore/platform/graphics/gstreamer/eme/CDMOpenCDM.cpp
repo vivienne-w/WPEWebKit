@@ -336,7 +336,7 @@ CDMInstanceOpenCDM::Session::Session(CDMInstanceOpenCDM* parent, OpenCDMSystem& 
 
     m_session.reset(session);
     m_id = String::fromUTF8(opencdm_session_id(m_session.get()));
-    GST_DEBUG("set m_CDMInstanceClient to %p for sessionid: %s\n", m_CDMInstanceClient, m_id.utf8().data());
+    GST_TRACE("set m_CDMInstanceClient to %p for sessionid: %s\n", m_CDMInstanceClient, m_id.utf8().data());
 
     Session::m_validSessions.add(this);
 }
@@ -367,7 +367,7 @@ void CDMInstanceOpenCDM::Session::challengeGeneratedCallback(RefPtr<SharedBuffer
             sessionChangedCallback(this, true, message.copyRef(), m_keyStatuses);
         m_sessionChangedCallbacks.clear();
     } else {
-        GST_DEBUG("calling issueMessage for m_CDMInstanceClient: %p, sessionid: %s\n", m_CDMInstanceClient, m_id.utf8().data());
+        GST_TRACE("calling issueMessage for m_CDMInstanceClient: %p, sessionid: %s\n", m_CDMInstanceClient, m_id.utf8().data());
         if (m_CDMInstanceClient && requestType.has_value())
             m_CDMInstanceClient->issueMessage(static_cast<CDMInstanceClient::MessageType>(requestType.value()), message.releaseNonNull());
     }
@@ -375,7 +375,6 @@ void CDMInstanceOpenCDM::Session::challengeGeneratedCallback(RefPtr<SharedBuffer
 
 void CDMInstanceOpenCDM::Session::keyUpdatedCallback(RefPtr<SharedBuffer>&& buffer)
 {
-    GST_DEBUG("keyUpdatedCallback for m_CDMInstanceClient %p, sessionid: %s\n", m_CDMInstanceClient, m_id.utf8().data());
     GST_MEMDUMP("Updated key", reinterpret_cast<const guint8*>(buffer->data()), buffer->size());
     auto index = m_keyStatuses.findMatching([&buffer](const std::pair<Ref<SharedBuffer>, KeyStatus>& item) {
         return memmem(buffer->data(), buffer->size(), item.first->data(), item.first->size());
@@ -390,7 +389,6 @@ void CDMInstanceOpenCDM::Session::keyUpdatedCallback(RefPtr<SharedBuffer>&& buff
 
 void CDMInstanceOpenCDM::Session::keysUpdateDoneCallback(RefPtr<SharedBuffer>&&)
 {
-    GST_DEBUG("keysUpdateDoneCallback m_CDMInstanceClient %p, sessionid: %s\n", m_CDMInstanceClient, m_id.utf8().data());
     bool appliesToApiCall = !m_sessionChangedCallbacks.isEmpty();
     if (!appliesToApiCall && m_parent && m_CDMInstanceClient) {
         m_CDMInstanceClient->updateKeyStatuses(copyAndMaybeReplaceValue(m_keyStatuses));
