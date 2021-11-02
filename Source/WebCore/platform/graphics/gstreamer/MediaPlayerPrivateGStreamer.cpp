@@ -416,7 +416,7 @@ GstSeekFlags MediaPlayerPrivateGStreamer::hardwareDependantSeekFlags()
     // in a key frame.
     return static_cast<GstSeekFlags>(GST_SEEK_FLAG_KEY_UNIT | GST_SEEK_FLAG_SNAP_NEAREST);
 #else
-    return GST_SEEK_FLAG_ACCURATE;
+    return static_cast<GstSeekFlags>(GST_SEEK_FLAG_ACCURATE | GST_SEEK_FLAG_KEY_UNIT);
 #endif
 }
 
