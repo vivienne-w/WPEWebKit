@@ -92,10 +92,6 @@ ImageBufferData::ImageBufferData(const IntSize& size, RenderingMode renderingMod
     , m_size(size)
     , m_renderingMode(renderingMode)
 #if ENABLE(ACCELERATED_2D_CANVAS)
-#if USE(COORDINATED_GRAPHICS_THREADED)
-    , m_bufferChanged(false)
-    , m_compositorTexture(0)
-#endif
     , m_texture(0)
 #endif
 {
@@ -126,11 +122,6 @@ ImageBufferData::~ImageBufferData()
     if (m_texture)
         glDeleteTextures(1, &m_texture);
 
-#if USE(COORDINATED_GRAPHICS_THREADED)
-    if (m_compositorTexture)
-        glDeleteTextures(1, &m_compositorTexture);
-#endif
-
     if (previousActiveContext)
         previousActiveContext->makeContextCurrent();
 #endif
@@ -138,29 +129,6 @@ ImageBufferData::~ImageBufferData()
 
 #if ENABLE(ACCELERATED_2D_CANVAS)
 #if USE(COORDINATED_GRAPHICS_THREADED)
-void ImageBufferData::createCompositorBuffer()
-{
-    auto* context = PlatformDisplay::sharedDisplayForCompositing().sharingGLContext();
-    context->makeContextCurrent();
-
-    glGenTextures(1, &m_compositorTexture);
-    glBindTexture(GL_TEXTURE_2D, m_compositorTexture);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-    glTexImage2D(GL_TEXTURE_2D, 0 , GL_RGBA, m_size.width(), m_size.height(), 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
-
-    m_compositorSurface = adoptRef(cairo_gl_surface_create_for_texture(context->cairoDevice(), CAIRO_CONTENT_COLOR_ALPHA, m_compositorTexture, m_size.width(), m_size.height()));
-    m_compositorCr = adoptRef(cairo_create(m_compositorSurface.get()));
-    cairo_set_antialias(m_compositorCr.get(), CAIRO_ANTIALIAS_NONE);
-}
-
-void ImageBufferData::markBufferChanged()
-{
-    m_bufferChanged = true;
-}
 
 #if !USE(NICOSIA)
 RefPtr<TextureMapperPlatformLayerProxy> ImageBufferData::proxy() const
@@ -173,40 +141,13 @@ void ImageBufferData::swapBuffersIfNeeded()
 {
     ASSERT(m_renderingMode == RenderingMode::Accelerated);
 
-    if (!m_bufferChanged)
-        return;
-
     GLContext* previousActiveContext = GLContext::current();
     cairo_surface_flush(m_surface.get());
-
-    if (!m_compositorTexture) {
-        createCompositorBuffer();
-
-        auto proxyOperation =
-            [this](TextureMapperPlatformLayerProxy& proxy)
-            {
-                LockHolder holder(proxy.lock());
-                proxy.pushNextBuffer(std::make_unique<TextureMapperPlatformLayerBuffer>(m_compositorTexture, m_size, TextureMapperGL::ShouldBlend, GL_RGBA));
-            };
-#if USE(NICOSIA)
-        proxyOperation(downcast<Nicosia::ContentLayerTextureMapperImpl>(m_nicosiaLayer->impl()).proxy());
-#else
-        proxyOperation(*m_platformLayerProxy);
-#endif
-    }
-
-    // It would be great if we could just swap the buffers here as we do with webgl, but that breaks the cases
-    // where one frame uses the content already rendered in the previous frame. So we just copy the content
-    // into the compositor buffer.
-    cairo_set_source_surface(m_compositorCr.get(), m_surface.get(), 0, 0);
-    cairo_set_operator(m_compositorCr.get(), CAIRO_OPERATOR_SOURCE);
-    cairo_paint(m_compositorCr.get());
-    cairo_surface_flush(m_compositorSurface.get());
     glFlush();
-
-    m_bufferChanged = false;
     if (previousActiveContext)
         previousActiveContext->makeContextCurrent();
+
+    m_platformLayerProxy->pushNextBuffer(std::make_unique<TextureMapperPlatformLayerBuffer>(m_texture, m_size, TextureMapperGL::ShouldBlend, GraphicsContext3D::RGBA));
 }
 #endif
 
@@ -748,15 +689,6 @@ PlatformLayer* ImageBuffer::platformLayer() const
 #endif
     return 0;
 }
-
-#if USE(COORDINATED_GRAPHICS_THREADED)
-void ImageBuffer::markBufferChanged()
-{
-#if ENABLE(ACCELERATED_2D_CANVAS)
-    m_data.markBufferChanged();
-#endif
-}
-#endif
 
 bool ImageBuffer::copyToPlatformTexture(GraphicsContext3D&, GC3Denum target, Platform3DObject destinationTexture, GC3Denum internalformat, bool premultiplyAlpha, bool flipY)
 {
