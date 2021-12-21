@@ -147,6 +147,7 @@ void ImageBufferData::swapBuffersIfNeeded()
     if (previousActiveContext)
         previousActiveContext->makeContextCurrent();
 
+    LockHolder locker(m_platformLayerProxy->lock());
     m_platformLayerProxy->pushNextBuffer(std::make_unique<TextureMapperPlatformLayerBuffer>(m_texture, m_size, TextureMapperGL::ShouldBlend, GraphicsContext3D::RGBA));
 }
 #endif
