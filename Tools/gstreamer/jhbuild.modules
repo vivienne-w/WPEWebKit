@@ -78,7 +78,7 @@
       <dep package="openh264"/>
     </dependencies>
     <branch hash="sha:f1cb7aa2389569a5343661aae473f0a940a90b872001824bc47fa8072a041e74" module="gst-plugins-bad/gst-plugins-bad-${version}.tar.xz" repo="gstreamer" version="1.16.2">
-	    <patch file="gst-plugins-bad-0001-add-c++11-flag.patch" strip="1" />
+	    <patch file="gst-plugins-bad-0001-configure-remove-std-c++98.patch" strip="1" />
     </branch>
   </autotools>
 

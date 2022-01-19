@@ -1,0 +1,11 @@
+--- a/configure.ac	2022-01-19 15:53:46.213633612 +0100
++++ b/configure.ac	2022-01-19 15:54:12.257206786 +0100
+@@ -1901,7 +1901,7 @@
+     if test "x$HAVE_OPENEXR240" = "xyes"; then
+       OPENEXR_STDCFLAGS=
+     else
+-      OPENEXR_STDCFLAGS="-std=c++98"
++      OPENEXR_STDCFLAGS=
+     fi
+     AC_SUBST([OPENEXR_STDCFLAGS])
+   fi
