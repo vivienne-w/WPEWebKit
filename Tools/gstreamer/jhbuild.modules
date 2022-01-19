@@ -44,7 +44,7 @@
     <dependencies>
       <dep package="orc"/>
     </dependencies>
-    <branch hash="sha:28d82b0d261544a9bf85b429399929e4986eb00efcf1ce16cc71d269a4c3186c" module="gstreamer/gstreamer-${version}.tar.xz" repo="gstreamer" version="1.14.1">
+    <branch hash="sha:e3f044246783fd685439647373fa13ba14f7ab0b346eadd06437092f8419e94e" module="gstreamer/gstreamer-${version}.tar.xz" repo="gstreamer" version="1.16.2">
     </branch>
   </autotools>
 
@@ -57,8 +57,7 @@
     <dependencies>
       <dep package="gstreamer"/>
     </dependencies>
-    <branch hash="sha:1026c7c3082d825d9b5d034c1a6dd8a4ebab60eb3738b0a0afde4ad2dc0b0db5" module="gst-plugins-base/gst-plugins-base-${version}.tar.xz" repo="gstreamer" version="1.14.1" >
-      <patch file="gst-plugins-base-0001-parsebin-Post-STREAM_COLLECTION-on-EVENT_STREAM_COLL.patch" strip="1"/> <!-- Merged as 89d0e9cc92a86aa0227ee87406737b6d31670aea -->
+    <branch hash="sha:b13e73e2fe74a4166552f9577c3dcb24bed077021b9c7fa600d910ec6987816a" module="gst-plugins-base/gst-plugins-base-${version}.tar.xz" repo="gstreamer" version="1.16.2" >
     </branch>
   </autotools>
 
@@ -68,16 +67,7 @@
       <dep package="libvpx"/>
     </dependencies>
 
-    <branch hash="sha:34ec062ddb766a32377532e039781f4a16fbc3e8b449e642605bacab26a99172" module="gst-plugins-good/gst-plugins-good-${version}.tar.xz" repo="gstreamer" version="1.14.1">
-      <patch file="gst-plugins-good-0002-qtdemux-add-context-for-a-preferred-protection.patch" strip="1" /> <!-- Merged as ee4b45da24cb7465b416c230597f8efc7b2c45cb -->
-      <patch file="gst-plugins-good-0003-qtdemux-also-push-buffers-without-encryption-info-in.patch" strip="1" /> <!-- Merged as 844423ff99e281fc831303b92861ed43ce5c1518 -->
-      <patch file="gst-plugins-good-0001-qtdemux-Do-not-run-the-preferred-decryptor-context-q.patch" strip="1" /> <!-- Merged as 3e063703b3a51b8aaa7f75f36c4660c583a60e93 -->
-      <patch file="gst-plugins-good-0002-qtdemux-Do-not-unref-a-NULL-stream_tags.patch" strip="1" /> <!-- Merged as 43a540b1cd9f162d3dae5d50e36703dfaf558a3e -->
-      <patch file="gst-plugins-good-0003-qtdemux-Clarify-field-name-about-stream-encryption-s.patch" strip="1" /> <!-- Merged as 0fbde2a07928ba79b7a4ddb4585f6b1de36a74bb -->
-      <patch file="gst-plugins-good-0007-matroskademux-Allow-Matroska-headers-to-be-read-more.patch" strip="1" /> <!-- Merged as 9dc7859184d4b7ad1dd7e2b54704e994dbace329 (to be shipped in 1.14.4) -->
-      <patch file="gst-plugins-good-0008-matroskademux-Refactor-track-parsing-out-from-adding.patch" strip="1" /> <!-- Merged as f279bc5336dda19741a5996a108da42dd3201366 (to be shipped in 1.14.4) -->
-      <patch file="gst-plugins-good-0009-matroskademux-Parse-successive-Tracks-elements.patch" strip="1" /> <!-- Merged as 0e60076a390fd3ef53d350940b2c695ff7bbe008 (to be shipped in 1.14.4) -->
-      <patch file="gst-plugins-good-0010-matroskademux-Emit-no-more-pads-after-parsing-Tracks.patch" strip="1" /> <!-- Merged as 7ceefec7141069b4adf4451a874766f8760c66d6 (to be shipped in 1.14.4) -->
+    <branch hash="sha:40bb3bafda25c0b739c8fc36e48380fccf61c4d3f83747e97ac3f9b0171b1319" module="gst-plugins-good/gst-plugins-good-${version}.tar.xz" repo="gstreamer" version="1.16.2">
     </branch>
   </autotools>
 
@@ -87,18 +77,20 @@
       <dep package="gst-plugins-base"/>
       <dep package="openh264"/>
     </dependencies>
-    <branch hash="sha:2a77c6908032aafdf2cd2e5823fec948f16a25c2d1497a953828d762dc20d61a" module="gst-plugins-bad/gst-plugins-bad-${version}.tar.xz" repo="gstreamer" version="1.14.1" />
+    <branch hash="sha:f1cb7aa2389569a5343661aae473f0a940a90b872001824bc47fa8072a041e74" module="gst-plugins-bad/gst-plugins-bad-${version}.tar.xz" repo="gstreamer" version="1.16.2">
+	    <patch file="gst-plugins-bad-0001-add-c++11-flag.patch" strip="1" />
+    </branch>
   </autotools>
 
   <autotools id="gst-libav" autogen-sh="configure" autogenargs="--with-libav-extra-configure='--disable-yasm' --disable-gtk-doc">
     <dependencies>
       <dep package="gst-plugins-base"/>
     </dependencies>
-    <branch hash="sha:eff80a02d2f2fb9f34b67e9a26e9954d3218c7aa18e863f2a47805fa7066029d" module="gst-libav/gst-libav-${version}.tar.xz" repo="gstreamer" version="1.14.1" />
+    <branch hash="sha:c724f612700c15a933c7356fbeabb0bb9571fb5538f8b1b54d4d2d94188deef2" module="gst-libav/gst-libav-${version}.tar.xz" repo="gstreamer" version="1.16.2" />
   </autotools>
 
   <autotools id="gstreamer-vaapi" autogen-sh="configure" autogenargs="--disable-examples --disable-gtk-doc">
-    <branch hash="sha:585c3ddb0c39220de0a33e5d0ed6196a108b8407ec3538d7c64617713b4434e8" module="gstreamer-vaapi/gstreamer-vaapi-${version}.tar.xz" repo="gstreamer" version="1.14.1" />
+    <branch hash="sha:191de7b0ab64a85dd0875c990721e7be95518f60e2a9106beca162004ed7c601" module="gstreamer-vaapi/gstreamer-vaapi-${version}.tar.xz" repo="gstreamer" version="1.16.2" />
     <dependencies>
       <dep package="gstreamer"/>
       <dep package="gst-plugins-base"/>

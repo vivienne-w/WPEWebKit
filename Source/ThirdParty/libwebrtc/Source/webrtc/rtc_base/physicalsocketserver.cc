@@ -70,7 +70,7 @@ typedef void* SockOptArg;
 
 int64_t GetSocketRecvTimestamp(int socket) {
   struct timeval tv_ioctl;
-  int ret = ioctl(socket, SIOCGSTAMP, &tv_ioctl);
+  int ret = ioctl(socket, SIOCGSTAMP_OLD, &tv_ioctl);
   if (ret != 0)
     return -1;
   int64_t timestamp =
