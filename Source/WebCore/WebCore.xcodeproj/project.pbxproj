@@ -3322,6 +3322,7 @@
 		AA7FEEAD16A4E74B004C0C33 /* JSSpeechSynthesis.h in Headers */ = {isa = PBXBuildFile; fileRef = AA7FEEAC16A4E74B004C0C33 /* JSSpeechSynthesis.h */; };
 		AAA728F716D1D8BC00D3BBC6 /* WebAccessibilityObjectWrapperIOS.h in Headers */ = {isa = PBXBuildFile; fileRef = AAA728F116D1D8BC00D3BBC6 /* WebAccessibilityObjectWrapperIOS.h */; };
 		AAC08CF315F941FD00F1E188 /* AccessibilitySVGRoot.h in Headers */ = {isa = PBXBuildFile; fileRef = AAC08CF115F941FC00F1E188 /* AccessibilitySVGRoot.h */; };
+		AADEFE4525AF4FD60040DD67 /* FocusOptions.h in Headers */ = {isa = PBXBuildFile; fileRef = AADEFE4325AF4FCB0040DD67 /* FocusOptions.h */; settings = {ATTRIBUTES = (Private, ); }; };
 		AB23A32809BBA7D00067CC53 /* BeforeTextInsertedEvent.h in Headers */ = {isa = PBXBuildFile; fileRef = AB23A32609BBA7D00067CC53 /* BeforeTextInsertedEvent.h */; };
 		AB247A6D0AFD6383003FA5FD /* RenderSlider.h in Headers */ = {isa = PBXBuildFile; fileRef = AB247A6B0AFD6383003FA5FD /* RenderSlider.h */; };
 		AB31C91E10AE1B8E000C7B92 /* LineClampValue.h in Headers */ = {isa = PBXBuildFile; fileRef = AB31C91D10AE1B8E000C7B92 /* LineClampValue.h */; settings = {ATTRIBUTES = (Private, ); }; };
@@ -11893,6 +11894,7 @@
 		AA2A5AC616A485D500975A25 /* SpeechSynthesisVoice.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = SpeechSynthesisVoice.cpp; sourceTree = "<group>"; };
 		AA2A5AC716A485D500975A25 /* SpeechSynthesisVoice.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SpeechSynthesisVoice.h; sourceTree = "<group>"; };
 		AA2A5AC816A485D500975A25 /* SpeechSynthesisVoice.idl */ = {isa = PBXFileReference; lastKnownFileType = text; path = SpeechSynthesisVoice.idl; sourceTree = "<group>"; };
+		AA2E0D0925AF5104007693BA /* FocusOptions.idl */ = {isa = PBXFileReference; lastKnownFileType = text; path = FocusOptions.idl; sourceTree = "<group>"; };
 		AA478A7D16CD70C3007D1BB4 /* WebAccessibilityObjectWrapperMac.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = WebAccessibilityObjectWrapperMac.h; sourceTree = "<group>"; };
 		AA478A7E16CD70C3007D1BB4 /* WebAccessibilityObjectWrapperMac.mm */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.objcpp; fileEncoding = 4; path = WebAccessibilityObjectWrapperMac.mm; sourceTree = "<group>"; };
 		AA4C3A740B2B1679002334A2 /* InlineStyleSheetOwner.cpp */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.cpp.cpp; path = InlineStyleSheetOwner.cpp; sourceTree = "<group>"; };
@@ -11910,6 +11912,7 @@
 		AAA728F316D1D8BC00D3BBC6 /* AXObjectCacheIOS.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = AXObjectCacheIOS.mm; sourceTree = "<group>"; };
 		AAC08CF015F941FC00F1E188 /* AccessibilitySVGRoot.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = AccessibilitySVGRoot.cpp; sourceTree = "<group>"; };
 		AAC08CF115F941FC00F1E188 /* AccessibilitySVGRoot.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AccessibilitySVGRoot.h; sourceTree = "<group>"; };
+		AADEFE4325AF4FCB0040DD67 /* FocusOptions.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FocusOptions.h; sourceTree = "<group>"; };
 		AAE27B7416CBFC0D00623043 /* PlatformSpeechSynthesizerMock.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = PlatformSpeechSynthesizerMock.cpp; sourceTree = "<group>"; };
 		AAE27B7516CBFC0D00623043 /* PlatformSpeechSynthesizerMock.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PlatformSpeechSynthesizerMock.h; sourceTree = "<group>"; };
 		AAE3755D17429BCC006200C2 /* PlatformSpeechSynthesizerIOS.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = PlatformSpeechSynthesizerIOS.mm; sourceTree = "<group>"; };
@@ -26566,6 +26569,8 @@
 				B6D9D23414EABD260090D75E /* FocusEvent.cpp */,
 				B6D9D23314EABD260090D75E /* FocusEvent.h */,
 				B6D9D27214EABF030090D75E /* FocusEvent.idl */,
+				AADEFE4325AF4FCB0040DD67 /* FocusOptions.h */,
+				AA2E0D0925AF5104007693BA /* FocusOptions.idl */,
 				A853123C11D0471B00D4D077 /* FragmentScriptingPermission.h */,
 				0720B09E14D3323500642955 /* GenericEventQueue.cpp */,
 				0720B09F14D3323500642955 /* GenericEventQueue.h */,
@@ -28223,6 +28228,7 @@
 				14993BE60B2F2B1C0050497F /* FocusController.h in Headers */,
 				062287840B4DB322000C34DF /* FocusDirection.h in Headers */,
 				B6D9D23514EABD260090D75E /* FocusEvent.h in Headers */,
+				AADEFE4525AF4FD60040DD67 /* FocusOptions.h in Headers */,
 				B2C3DA650D006CD600EF6F26 /* Font.h in Headers */,
 				1AC2D89D1B1E291F00D52E87 /* FontAntialiasingStateSaver.h in Headers */,
 				BCB92D4F1293550B00C8387F /* FontBaseline.h in Headers */,

@@ -147,20 +147,20 @@ bool HTMLLabelElement::willRespondToMouseClickEvents()
     return (element && element->willRespondToMouseClickEvents()) || HTMLElement::willRespondToMouseClickEvents();
 }
 
-void HTMLLabelElement::focus(bool restorePreviousSelection, FocusDirection direction)
+void HTMLLabelElement::focus(const FocusOptions& options)
 {
     if (document().haveStylesheetsLoaded()) {
         document().updateLayout();
         if (isFocusable()) {
             // The value of restorePreviousSelection is not used for label elements as it doesn't override updateFocusAppearance.
-            Element::focus(restorePreviousSelection, direction);
+            Element::focus(options);
             return;
         }
     }
 
     // To match other browsers, always restore previous selection.
     if (auto element = control())
-        element->focus(true, direction);
+        element->focus({ true, options.direction });
 }
 
 void HTMLLabelElement::accessKeyAction(bool sendMouseEvents)

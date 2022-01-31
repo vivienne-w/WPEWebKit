@@ -2618,6 +2618,7 @@ JSFileSystemEntryCallback.cpp
 JSFileSystemFileEntry.cpp
 JSFillMode.cpp
 JSFocusEvent.cpp
+JSFocusOptions.cpp
 JSFontFace.cpp
 JSFontFaceSet.cpp
 JSGainNode.cpp

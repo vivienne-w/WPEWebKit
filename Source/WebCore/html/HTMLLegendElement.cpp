@@ -57,19 +57,19 @@ RefPtr<HTMLFormControlElement> HTMLLegendElement::associatedControl()
     return descendantsOfType<HTMLFormControlElement>(*enclosingFieldset).first();
 }
 
-void HTMLLegendElement::focus(bool restorePreviousSelection, FocusDirection direction)
+void HTMLLegendElement::focus(const FocusOptions& options)
 {
     if (document().haveStylesheetsLoaded()) {
         document().updateLayoutIgnorePendingStylesheets();
         if (isFocusable()) {
-            Element::focus(restorePreviousSelection, direction);
+            Element::focus(options);
             return;
         }
     }
 
     // To match other browsers' behavior, never restore previous selection.
     if (auto control = associatedControl())
-        control->focus(false, direction);
+        control->focus({ false, options.direction });
 }
 
 void HTMLLegendElement::accessKeyAction(bool sendMouseEvents)
