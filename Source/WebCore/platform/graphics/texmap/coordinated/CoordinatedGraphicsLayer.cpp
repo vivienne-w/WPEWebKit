@@ -757,7 +757,7 @@ void CoordinatedGraphicsLayer::syncAnimations()
         return;
 
     m_shouldSyncAnimations = false;
-    m_layerState.animations = m_animations.getActiveAnimations();
+    m_layerState.animations = m_animations;
     m_layerState.animationsChanged = true;
     m_nicosia.delta.animationsChanged = true;
 }
@@ -853,7 +853,7 @@ void CoordinatedGraphicsLayer::flushCompositingStateForThisLayerOnly()
                 if (localDelta.filtersChanged)
                     state.filters = filters();
                 if (localDelta.animationsChanged)
-                    state.animations = m_animations.getActiveAnimations();
+                    state.animations = m_animations;
 
                 if (localDelta.childrenChanged) {
                     state.children = WTF::map(children(),

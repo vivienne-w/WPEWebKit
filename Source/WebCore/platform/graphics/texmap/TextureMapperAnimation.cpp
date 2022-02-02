@@ -194,8 +194,8 @@ TextureMapperAnimation::TextureMapperAnimation(const TextureMapperAnimation& oth
 
 void TextureMapperAnimation::apply(ApplicationResult& applicationResults, MonotonicTime time)
 {
-    if (!isActive())
-        return;
+   // Even when m_state == AnimationState::Stopped && !m_fillsForwards, we should calculate the last value to avoid a flash.
+   // CoordinatedGraphicsScene will soon remove the stopped animation and update the value instead of this function.
 
     Seconds totalRunningTime = computeTotalRunningTime(time);
     double normalizedValue = normalizedAnimationValue(totalRunningTime.seconds(), m_animation->duration(), m_animation->direction(), m_animation->iterationCount());
@@ -203,8 +203,7 @@ void TextureMapperAnimation::apply(ApplicationResult& applicationResults, Monoto
     if (m_animation->iterationCount() != Animation::IterationCountInfinite && totalRunningTime.seconds() >= m_animation->duration() * m_animation->iterationCount()) {
         m_state = AnimationState::Stopped;
         m_pauseTime = 0_s;
-        if (m_animation->fillsForwards())
-            normalizedValue = normalizedAnimationValueForFillsForwards(m_animation->iterationCount(), m_animation->direction());
+        normalizedValue = normalizedAnimationValueForFillsForwards(m_animation->iterationCount(), m_animation->direction());
     }
 
     applicationResults.hasRunningAnimations |= (m_state == AnimationState::Playing);
@@ -264,11 +263,6 @@ Seconds TextureMapperAnimation::computeTotalRunningTime(MonotonicTime time)
     m_lastRefreshedTime = time;
     m_totalRunningTime += m_lastRefreshedTime - oldLastRefreshedTime;
     return m_totalRunningTime;
-}
-
-bool TextureMapperAnimation::isActive() const
-{
-    return m_state != AnimationState::Stopped || m_animation->fillsForwards();
 }
 
 void TextureMapperAnimation::applyInternal(ApplicationResult& applicationResults, const AnimationValue& from, const AnimationValue& to, float progress)
@@ -341,23 +335,13 @@ void TextureMapperAnimations::apply(TextureMapperAnimation::ApplicationResult& a
 bool TextureMapperAnimations::hasActiveAnimationsOfType(AnimatedPropertyID type) const
 {
     return std::any_of(m_animations.begin(), m_animations.end(),
-        [&type](const TextureMapperAnimation& animation) { return animation.isActive() && animation.keyframes().property() == type; });
+        [&type](const TextureMapperAnimation& animation) { return animation.keyframes().property() == type; });
 }
 
 bool TextureMapperAnimations::hasRunningAnimations() const
 {
     return std::any_of(m_animations.begin(), m_animations.end(),
         [](const TextureMapperAnimation& animation) { return animation.state() == TextureMapperAnimation::AnimationState::Playing; });
-}
-
-TextureMapperAnimations TextureMapperAnimations::getActiveAnimations() const
-{
-    TextureMapperAnimations active;
-    for (auto& animation : m_animations) {
-        if (animation.isActive())
-            active.add(animation);
-    }
-    return active;
 }
 
 } // namespace WebCore
