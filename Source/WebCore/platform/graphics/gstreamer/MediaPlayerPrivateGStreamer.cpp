@@ -1124,6 +1124,44 @@ void MediaPlayerPrivateGStreamer::handleMessage(GstMessage* message)
             updateVideoRectangle();
 #endif
 
+        // SmoothStreaming non-MSE videos can take a lot of memory and eventually cause OOM, but limiting the size of the
+        // multiqueue after mssdemux mitigates this problem.
+        if (currentState == GST_STATE_PAUSED && newState == GST_STATE_PLAYING
+            && g_str_has_prefix(GST_MESSAGE_SRC_NAME(message), "multiqueue")) {
+            GstIterator* iter = gst_element_iterate_sink_pads(GST_ELEMENT(GST_MESSAGE_SRC(message)));
+            bool done = false;
+            while (!done) {
+                GValue item = G_VALUE_INIT;
+                switch (gst_iterator_next(iter, &item)) {
+                case GST_ITERATOR_OK: {
+                    GstPad* pad = static_cast<GstPad*>(g_value_get_object(&item));
+                    GstPad* peerPad = gst_pad_get_peer(pad);
+                    if (peerPad) {
+                        GstElement* peerElement = gst_pad_get_parent_element(peerPad);
+                        if (peerElement && g_str_has_prefix(GST_ELEMENT_NAME(peerElement), "mssdemux")) {
+                            GST_WARNING("SmoothStreaming non-MSE video detected, limiting %s size to avoid OOM", GST_MESSAGE_SRC_NAME(message));
+                            g_object_set(GST_MESSAGE_SRC(message), "max-size-bytes", 2 * MB, nullptr);
+                            g_object_set(GST_MESSAGE_SRC(message), "max-size-time",  5 * GST_SECOND, nullptr);
+                            done = true;
+                        }
+                    }
+                    break;
+                }
+                case GST_ITERATOR_RESYNC:
+                    gst_iterator_resync(iter);
+                    break;
+                case GST_ITERATOR_ERROR:
+                    FALLTHROUGH;
+                case GST_ITERATOR_DONE:
+                    done = true;
+                    break;
+                }
+                g_value_unset(&item);
+            }
+            gst_iterator_free(iter);
+
+        }
+
         if (!messageSourceIsPlaybin || m_delayingLoad)
             break;
         updateStates();
