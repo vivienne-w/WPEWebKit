@@ -49,7 +49,7 @@ private:
     // Overridden to either click() or focus() the corresponding control.
     void defaultEventHandler(Event&) final;
 
-    void focus(bool restorePreviousSelection, FocusDirection) final;
+    void focus(const FocusOptions&) final;
 };
 
 } //namespace

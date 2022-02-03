@@ -493,7 +493,7 @@ bool FocusController::advanceFocusInDocumentOrder(FocusDirection direction, Keyb
         }
     }
 
-    element->focus(false, direction);
+    element->focus({ false, direction });
     return true;
 }
 
@@ -1063,7 +1063,7 @@ bool FocusController::advanceFocusDirectionallyInContainer(Node* container, cons
     Element* element = downcast<Element>(focusCandidate.focusableNode);
     ASSERT(element);
 
-    element->focus(false, direction);
+    element->focus({ false, direction });
     return true;
 }
 

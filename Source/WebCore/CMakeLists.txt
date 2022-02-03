@@ -600,6 +600,7 @@ set(WebCore_NON_SVG_IDL_FILES
     dom/EventModifierInit.idl
     dom/EventTarget.idl
     dom/FocusEvent.idl
+    dom/FocusOptions.idl
     dom/GlobalEventHandlers.idl
     dom/HashChangeEvent.idl
     dom/InputEvent.idl

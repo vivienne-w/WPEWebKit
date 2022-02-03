@@ -2500,7 +2500,7 @@ bool Element::hasAttributeNS(const AtomicString& namespaceURI, const AtomicStrin
     return elementData()->findAttributeByName(qName);
 }
 
-void Element::focus(bool restorePreviousSelection, FocusDirection direction)
+void Element::focus(const FocusOptions& options)
 {
     if (!isConnected())
         return;
@@ -2530,7 +2530,7 @@ void Element::focus(bool restorePreviousSelection, FocusDirection direction)
         // If a focus event handler changes the focus to a different node it
         // does not make sense to continue and update appearence.
         protect = this;
-        if (!page->focusController().setFocusedElement(this, *document().frame(), direction))
+        if (!page->focusController().setFocusedElement(this, *document().frame(), options.direction))
             return;
     }
 
@@ -2548,7 +2548,8 @@ void Element::focus(bool restorePreviousSelection, FocusDirection direction)
     if (!target)
         return;
 
-    target->updateFocusAppearance(restorePreviousSelection ? SelectionRestorationMode::Restore : SelectionRestorationMode::SetDefault, revealMode);
+    if (!options.preventScroll)
+        target->updateFocusAppearance(options.restorePreviousSelection ? SelectionRestorationMode::Restore : SelectionRestorationMode::SetDefault, revealMode);
 }
 
 RefPtr<Element> Element::focusAppearanceUpdateTarget()

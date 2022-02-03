@@ -594,7 +594,7 @@ void InputType::handleBlurEvent()
 void InputType::accessKeyAction(bool)
 {
     ASSERT(element());
-    element()->focus(false);
+    element()->focus({ false });
 }
 
 void InputType::addSearchResult()

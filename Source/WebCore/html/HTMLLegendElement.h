@@ -43,7 +43,7 @@ private:
     RefPtr<HTMLFormControlElement> associatedControl();
 
     void accessKeyAction(bool sendMouseEvents) final;
-    void focus(bool restorePreviousSelection, FocusDirection) final;
+    void focus(const FocusOptions&) final;
 };
 
 } // namespace WebCore

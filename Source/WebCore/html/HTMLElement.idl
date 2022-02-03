@@ -35,7 +35,7 @@
     [CEReactions, Reflect] attribute boolean hidden;
     void click();
     [CEReactions] attribute long tabIndex;
-    void focus();
+    void focus(optional FocusOptions options);
     void blur();
     [CEReactions, Reflect] attribute DOMString accessKey;
     // readonly attribute DOMString accessKeyLabel; // FIXME: Not supported.
