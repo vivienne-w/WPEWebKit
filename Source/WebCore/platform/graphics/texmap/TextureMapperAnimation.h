@@ -46,7 +46,6 @@ public:
     void apply(ApplicationResult&, MonotonicTime);
     void pause(Seconds);
     void resume();
-    bool isActive() const;
 
     const String& name() const { return m_name; }
     const KeyframeValueList& keyframes() const { return m_keyframes; }
@@ -89,7 +88,6 @@ public:
 
     bool hasRunningAnimations() const;
     bool hasActiveAnimationsOfType(AnimatedPropertyID type) const;
-    TextureMapperAnimations getActiveAnimations() const;
 
 private:
     Vector<TextureMapperAnimation> m_animations;
