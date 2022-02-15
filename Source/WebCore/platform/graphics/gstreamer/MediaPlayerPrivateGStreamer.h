@@ -292,6 +292,9 @@ private:
     HashMap<AtomicString, RefPtr<InbandMetadataTextTrackPrivateGStreamer>> m_metadataTracks;
 #endif
 #endif
+#if PLATFORM(BCM_NEXUS) || PLATFORM(BROADCOM)
+    GRefPtr<GstElement> m_vidfilter;
+#endif
     virtual bool isMediaSource() const { return false; }
 
     String m_errorMessage;
