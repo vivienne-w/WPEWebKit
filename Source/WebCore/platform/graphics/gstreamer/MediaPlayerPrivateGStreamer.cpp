@@ -213,8 +213,10 @@ MediaPlayerPrivateGStreamer::MediaPlayerPrivateGStreamer(MediaPlayer* player)
     , m_platformLayerProxy(adoptRef(new TextureMapperPlatformLayerProxy()))
 #endif
 #endif
+#if !RELEASE_LOG_DISABLED
     , m_logger(player->mediaPlayerLogger())
     , m_logIdentifier(player->mediaPlayerLogIdentifier())
+#endif
 {
 #if USE(GLIB)
     m_readyTimerHandler.setPriority(G_PRIORITY_DEFAULT_IDLE);
@@ -3808,10 +3810,12 @@ void MediaPlayerPrivateGStreamer::platformResume()
 #endif
 }
 
+#if !RELEASE_LOG_DISABLED
 WTFLogChannel& MediaPlayerPrivateGStreamer::logChannel() const
 {
     return WebCore::LogMedia;
 }
+#endif
 
 }
 

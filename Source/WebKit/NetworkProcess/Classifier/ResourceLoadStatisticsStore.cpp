@@ -609,14 +609,22 @@ void ResourceLoadStatisticsStore::debugLogDomainsInBatches(const char* action, c
     
     for (auto& domain : domains) {
         if (batch.size() == maxNumberOfDomainsInOneLogStatement) {
+#if OS(DARWIN)
             RELEASE_LOG_INFO(ITPDebug, "About to %" PUBLIC_LOG_STRING " cookies in third-party contexts for (%{public}d of %u): %" PUBLIC_LOG_STRING ".", action, batchNumber, numberOfBatches, domainsToString(batch).utf8().data());
+#else
+            RELEASE_LOG_INFO(ITPDebug, "About to %" PUBLIC_LOG_STRING " cookies in third-party contexts for (%d of %u): %" PUBLIC_LOG_STRING ".", action, batchNumber, numberOfBatches, domainsToString(batch).utf8().data());
+#endif
             batch.shrink(0);
             ++batchNumber;
         }
         batch.append(domain);
     }
     if (!batch.isEmpty())
+#if OS(DARWIN)
         RELEASE_LOG_INFO(ITPDebug, "About to %" PUBLIC_LOG_STRING " cookies in third-party contexts for (%{public}d of %u): %" PUBLIC_LOG_STRING ".", action, batchNumber, numberOfBatches, domainsToString(batch).utf8().data());
+#else
+        RELEASE_LOG_INFO(ITPDebug, "About to %" PUBLIC_LOG_STRING " cookies in third-party contexts for (%d of %u): %" PUBLIC_LOG_STRING ".", action, batchNumber, numberOfBatches, domainsToString(batch).utf8().data());
+#endif
 }
 
 } // namespace WebKit
