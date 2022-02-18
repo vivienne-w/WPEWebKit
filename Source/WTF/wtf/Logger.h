@@ -25,9 +25,15 @@
 
 #pragma once
 
+#include <wtf/Assertions.h>
 #include <wtf/Lock.h>
 #include <wtf/ThreadSafeRefCounted.h>
 #include <wtf/text/StringBuilder.h>
+
+#if USE(JOURNALD)
+#define SD_JOURNAL_SUPPRESS_LOCATION
+#include <systemd/sd-journal.h>
+#endif
 
 namespace WTF {
 
@@ -174,6 +180,57 @@ public:
         log(channel, WTFLogLevel::Debug, arguments...);
     }
 
+    template<typename... Arguments>
+    inline void logAlwaysVerbose(WTFLogChannel& channel, const char* file, const char* function, int line, UNUSED_FUNCTION const Arguments&... arguments) const
+    {
+#if RELEASE_LOG_DISABLED
+        // "Standard" WebCore logging goes to stderr, which is captured in layout test output and can generally be a problem
+        //  on some systems, so don't allow it.
+        UNUSED_PARAM(channel);
+#else
+        if (!willLog(channel, WTFLogLevel::Always))
+            return;
+
+        logVerbose(channel, WTFLogLevel::Always, file, function, line, arguments...);
+#endif
+    }
+
+    template<typename... Arguments>
+    inline void errorVerbose(WTFLogChannel& channel, const char* file, const char* function, int line, const Arguments&... arguments) const
+    {
+        if (!willLog(channel, WTFLogLevel::Error))
+            return;
+
+        logVerbose(channel, WTFLogLevel::Error, file, function, line, arguments...);
+    }
+
+    template<typename... Arguments>
+    inline void warningVerbose(WTFLogChannel& channel, const char* file, const char* function, int line, const Arguments&... arguments) const
+    {
+        if (!willLog(channel, WTFLogLevel::Warning))
+            return;
+
+        logVerbose(channel, WTFLogLevel::Warning, file, function, line, arguments...);
+    }
+
+    template<typename... Arguments>
+    inline void infoVerbose(WTFLogChannel& channel, const char* file, const char* function, int line, const Arguments&... arguments) const
+    {
+        if (!willLog(channel, WTFLogLevel::Info))
+            return;
+
+        logVerbose(channel, WTFLogLevel::Info, file, function, line, arguments...);
+    }
+
+    template<typename... Arguments>
+    inline void debugVerbose(WTFLogChannel& channel, const char* file, const char* function, int line, const Arguments&... arguments) const
+    {
+        if (!willLog(channel, WTFLogLevel::Debug))
+            return;
+
+        logVerbose(channel, WTFLogLevel::Debug, file, function, line, arguments...);
+    }
+
     inline bool willLog(const WTFLogChannel& channel, WTFLogLevel level) const
     {
         if (!m_enabled)
@@ -245,8 +302,43 @@ private:
 
 #if RELEASE_LOG_DISABLED
         WTFLog(&channel, "%s", logMessage.utf8().data());
-#else
+#elif USE(OS_LOG)
         os_log(channel.osLogChannel, "%{public}s", logMessage.utf8().data());
+#elif USE(JOURNALD)
+        sd_journal_send("WEBKIT_SUBSYSTEM=%s", channel.subsystem, "WEBKIT_CHANNEL=%s", channel.name, "MESSAGE=%s", logMessage.utf8().data(), nullptr);
+#else
+        fprintf(stderr, "[%s:%s:-] %s\n", channel.subsystem, channel.name, logMessage.utf8().data());
+#endif
+
+        if (channel.state == WTFLogChannelState::Off || level > channel.level)
+            return;
+
+        auto lock = tryHoldLock(observerLock());
+        if (!lock)
+            return;
+
+        for (Observer& observer : observers())
+            observer.didLogMessage(channel, level, { ConsoleLogValue<Argument>::toValue(arguments)... });
+    }
+
+    template<typename... Argument>
+    static inline void logVerbose(WTFLogChannel& channel, WTFLogLevel level, const char* file, const char* function, int line, const Argument&... arguments)
+    {
+        String logMessage = makeString(LogArgument<Argument>::toString(arguments)...);
+
+#if RELEASE_LOG_DISABLED
+        WTFLogVerbose(file, line, function, &channel, "%s", logMessage.utf8().data());
+#elif USE(OS_LOG)
+        os_log(channel.osLogChannel, "%{public}s", logMessage.utf8().data());
+        UNUSED_PARAM(file);
+        UNUSED_PARAM(line);
+        UNUSED_PARAM(function);
+#elif USE(JOURNALD)
+        auto fileString = makeString("CODE_FILE=", file);
+        auto lineString = makeString("CODE_LINE=", line);
+        sd_journal_send_with_location(fileString.utf8().data(), lineString.utf8().data(), function, "WEBKIT_SUBSYSTEM=%s", channel.subsystem, "WEBKIT_CHANNEL=%s", channel.name, "MESSAGE=%s", logMessage.utf8().data(), nullptr);
+#else
+        fprintf(stderr, "[%s:%s:-] %s FILE=%s:%d %s\n", channel.subsystem, channel.name, logMessage.utf8().data(), file, line, function);
 #endif
 
         if (channel.state == WTFLogChannelState::Off || level > channel.level)

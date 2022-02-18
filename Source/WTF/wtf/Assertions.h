@@ -51,6 +51,11 @@
 #include <os/log.h>
 #endif
 
+#if USE(JOURNALD)
+#define SD_JOURNAL_SUPPRESS_LOCATION
+#include <systemd/sd-journal.h>
+#endif
+
 #ifdef __cplusplus
 #include <cstdlib>
 #include <type_traits>
@@ -90,8 +95,14 @@ extern "C" void _ReadWriteBarrier(void);
 #define LOG_DISABLED !ASSERT_ENABLED
 #endif
 
-#ifndef RELEASE_LOG_DISABLED
-#define RELEASE_LOG_DISABLED !(USE(OS_LOG))
+#if ENABLE(RELEASE_LOG)
+#define RELEASE_LOG_DISABLED 0
+#else
+#define RELEASE_LOG_DISABLED !(USE(OS_LOG) || USE(JOURNALD))
+#endif
+
+#ifndef VERBOSE_RELEASE_LOG
+#define VERBOSE_RELEASE_LOG USE(JOURNALD)
 #endif
 
 #if COMPILER(GCC_COMPATIBLE)
@@ -154,7 +165,9 @@ typedef struct {
     WTFLogLevel level;
 #if !RELEASE_LOG_DISABLED
     const char* subsystem;
+#if USE(OS_LOG)
     __unsafe_unretained os_log_t osLogChannel;
+#endif
 #endif
 } WTFLogChannel;
 
@@ -163,7 +176,15 @@ typedef struct {
 #define JOIN_LOG_CHANNEL_WITH_PREFIX(prefix, channel) JOIN_LOG_CHANNEL_WITH_PREFIX_LEVEL_2(prefix, channel)
 #define JOIN_LOG_CHANNEL_WITH_PREFIX_LEVEL_2(prefix, channel) prefix ## channel
 
+#if PLATFORM(GTK)
+#define LOG_CHANNEL_WEBKIT_SUBSYSTEM "WebKitGTK"
+#elif PLATFORM(WPE)
+#define LOG_CHANNEL_WEBKIT_SUBSYSTEM "WPEWebKit"
+#elif PLATFORM(PLAYSTATION)
+#define LOG_CHANNEL_WEBKIT_SUBSYSTEM "SceNKWebKit"
+#else
 #define LOG_CHANNEL_WEBKIT_SUBSYSTEM "com.apple.WebKit"
+#endif
 
 #define DECLARE_LOG_CHANNEL(name) \
     extern WTFLogChannel LOG_CHANNEL(name);
@@ -172,9 +193,12 @@ typedef struct {
 #if RELEASE_LOG_DISABLED
 #define DEFINE_LOG_CHANNEL(name, subsystem) \
     WTFLogChannel LOG_CHANNEL(name) = { (WTFLogChannelState)0, #name, (WTFLogLevel)1 };
-#else
+#elif USE(OS_LOG)
 #define DEFINE_LOG_CHANNEL(name, subsystem) \
     WTFLogChannel LOG_CHANNEL(name) = { (WTFLogChannelState)0, #name, (WTFLogLevel)1, subsystem, OS_LOG_DEFAULT };
+#else
+#define DEFINE_LOG_CHANNEL(name, subsystem)                             \
+    WTFLogChannel LOG_CHANNEL(name) = { (WTFLogChannelState)0, #name, (WTFLogLevel)1, subsystem };
 #endif
 #endif
 
@@ -484,6 +508,8 @@ constexpr bool assertionFailureDueToUnreachableCode = false;
 /* RELEASE_LOG */
 
 #if RELEASE_LOG_DISABLED
+#define PUBLIC_LOG_STRING "s"
+#define PRIVATE_LOG_STRING "s"
 #define RELEASE_LOG(channel, ...) ((void)0)
 #define RELEASE_LOG_ERROR(channel, ...) LOG_ERROR(__VA_ARGS__)
 #define RELEASE_LOG_FAULT(channel, ...) LOG_ERROR(__VA_ARGS__)
@@ -497,15 +523,13 @@ constexpr bool assertionFailureDueToUnreachableCode = false;
 #define RELEASE_LOG_WITH_LEVEL_IF(isAllowed, channel, level, ...) do { if (isAllowed) RELEASE_LOG_WITH_LEVEL(channel, level, __VA_ARGS__); } while (0)
 
 #define RELEASE_LOG_STACKTRACE(channel) ((void)0)
-#else
+#elif USE(OS_LOG)
+#define PUBLIC_LOG_STRING "{public}s"
+#define PRIVATE_LOG_STRING "{private}s"
 #define RELEASE_LOG(channel, ...) os_log(LOG_CHANNEL(channel).osLogChannel, __VA_ARGS__)
 #define RELEASE_LOG_ERROR(channel, ...) os_log_error(LOG_CHANNEL(channel).osLogChannel, __VA_ARGS__)
 #define RELEASE_LOG_FAULT(channel, ...) os_log_fault(LOG_CHANNEL(channel).osLogChannel, __VA_ARGS__)
 #define RELEASE_LOG_INFO(channel, ...) os_log_info(LOG_CHANNEL(channel).osLogChannel, __VA_ARGS__)
-
-#define RELEASE_LOG_IF(isAllowed, channel, ...) do { if (isAllowed) RELEASE_LOG(      channel, __VA_ARGS__); } while (0)
-#define RELEASE_LOG_ERROR_IF(isAllowed, channel, ...) do { if (isAllowed) RELEASE_LOG_ERROR(channel, __VA_ARGS__); } while (0)
-#define RELEASE_LOG_INFO_IF(isAllowed, channel, ...) do { if (isAllowed) RELEASE_LOG_INFO(channel, __VA_ARGS__); } while (0)
 
 #define RELEASE_LOG_WITH_LEVEL(channel, logLevel, ...) do { \
     if (LOG_CHANNEL(channel).level >= (logLevel)) \
@@ -516,6 +540,62 @@ constexpr bool assertionFailureDueToUnreachableCode = false;
     if ((isAllowed) && LOG_CHANNEL(channel).level >= (logLevel)) \
         os_log(LOG_CHANNEL(channel).osLogChannel, __VA_ARGS__); \
 } while (0)
+
+#elif USE(JOURNALD)
+
+#define PUBLIC_LOG_STRING "s"
+#define PRIVATE_LOG_STRING "s"
+#define SD_JOURNAL_SEND(channel, priority, file, line, function, ...) sd_journal_send_with_location("CODE_FILE=" file, "CODE_LINE=" line, function, "WEBKIT_SUBSYSTEM=%s", LOG_CHANNEL(channel).subsystem, "WEBKIT_CHANNEL=%s", LOG_CHANNEL(channel).name, "PRIORITY=%i", priority, "MESSAGE=" __VA_ARGS__, nullptr)
+
+#define _XSTRINGIFY(line) #line
+#define _STRINGIFY(line) _XSTRINGIFY(line)
+#define RELEASE_LOG(channel, ...) SD_JOURNAL_SEND(channel, LOG_NOTICE, __FILE__, _STRINGIFY(__LINE__), __func__, __VA_ARGS__)
+#define RELEASE_LOG_ERROR(channel, ...) SD_JOURNAL_SEND(channel, LOG_ERR, __FILE__, _STRINGIFY(__LINE__), __func__, __VA_ARGS__)
+#define RELEASE_LOG_FAULT(channel, ...) SD_JOURNAL_SEND(channel, LOG_CRIT, __FILE__, _STRINGIFY(__LINE__), __func__, __VA_ARGS__)
+#define RELEASE_LOG_INFO(channel, ...) SD_JOURNAL_SEND(channel, LOG_INFO, __FILE__, _STRINGIFY(__LINE__), __func__, __VA_ARGS__)
+
+#define RELEASE_LOG_WITH_LEVEL(channel, logLevel, ...) do { \
+    if (LOG_CHANNEL(channel).level >= (logLevel)) \
+        SD_JOURNAL_SEND(channel, LOG_INFO, __FILE__, _STRINGIFY(__LINE__), __func__, __VA_ARGS__); \
+} while (0)
+
+#define RELEASE_LOG_WITH_LEVEL_IF(isAllowed, channel, logLevel, ...) do { \
+    if ((isAllowed) && LOG_CHANNEL(channel).level >= (logLevel)) \
+        SD_JOURNAL_SEND(channel, LOG_INFO, __FILE__, _STRINGIFY(__LINE__), __func__, __VA_ARGS__); \
+} while (0)
+
+#else
+
+#define PUBLIC_LOG_STRING "s"
+#define PRIVATE_LOG_STRING "s"
+#define LOGF(channel, priority, fmt, ...) do { \
+    auto& logChannel = LOG_CHANNEL(channel); \
+    if (logChannel.state != WTFLogChannelState::Off) \
+        fprintf(stderr, "[%s:%s:%i] " fmt "\n", logChannel.subsystem, logChannel.name, priority, ##__VA_ARGS__); \
+} while (0)
+
+#define RELEASE_LOG(channel, ...) LOGF(channel, 4, __VA_ARGS__)
+#define RELEASE_LOG_ERROR(channel, ...) LOGF(channel, 1, __VA_ARGS__)
+#define RELEASE_LOG_FAULT(channel, ...) LOGF(channel, 2, __VA_ARGS__)
+#define RELEASE_LOG_INFO(channel, ...) LOGF(channel, 3, __VA_ARGS__)
+
+#define RELEASE_LOG_WITH_LEVEL(channel, logLevel, ...) do { \
+    if (LOG_CHANNEL(channel).level >= (logLevel)) \
+        LOGF(channel, logLevel, __VA_ARGS__); \
+} while (0)
+
+#define RELEASE_LOG_WITH_LEVEL_IF(isAllowed, channel, logLevel, ...) do { \
+    if ((isAllowed) && LOG_CHANNEL(channel).level >= (logLevel)) \
+        LOGF(channel, logLevel, __VA_ARGS__); \
+} while (0)
+
+#endif
+
+#if !RELEASE_LOG_DISABLED
+#define RELEASE_LOG_STACKTRACE(channel) WTFReleaseLogStackTrace(&LOG_CHANNEL(channel))
+#define RELEASE_LOG_IF(isAllowed, channel, ...) do { if (isAllowed) RELEASE_LOG(channel, __VA_ARGS__); } while (0)
+#define RELEASE_LOG_ERROR_IF(isAllowed, channel, ...) do { if (isAllowed) RELEASE_LOG_ERROR(channel, __VA_ARGS__); } while (0)
+#define RELEASE_LOG_INFO_IF(isAllowed, channel, ...) do { if (isAllowed) RELEASE_LOG_INFO(channel, __VA_ARGS__); } while (0)
 
 #define RELEASE_LOG_STACKTRACE(channel) WTFReleaseLogStackTrace(&LOG_CHANNEL(channel))
 #endif

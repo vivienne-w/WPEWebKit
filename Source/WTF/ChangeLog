@@ -1,3 +1,75 @@
+2021-04-28  Basuke Suzuki  <basuke.suzuki@sony.com>
+
+        Suppress warnings for %{private}s format specifier
+        https://bugs.webkit.org/show_bug.cgi?id=225137
+
+        Reviewed by Alex Christensen.
+
+        Add PRIVATE_LOG_STRING macro which is defined depending on if
+        os_log() is used or rather old printf().
+        See also: https://bugs.webkit.org/show_bug.cgi?id=207478
+
+        * wtf/Assertions.h:
+
+2021-10-03  Basuke Suzuki  <basuke.suzuki@sony.com>
+
+        Enable release log to stderr
+        https://bugs.webkit.org/show_bug.cgi?id=230725
+        <rdar://problem/83740529>
+
+        Reviewed by Michael Catanzaro.
+
+        Define new compiler definitions, USE_LOG_STDERR for release logging. We don't have
+        modern logging backend so that dumping out to stdout/stderr is still very valuable.
+
+        * wtf/Assertions.cpp:
+        * wtf/Assertions.h:
+        * wtf/Logger.h:
+        (WTF::Logger::log):
+        (WTF::Logger::logVerbose):
+
+2020-03-17  Philippe Normand  <pnormand@igalia.com>
+
+        RELEASE_LOG should not be Cocoa specific
+        https://bugs.webkit.org/show_bug.cgi?id=195182
+
+        Reviewed by Konstantin Tokarev.
+
+        Add sd-journal logging support and wrap the os_log calls with the USE(OS_LOG) guard.
+
+        * wtf/Assertions.cpp:
+        * wtf/Assertions.h:
+        * wtf/Logger.h:
+        (WTF::Logger::log):
+        * wtf/MemoryPressureHandler.cpp:
+        (WTF::toString):
+        * wtf/PlatformGTK.cmake:
+        * wtf/PlatformWPE.cmake:
+        * wtf/RefCountedLeakCounter.cpp:
+
+2020-02-17  Víctor Manuel Jáquez Leal  <vjaquez@igalia.com>
+
+        a lot gcc warnings because of %{public}s format specifier
+        https://bugs.webkit.org/show_bug.cgi?id=207478
+
+        Reviewed by Darin Adler.
+
+        Add PUBLIC_LOG_STRING macro which is defined depending on if
+        os_log()[1] is used or rather old printf().
+
+        OS Logging processes format specifiers for privacy matters, for
+        example dynamic strings, which demands %{public}s. But these
+        specifiers are not valid for printf().
+
+        Calls to logging with this specifier, if they are not Mac/Darwing
+        exclusive, use this new macro to avoid gcc warnings.
+
+        1. https://developer.apple.com/documentation/os/logging?language=objc
+
+        * wtf/Assertions.h:
+        * wtf/MemoryPressureHandler.cpp:
+        (WTF::MemoryPressureHandler::ReliefLogger::logMemoryUsageChange):
+
 2021-08-18  Xabier Rodriguez Calvar  <calvaris@igalia.com>
 
         [GStreamer][EME] Try to parse XML init datas that could possibly come from MPD manifests

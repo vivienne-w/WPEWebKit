@@ -38,6 +38,7 @@
 #if ENABLE(MEDIA_SOURCE) && USE(GSTREAMER)
 
 #include "ContentType.h"
+#include "Logging.h"
 #include "MediaPlayerPrivateGStreamer.h"
 #include "MediaPlayerPrivateGStreamerMSE.h"
 #include "NotImplemented.h"
@@ -59,6 +60,10 @@ MediaSourcePrivateGStreamer::MediaSourcePrivateGStreamer(MediaSourcePrivateClien
     : MediaSourcePrivate()
     , m_mediaSource(mediaSource)
     , m_playerPrivate(playerPrivate)
+#if !RELEASE_LOG_DISABLED
+    , m_logger(m_playerPrivate.mediaPlayerLogger())
+    , m_logIdentifier(m_playerPrivate.mediaPlayerLogIdentifier())
+#endif
 {
 }
 

@@ -361,8 +361,13 @@ void WebResourceLoadObserver::logUserInteractionWithReducedTimeResolution(const 
         auto escapedURL = escapeForJSON(url.string());
         auto escapedDomain = escapeForJSON(topFrameDomain.string());
 
+#if OS(DARWIN)
         LOCAL_LOG(R"({ "url": "%{public}s",)", escapedURL.utf8().data());
         LOCAL_LOG(R"(  "domain" : "%{public}s",)", escapedDomain.utf8().data());
+#else
+        LOCAL_LOG(R"({ "url": "%s",)", escapedURL.utf8().data());
+        LOCAL_LOG(R"(  "domain" : "%s",)", escapedDomain.utf8().data());
+#endif
         LOCAL_LOG(R"(  "until" : %f })", newTime.secondsSinceEpoch().seconds());
 
 #undef LOCAL_LOG

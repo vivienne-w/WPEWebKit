@@ -188,7 +188,7 @@ void NetworkResourceLoader::start()
 
             WTF::switchOn(result,
                 [this] (ResourceError& error) {
-                    RELEASE_LOG_IF_ALLOWED("start: NetworkLoadChecker::check returned an error (error.domain=%{public}s, error.code=%d, isCancellation=%d)", error.domain().utf8().data(), error.errorCode(), error.isCancellation());
+                    RELEASE_LOG_IF_ALLOWED("start: NetworkLoadChecker::check returned an error (error.domain=%" PUBLIC_LOG_STRING ", error.code=%d, isCancellation=%d)", error.domain().utf8().data(), error.errorCode(), error.isCancellation());
                     if (!error.isCancellation())
                         this->didFailLoading(error);
                 },
@@ -330,7 +330,7 @@ void NetworkResourceLoader::startNetworkLoad(ResourceRequest&& request, FirstLoa
     parameters.request = WTFMove(request);
     m_networkLoad = makeUnique<NetworkLoad>(*this, &networkSession->blobRegistry(), WTFMove(parameters), *networkSession);
 
-    RELEASE_LOG_IF_ALLOWED("startNetworkLoad: Going to the network (description=%{public}s)", m_networkLoad->description().utf8().data());
+    RELEASE_LOG_IF_ALLOWED("startNetworkLoad: Going to the network (description=%" PUBLIC_LOG_STRING ")", m_networkLoad->description().utf8().data());
 }
 
 ResourceLoadInfo NetworkResourceLoader::resourceLoadInfo()
@@ -487,7 +487,7 @@ bool NetworkResourceLoader::shouldInterruptLoadForCSPFrameAncestorsOrXFrameOptio
 
 void NetworkResourceLoader::didReceiveResponse(ResourceResponse&& receivedResponse, ResponseCompletionHandler&& completionHandler)
 {
-    RELEASE_LOG_IF_ALLOWED("didReceiveResponse: (httpStatusCode=%d, MIMEType=%{public}s, expectedContentLength=%" PRId64 ", hasCachedEntryForValidation=%d, hasNetworkLoadChecker=%d)", receivedResponse.httpStatusCode(), receivedResponse.mimeType().utf8().data(), receivedResponse.expectedContentLength(), !!m_cacheEntryForValidation, !!m_networkLoadChecker);
+    RELEASE_LOG_IF_ALLOWED("didReceiveResponse: (httpStatusCode=%d, MIMEType=%" PUBLIC_LOG_STRING ", expectedContentLength=%" PRId64 ", hasCachedEntryForValidation=%d, hasNetworkLoadChecker=%d)", receivedResponse.httpStatusCode(), receivedResponse.mimeType().utf8().data(), receivedResponse.expectedContentLength(), !!m_cacheEntryForValidation, !!m_networkLoadChecker);
 
     if (isMainResource())
         didReceiveMainResourceResponse(receivedResponse);
@@ -531,7 +531,7 @@ void NetworkResourceLoader::didReceiveResponse(ResourceResponse&& receivedRespon
     if (m_networkLoadChecker) {
         auto error = m_networkLoadChecker->validateResponse(m_networkLoad ? m_networkLoad->currentRequest() : originalRequest(), m_response);
         if (!error.isNull()) {
-            RELEASE_LOG_ERROR_IF_ALLOWED("didReceiveResponse: NetworkLoadChecker::validateResponse returned an error (error.domain=%{public}s, error.code=%d)", error.domain().utf8().data(), error.errorCode());
+            RELEASE_LOG_ERROR_IF_ALLOWED("didReceiveResponse: NetworkLoadChecker::validateResponse returned an error (error.domain=%" PUBLIC_LOG_STRING ", error.code=%d)", error.domain().utf8().data(), error.errorCode());
             RunLoop::main().dispatch([protectedThis = makeRef(*this), error = WTFMove(error)] {
                 if (protectedThis->m_networkLoad)
                     protectedThis->didFailLoading(error);
@@ -1209,6 +1209,7 @@ static void logBlockedCookieInformation(NetworkConnectionToWebProcess& connectio
 #define LOCAL_LOG(str, ...) \
     LOCAL_LOG_IF_ALLOWED("logCookieInformation: BLOCKED cookie access for webPageID=%s, frameID=%s, resourceID=%s, firstParty=%s: " str, escapedPageID.utf8().data(), escapedFrameID.utf8().data(), escapedIdentifier.utf8().data(), escapedFirstParty.utf8().data(), ##__VA_ARGS__)
 
+#if OS(DARWIN)
     LOCAL_LOG(R"({ "url": "%{public}s",)", escapedURL.utf8().data());
     LOCAL_LOG(R"(  "partition": "%{public}s",)", "BLOCKED");
     LOCAL_LOG(R"(  "hasStorageAccess": %{public}s,)", "false");
@@ -1217,6 +1218,16 @@ static void logBlockedCookieInformation(NetworkConnectionToWebProcess& connectio
     LOCAL_LOG(R"(  "isTopSite": "%{public}s",)", sameSiteInfo.isTopSite ? "true" : "false");
     LOCAL_LOG(R"(  "cookies": [])");
     LOCAL_LOG(R"(  })");
+#else
+    LOCAL_LOG(R"({ "url": "%s",)", escapedURL.utf8().data());
+    LOCAL_LOG(R"(  "partition": "%s",)", "BLOCKED");
+    LOCAL_LOG(R"(  "hasStorageAccess": %s,)", "false");
+    LOCAL_LOG(R"(  "referer": "%s",)", escapedReferrer.utf8().data());
+    LOCAL_LOG(R"(  "isSameSite": "%s",)", sameSiteInfo.isSameSite ? "true" : "false");
+    LOCAL_LOG(R"(  "isTopSite": "%s",)", sameSiteInfo.isTopSite ? "true" : "false");
+    LOCAL_LOG(R"(  "cookies": [])");
+    LOCAL_LOG(R"(  })");
+#endif
 #undef LOCAL_LOG
 #undef LOCAL_LOG_IF_ALLOWED
 }
@@ -1241,6 +1252,7 @@ static void logCookieInformationInternal(NetworkConnectionToWebProcess& connecti
 #define LOCAL_LOG(str, ...) \
     LOCAL_LOG_IF_ALLOWED("logCookieInformation: webPageID=%s, frameID=%s, resourceID=%s: " str, escapedPageID.utf8().data(), escapedFrameID.utf8().data(), escapedIdentifier.utf8().data(), ##__VA_ARGS__)
 
+#if OS(DARWIN)
     LOCAL_LOG(R"({ "url": "%{public}s",)", escapedURL.utf8().data());
     LOCAL_LOG(R"(  "partition": "%{public}s",)", escapedPartition.utf8().data());
     LOCAL_LOG(R"(  "hasStorageAccess": %{public}s,)", hasStorageAccess ? "true" : "false");
@@ -1248,6 +1260,15 @@ static void logCookieInformationInternal(NetworkConnectionToWebProcess& connecti
     LOCAL_LOG(R"(  "isSameSite": "%{public}s",)", sameSiteInfo.isSameSite ? "true" : "false");
     LOCAL_LOG(R"(  "isTopSite": "%{public}s",)", sameSiteInfo.isTopSite ? "true" : "false");
     LOCAL_LOG(R"(  "cookies": [)");
+#else
+    LOCAL_LOG(R"({ "url": "%s",)", escapedURL.utf8().data());
+    LOCAL_LOG(R"(  "partition": "%s",)", escapedPartition.utf8().data());
+    LOCAL_LOG(R"(  "hasStorageAccess": %s,)", hasStorageAccess ? "true" : "false");
+    LOCAL_LOG(R"(  "referer": "%s",)", escapedReferrer.utf8().data());
+    LOCAL_LOG(R"(  "isSameSite": "%s",)", sameSiteInfo.isSameSite ? "true" : "false");
+    LOCAL_LOG(R"(  "isTopSite": "%s",)", sameSiteInfo.isTopSite ? "true" : "false");
+    LOCAL_LOG(R"(  "cookies": [)");
+#endif
 
     auto size = cookies.size();
     decltype(size) count = 0;
@@ -1263,7 +1284,7 @@ static void logCookieInformationInternal(NetworkConnectionToWebProcess& connecti
         auto escapedComment = escapeForJSON(cookie.comment);
         auto escapedCommentURL = escapeForJSON(cookie.commentURL.string());
         // FIXME: Log Same-Site policy for each cookie. See <https://bugs.webkit.org/show_bug.cgi?id=184894>.
-
+#if OS(DARWIN)
         LOCAL_LOG(R"(  { "name": "%{public}s",)", escapedName.utf8().data());
         LOCAL_LOG(R"(    "value": "%{public}s",)", escapedValue.utf8().data());
         LOCAL_LOG(R"(    "domain": "%{public}s",)", escapedDomain.utf8().data());
@@ -1276,6 +1297,20 @@ static void logCookieInformationInternal(NetworkConnectionToWebProcess& connecti
         LOCAL_LOG(R"(    "comment": "%{public}s",)", escapedComment.utf8().data());
         LOCAL_LOG(R"(    "commentURL": "%{public}s")", escapedCommentURL.utf8().data());
         LOCAL_LOG(R"(  }%{public}s)", trailingComma);
+#else
+        LOCAL_LOG(R"(  { "name": "%s",)", escapedName.utf8().data());
+        LOCAL_LOG(R"(    "value": "%s",)", escapedValue.utf8().data());
+        LOCAL_LOG(R"(    "domain": "%s",)", escapedDomain.utf8().data());
+        LOCAL_LOG(R"(    "path": "%s",)", escapedPath.utf8().data());
+        LOCAL_LOG(R"(    "created": %f,)", cookie.created);
+        LOCAL_LOG(R"(    "expires": %f,)", cookie.expires);
+        LOCAL_LOG(R"(    "httpOnly": %s,)", cookie.httpOnly ? "true" : "false");
+        LOCAL_LOG(R"(    "secure": %s,)", cookie.secure ? "true" : "false");
+        LOCAL_LOG(R"(    "session": %s,)", cookie.session ? "true" : "false");
+        LOCAL_LOG(R"(    "comment": "%s",)", escapedComment.utf8().data());
+        LOCAL_LOG(R"(    "commentURL": "%s")", escapedCommentURL.utf8().data());
+        LOCAL_LOG(R"(  }%s)", trailingComma);
+#endif
     }
     LOCAL_LOG(R"(]})");
 #undef LOCAL_LOG

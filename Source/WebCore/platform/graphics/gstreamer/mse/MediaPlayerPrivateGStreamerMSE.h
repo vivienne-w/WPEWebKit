@@ -81,6 +81,9 @@ public:
     void unblockDurationChanges();
 
     PlaybackPipeline* playbackPipeline() const { return m_playbackPipeline.get(); }
+#if !RELEASE_LOG_DISABLED
+    WTFLogChannel& logChannel() const final { return WebCore::LogMediaSource; }
+#endif
 
 private:
     friend class MediaPlayerFactoryGStreamerMSE;
