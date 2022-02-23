@@ -5729,7 +5729,7 @@ void HTMLMediaElement::suspend(ReasonForSuspension reason)
         break;
     case ReasonForSuspension::PageWillBeSuspended:
         if (m_player)
-            m_player->platformSuspend();
+            m_player->platformHide();
         break;
     case ReasonForSuspension::JavaScriptDebuggerPaused:
     case ReasonForSuspension::WillDeferLoading:
@@ -5745,7 +5745,7 @@ void HTMLMediaElement::resume()
     setInActiveDocument(true);
 
     if (m_player)
-        m_player->platformResume();
+        m_player->platformShow();
 
     if (!m_mediaSession->pageAllowsPlaybackAfterResuming())
         document().addMediaCanStartListener(*this);
@@ -5792,9 +5792,18 @@ void HTMLMediaElement::visibilityStateChanged()
 
     updateSleepDisabling();
     m_mediaSession->visibilityChanged();
-    if (m_player)
+    if (m_player) {
         m_player->setVisible(!m_elementIsHidden);
+        if (m_elementIsHidden)
+            m_player->platformHide();
+        else
+            m_player->platformShow();
+    }
 
+    // A suspended and hidden view must resume playback when the view is resumed (despite only audio will
+    // work). The code below prevents that behavior requiring the player to be visible in oder to resume
+    // the playback. As we're not interested in this, we leave it out WPE.
+#if !PLATFORM(WPE)
     bool isPlayingAudio = isPlaying() && hasAudio() && !muted() && volume();
     if (!isPlayingAudio) {
         if (m_elementIsHidden) {
@@ -5805,6 +5814,7 @@ void HTMLMediaElement::visibilityStateChanged()
             m_mediaSession->endInterruption(PlatformMediaSession::MayResumePlaying);
         }
     }
+#endif
 }
 
 #if ENABLE(VIDEO_TRACK)

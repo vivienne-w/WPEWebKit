@@ -6627,8 +6627,8 @@ void WebGLRenderingContextBase::activityStateDidChange(OptionSet<ActivityState::
         m_context->setContextVisibility(newActivityState.contains(ActivityState::IsVisible));
 
     if (m_nonCompositedWebGLMode) {
-        if (((changed & ActivityState::IsSuspended) && (newActivityState & ActivityState::IsSuspended)) ||
-            ((changed & ActivityState::IsInWindow) && !(newActivityState & ActivityState::IsInWindow))) {
+        if (((changed & ActivityState::IsInWindow) && !(newActivityState & ActivityState::IsInWindow)) ||
+            ((changed & ActivityState::IsVisible) && !(newActivityState & ActivityState::IsVisible))) {
             if (m_scissorEnabled)
                 m_context->disable(GraphicsContextGL::SCISSOR_TEST);
             m_context->clearColor(0, 0, 0, 0);

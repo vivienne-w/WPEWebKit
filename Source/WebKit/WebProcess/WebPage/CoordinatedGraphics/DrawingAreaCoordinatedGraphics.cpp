@@ -385,31 +385,31 @@ RefPtr<DisplayRefreshMonitor> DrawingAreaCoordinatedGraphics::createDisplayRefre
 
 void DrawingAreaCoordinatedGraphics::activityStateDidChange(OptionSet<ActivityState::Flag> changed, ActivityStateChangeID, const Vector<CallbackID>&)
 {
-    if (changed & ActivityState::IsInWindow && !m_isViewSuspended) {
-        if (m_webPage.corePage()->isInWindow()) {
-            m_webPage.corePage()->resumeActiveDOMObjectsAndAnimations();
+    // We use calls to suspendPainting() and resumePainting() to stop the compositor loop and paint the content transparent
+    // so nothing gets rendered. There are 2 exceptions to this that need to be handled separately:
+    // - WebGL in nonCompositedWebGL: we're not using the compositor in this case. WebGLRenderingContextBase will observe the activity
+    //   state changes and paint the content transparent when the view is suspended or hidden.
+    // - MediaPlayer videoSink window when using the GStreamer holepunch: HTMLMediaElement will perform calls to the MediaPlayer
+    //   to set an empty rectangle when it detects that the view has become hidden or suspended.
+
+    // Handle hide/show functionality.
+    if (changed & ActivityState::IsVisible && !m_isViewSuspended) {
+        if (m_webPage.corePage()->isVisible())
             resumePainting();
-        } else {
+        else
             suspendPainting();
-            m_webPage.corePage()->suspendActiveDOMObjectsAndAnimations();
-        }
     }
 
-    if (changed & ActivityState::IsSuspended) {
+    // Handle suspend/resume functionality. Besides stopping the rendering, we stop active DOM objects and media playback.
+    if (changed & ActivityState::IsInWindow) {
         if (m_isViewSuspended) {
-            // DOM objects will be disabled if the page is hidden. We need to activate them so the call to resumeAllMediaPlayback works.
             m_webPage.corePage()->resumeActiveDOMObjectsAndAnimations();
             m_webPage.corePage()->resumeAllMediaPlayback();
-            // If the page is visible, resume rendering, otherwise disable DOM objects so the videoSink rectangle is hidden.
-            if (m_webPage.corePage()->isInWindow())
+            if (m_webPage.corePage()->isVisible())
                 resumePainting();
-            else
-                m_webPage.corePage()->suspendActiveDOMObjectsAndAnimations();
             m_isViewSuspended = false;
         } else {
             suspendPainting();
-            // DOM objects will be disabled if the page is hidden. We need to activate them so the call to suspendAllMediaPlayback works.
-            m_webPage.corePage()->resumeActiveDOMObjectsAndAnimations();
             m_webPage.corePage()->suspendAllMediaPlayback();
             m_webPage.corePage()->suspendActiveDOMObjectsAndAnimations();
             m_isViewSuspended = true;

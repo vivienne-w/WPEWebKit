@@ -1616,14 +1616,14 @@ void MediaPlayer::remoteEngineFailedToLoad()
     client().mediaPlayerEngineFailedToLoad();
 }
 
-void MediaPlayer::platformSuspend()
+void MediaPlayer::platformHide()
 {
-    m_private->platformSuspend();
+    m_private->platformHide();
 }
 
-void MediaPlayer::platformResume()
+void MediaPlayer::platformShow()
 {
-    m_private->platformResume();
+    m_private->platformShow();
 }
 
 #if !RELEASE_LOG_DISABLED

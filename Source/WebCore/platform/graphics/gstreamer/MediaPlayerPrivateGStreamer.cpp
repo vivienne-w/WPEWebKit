@@ -3455,19 +3455,19 @@ GstElement* MediaPlayerPrivateGStreamer::createVideoSinkGL()
 #endif // USE(GSTREAMER_GL)
 
 #if USE(GSTREAMER_HOLEPUNCH)
-static void setRectangleToVideoSink(GstElement* videoSink, const IntRect& rect, bool changeSuspensionState = false)
+static void setRectangleToVideoSink(GstElement* videoSink, const IntRect& rect, bool changeVisibleState = false, bool newVisibility = false)
 {
     static Lock mutex;
-    static bool isSuspended = false;
+    static bool isVisible = true;
 
     if (!videoSink)
         return;
 
-    if (isSuspended && !changeSuspensionState)
+    if (!isVisible && !changeVisibleState)
         return;
 
     LockHolder holder(mutex);
-    isSuspended = changeSuspensionState ? !isSuspended : isSuspended;
+    isVisible = changeVisibleState ? newVisibility : isVisible;
 
 #if USE(WESTEROS_SINK) || USE(WPEWEBKIT_PLATFORM_BCM_NEXUS)
     // Valid for brcmvideosink and westerossink.
@@ -3796,17 +3796,17 @@ MediaPlayer::SupportsType MediaPlayerPrivateGStreamer::extendedSupportsType(cons
     return result;
 }
 
-void MediaPlayerPrivateGStreamer::platformSuspend()
+void MediaPlayerPrivateGStreamer::platformHide()
 {
 #if USE(GSTREAMER_HOLEPUNCH)
-    setRectangleToVideoSink(m_videoSink.get(), IntRect(), true);
+    setRectangleToVideoSink(m_videoSink.get(), IntRect(), true, false);
 #endif
 }
 
-void MediaPlayerPrivateGStreamer::platformResume()
+void MediaPlayerPrivateGStreamer::platformShow()
 {
 #if USE(GSTREAMER_HOLEPUNCH)
-    setRectangleToVideoSink(m_videoSink.get(), IntRect(), true);
+    setRectangleToVideoSink(m_videoSink.get(), IntRect(), true, true);
 #endif
 }
 

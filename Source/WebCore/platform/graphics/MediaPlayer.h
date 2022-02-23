@@ -634,8 +634,8 @@ public:
     void requestInstallMissingPlugins(const String& details, const String& description, MediaPlayerRequestInstallMissingPluginsCallback& callback) { client().requestInstallMissingPlugins(details, description, callback); }
 #endif
 
-    void platformSuspend();
-    void platformResume();
+    void platformHide();
+    void platformShow();
 
 private:
     MediaPlayer(MediaPlayerClient&);
