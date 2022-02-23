@@ -792,7 +792,9 @@ void CoordinatedGraphicsLayer::flushCompositingStateForThisLayerOnly()
     m_nicosia.delta.animatedBackingStoreClientChanged = true;
 
     // Determine image backing presence according to the composited image source.
-    if (m_compositedNativeImagePtr) {
+    if (m_coordinator->nonCompositedWebGLEnabled()) {
+        ASSERT(m_nicosia.imageBacking == nullptr);
+    } else if (m_compositedNativeImagePtr) {
         ASSERT(m_compositedImage);
         auto& image = *m_compositedImage;
         uintptr_t imageID = reinterpret_cast<uintptr_t>(&image);
@@ -963,6 +965,11 @@ void CoordinatedGraphicsLayer::requestBackingStoreUpdate()
 {
     setNeedsVisibleRectAdjustment();
     notifyFlushRequired();
+}
+
+bool CoordinatedGraphicsLayer::canHaveBackingStore() const
+{
+    return m_coordinator && !m_coordinator->nonCompositedWebGLEnabled();
 }
 
 void CoordinatedGraphicsLayer::updateContentBuffersIncludingSubLayers()
@@ -1237,7 +1244,7 @@ void CoordinatedGraphicsLayer::computeTransformedVisibleRect()
 
 bool CoordinatedGraphicsLayer::shouldHaveBackingStore() const
 {
-    return drawsContent() && contentsAreVisible() && !m_size.isEmpty()
+    return canHaveBackingStore() && drawsContent() && contentsAreVisible() && !m_size.isEmpty()
         && (!!opacity() || m_animations.hasActiveAnimationsOfType(AnimatedPropertyOpacity));
 }
 
