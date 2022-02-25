@@ -40,6 +40,7 @@
 #include <WebCore/NicosiaImageBackingTextureMapperImpl.h>
 #include <WebCore/NicosiaPaintingEngine.h>
 #include <WebCore/Page.h>
+#include <WebCore/Settings.h>
 #include <wtf/MemoryPressureHandler.h>
 #include <wtf/SetForScope.h>
 
@@ -209,6 +210,11 @@ void CompositingCoordinator::initializeRootCompositingLayerIfNeeded()
 void CompositingCoordinator::syncLayerState()
 {
     m_shouldSyncFrame = true;
+}
+
+bool CompositingCoordinator::nonCompositedWebGLEnabled() const
+{
+    return m_page.corePage()->settings().nonCompositedWebGLEnabled();
 }
 
 void CompositingCoordinator::notifyFlushRequired(const GraphicsLayer*)
