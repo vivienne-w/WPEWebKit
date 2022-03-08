@@ -209,7 +209,24 @@ void logMemoryStatisticsAtTimeOfDeath()
 
 #if !PLATFORM(COCOA)
 void platformReleaseMemory(Critical) { }
-void jettisonExpensiveObjectsOnTopLevelNavigation() { }
+void jettisonExpensiveObjectsOnTopLevelNavigation()
+{
+    // based on code from cocoa/MemoryReleaseCocoa.mm
+    // Protect against doing excessive jettisoning during repeated navigations.
+    const auto minimumTimeSinceNavigation = std::chrono::seconds(2);
+
+    auto now = std::chrono::steady_clock::now();
+    static auto timeOfLastNavigation = now;
+    bool shouldJettison = (timeOfLastNavigation == now) || (std::chrono::duration_cast<std::chrono::seconds>(now - timeOfLastNavigation) >= minimumTimeSinceNavigation);
+    timeOfLastNavigation = now;
+
+    if (!shouldJettison)
+        return;
+
+    RunLoop::main().dispatch([]{
+        releaseMemory(Critical::Yes, Synchronous::Yes);
+    });
+}
 void registerMemoryReleaseNotifyCallbacks() { }
 #endif
 
