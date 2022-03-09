@@ -26,8 +26,9 @@
 #include "config.h"
 #include "WebKitInitialize.h"
 
+#include "WebKit2Initialize.h"
+#include <JavaScriptCore/RemoteInspector.h>
 #include <JavaScriptCore/RemoteInspectorServer.h>
-#include <WebKit/Shared/WebKit2Initialize.h>
 #include <wtf/glib/GUniquePtr.h>
 
 namespace WebKit {
@@ -52,7 +53,10 @@ static void initializeRemoteInspectorServer(const char* address)
     if (!port)
         return;
 
-    Inspector::RemoteInspectorServer::singleton().start(inspectorAddress.get(), port);
+    if (!Inspector::RemoteInspectorServer::singleton().start(inspectorAddress.get(), port))
+        return;
+
+    Inspector::RemoteInspector::setInspectorServerAddress(address);
 }
 #endif
 

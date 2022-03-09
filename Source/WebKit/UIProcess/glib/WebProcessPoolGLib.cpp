@@ -31,6 +31,7 @@
 #include "LegacyGlobalSettings.h"
 #include "WebMemoryPressureHandler.h"
 #include "WebProcessCreationParameters.h"
+#include <JavaScriptCore/RemoteInspector.h>
 #include <WebCore/PlatformDisplay.h>
 #include <wtf/FileSystem.h>
 
@@ -104,6 +105,8 @@ void WebProcessPool::platformInitializeWebProcess(const WebProcessProxy& process
 #if USE(GSTREAMER)
     parameters.gstreamerOptions = WebCore::extractGStreamerOptionsFromCommandLine();
 #endif
+
+    parameters.inspectorServerAddress = Inspector::RemoteInspector::inspectorServerAddress();
 }
 
 void WebProcessPool::platformInvalidateContext()

@@ -217,6 +217,10 @@ struct WebProcessCreationParameters {
     WebCore::RenderThemeIOS::CSSValueToSystemColorMap cssValueToSystemColorMap;
     WebCore::Color focusRingColor;
 #endif
+
+#if USE(GLIB)
+    CString inspectorServerAddress;
+#endif
 };
 
 } // namespace WebKit

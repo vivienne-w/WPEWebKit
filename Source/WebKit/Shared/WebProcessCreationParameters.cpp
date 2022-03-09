@@ -175,6 +175,10 @@ void WebProcessCreationParameters::encode(IPC::Encoder& encoder) const
     encoder << cssValueToSystemColorMap;
     encoder << focusRingColor;
 #endif
+
+#if USE(GLIB)
+    encoder << inspectorServerAddress;
+#endif
 }
 
 bool WebProcessCreationParameters::decode(IPC::Decoder& decoder, WebProcessCreationParameters& parameters)
@@ -465,6 +469,14 @@ bool WebProcessCreationParameters::decode(IPC::Decoder& decoder, WebProcessCreat
     if (!focusRingColor)
         return false;
     parameters.focusRingColor = WTFMove(*focusRingColor);
+#endif
+
+#if USE(GLIB)
+    Optional<CString> inspectorServerAddress;
+    decoder >> inspectorServerAddress;
+    if (!inspectorServerAddress)
+        return false;
+    parameters.inspectorServerAddress = WTFMove(*inspectorServerAddress);
 #endif
 
     return true;
