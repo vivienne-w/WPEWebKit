@@ -109,8 +109,6 @@ static void releaseCriticalMemory(Synchronous synchronous, MaintainBackForwardCa
         document->cachedResourceLoader().garbageCollectDocumentResources();
     }
 
-    GCController::singleton().deleteAllCode(JSC::DeleteAllCodeIfNotCollecting);
-
 #if ENABLE(VIDEO)
     for (auto* mediaElement : HTMLMediaElement::allMediaElements()) {
         if (mediaElement->paused())
@@ -119,6 +117,7 @@ static void releaseCriticalMemory(Synchronous synchronous, MaintainBackForwardCa
 #endif
 
     if (synchronous == Synchronous::Yes) {
+        GCController::singleton().deleteAllCode(JSC::DeleteAllCodeIfNotCollecting);
         GCController::singleton().garbageCollectNow();
     } else {
 #if PLATFORM(IOS_FAMILY) || PLATFORM(WPE)
