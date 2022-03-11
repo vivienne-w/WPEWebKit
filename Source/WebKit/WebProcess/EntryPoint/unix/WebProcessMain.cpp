@@ -27,6 +27,10 @@
 
 #include <cstdlib>
 
+#if defined (USE_BREAKPAD)
+#include "BreakpadExceptionHandler.h"
+#endif
+
 #if USE(GCRYPT)
 #include <pal/crypto/gcrypt/Initialization.h>
 #endif
@@ -35,6 +39,10 @@ using namespace WebKit;
 
 int main(int argc, char** argv)
 {
+#if defined (USE_BREAKPAD)
+    installExceptionHandler();
+#endif
+
     // Ignore the GTK_THEME environment variable, the theme is always set by the UI process now.
     unsetenv("GTK_THEME");
 

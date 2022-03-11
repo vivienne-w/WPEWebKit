@@ -296,6 +296,20 @@ list(APPEND WebKit_LIBRARIES
 )
 
 WEBKIT_BUILD_INSPECTOR_GRESOURCES(${DERIVED_SOURCES_WEBINSPECTORUI_DIR})
+
+if (ENABLE_BREAKPAD)
+    list(APPEND WebKit_INCLUDE_DIRECTORIES
+        ${BREAKPAD_INCLUDE_DIRS}
+        ${WEBKIT_DIR}/Shared/unix
+    )
+    list(APPEND WebKit_LIBRARIES
+        ${BREAKPAD_LIBRARIES}
+    )
+    list(APPEND WebKit_SOURCES
+        Shared/unix/BreakpadExceptionHandler.cpp
+    )
+endif ()
+
 list(APPEND WPEWebInspectorResources_DERIVED_SOURCES
     ${DERIVED_SOURCES_WEBINSPECTORUI_DIR}/InspectorGResourceBundle.c
 )

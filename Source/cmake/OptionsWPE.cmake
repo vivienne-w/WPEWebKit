@@ -197,6 +197,11 @@ if (USE_SYSTEMD)
     endif ()
 endif ()
 
+if (ENABLE_BREAKPAD)
+    find_package(Breakpad REQUIRED)
+    add_definitions(-DUSE_BREAKPAD=1)
+endif ()
+
 add_definitions(-DBUILDING_WPE__=1)
 add_definitions(-DGETTEXT_PACKAGE="WPE")
 add_definitions(-DJSC_GLIB_API_ENABLED)
