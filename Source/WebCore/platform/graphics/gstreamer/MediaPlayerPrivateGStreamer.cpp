@@ -3844,6 +3844,7 @@ void MediaPlayerPrivateGStreamer::elementSetupCallback(MediaPlayerPrivateGStream
     std::call_once(onceFlag, [] {
         GRefPtr<GstElementFactory> westerosfactory = adoptGRef(gst_element_factory_find("westerossink"));
         if (westerosfactory) {
+            gst_object_unref(gst_plugin_feature_load(GST_PLUGIN_FEATURE(westerosfactory.get())));
             westerosSinkType = gst_element_factory_get_element_type(westerosfactory.get());
             for (auto *t = gst_element_factory_get_static_pad_templates(westerosfactory.get()); t != nullptr; t = g_list_next(t)) {
                GstStaticPadTemplate *padtemplate = (GstStaticPadTemplate*)t->data;
