@@ -637,6 +637,8 @@ public:
     void platformHide();
     void platformShow();
 
+    String lastErrorMessage() const;
+
 private:
     MediaPlayer(MediaPlayerClient&);
     MediaPlayer(MediaPlayerClient&, MediaPlayerEnums::MediaEngineIdentifier);
@@ -676,6 +678,7 @@ private:
 #if ENABLE(LEGACY_ENCRYPTED_MEDIA) && ENABLE(ENCRYPTED_MEDIA)
     bool m_shouldContinueAfterKeyNeeded { false };
 #endif
+    String m_lastErrorMessage;
 };
 
 class MediaPlayerFactory {

@@ -134,10 +134,22 @@ static void enabledAppsrcNeedData(GstAppSrc* appsrc, guint, gpointer userData)
         // Search again for the Stream, just in case it was removed between the previous lock and this one.
         appsrcStream = getStreamByAppsrc(webKitMediaSrc, GST_ELEMENT(appsrc));
 
-        if (appsrcStream && appsrcStream->type != WebCore::Invalid)
-            webKitMediaSrc->priv->notifier->notify(WebKitMediaSrcMainThreadNotification::ReadyForMoreSamples, [webKitMediaSrc, appsrcStream] {
+        if (appsrcStream && appsrcStream->type != WebCore::Invalid) {
+            auto notificationType = [](WebCore::MediaSourceStreamTypeGStreamer type) {
+                switch(type) {
+                    case WebCore::Video: return WebKitMediaSrcMainThreadNotification::VideoReadyForMoreSamples;
+                    case WebCore::Audio: return WebKitMediaSrcMainThreadNotification::AudioReadyForMoreSamples;
+                    case WebCore::Text:  return WebKitMediaSrcMainThreadNotification::TextReadyForMoreSamples;
+                    default: break;
+                }
+                RELEASE_ASSERT_NOT_REACHED();
+                return WebKitMediaSrcMainThreadNotification::VideoReadyForMoreSamples;
+            }(appsrcStream->type);
+
+            webKitMediaSrc->priv->notifier->notify(notificationType, [webKitMediaSrc, appsrcStream] {
                 notifyReadyForMoreSamplesMainThread(webKitMediaSrc, appsrcStream);
             });
+        }
 
         GST_OBJECT_UNLOCK(webKitMediaSrc);
     }
@@ -686,10 +698,11 @@ static void notifyReadyForMoreSamplesMainThread(WebKitMediaSrc* source, Stream* 
     }
 
     WebCore::MediaPlayerPrivateGStreamerMSE* mediaPlayerPrivate = source->priv->mediaPlayerPrivate;
-    if (mediaPlayerPrivate && !mediaPlayerPrivate->seeking())
-        appsrcStream->sourceBuffer->notifyReadyForMoreSamples();
-
+    bool shouldNotify = mediaPlayerPrivate && mediaPlayerPrivate->gstSeekCompleted();
     GST_OBJECT_UNLOCK(source);
+
+    if (shouldNotify)
+        appsrcStream->sourceBuffer->notifyReadyForMoreSamples();
 }
 
 void webKitMediaSrcSetMediaPlayerPrivate(WebKitMediaSrc* source, WebCore::MediaPlayerPrivateGStreamerMSE* mediaPlayerPrivate)

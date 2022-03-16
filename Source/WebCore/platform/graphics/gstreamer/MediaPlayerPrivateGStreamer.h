@@ -406,6 +406,8 @@ protected:
 
     Optional<GstVideoDecoderPlatform> m_videoDecoderPlatform;
 
+    String errorMessage() const override { return m_errorMessage; }
+
 private:
     bool isPlayerShuttingDown() const { return m_isPlayerShuttingDown.load(); }
     MediaTime maxTimeLoaded() const;
@@ -475,6 +477,8 @@ private:
     InitData parseInitDataFromProtectionMessage(GstMessage*);
     bool waitForCDMAttachment();
 #endif
+
+    static void elementSetupCallback(MediaPlayerPrivateGStreamer*, GstElement*, GstElement*);
 
     Atomic<bool> m_isPlayerShuttingDown;
 #if ENABLE(VIDEO_TRACK)
@@ -563,6 +567,8 @@ private:
     Ref<const Logger> m_logger;
     const void* m_logIdentifier;
 #endif
+
+    String m_errorMessage;
 };
 
 }
