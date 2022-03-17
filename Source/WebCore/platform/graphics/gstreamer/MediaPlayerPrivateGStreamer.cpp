@@ -1951,30 +1951,32 @@ void MediaPlayerPrivateGStreamer::handleMessage(GstMessage* message)
         asyncStateChangeDone();
         break;
     case GST_MESSAGE_STATE_CHANGED: {
+        GstState newState;
+        gst_message_parse_state_changed(message, &currentState, &newState, nullptr);
+
+#if USE(GSTREAMER_HOLEPUNCH)
+        if (currentState == GST_STATE_NULL && newState == GST_STATE_READY) {
+            // If we didn't create a video sink, store a reference to the created one.
+            if (!m_videoSink)
+                g_object_get(pipeline(), "video-sink", &m_videoSink.outPtr(), nullptr);
+
+            // Ensure that there's a buffer with the transparent rectangle available when playback is going to start.
+            if (m_videoSink)
+                pushNextHolePunchBuffer();
+        }
+#endif
+
         if (!messageSourceIsPlaybin || m_isDelayingLoad)
             break;
         updateStates();
 
         // Construct a filename for the graphviz dot file output.
-        GstState newState;
-        gst_message_parse_state_changed(message, &currentState, &newState, nullptr);
         CString dotFileName = makeString(GST_OBJECT_NAME(m_pipeline.get()), '.',
             gst_element_state_get_name(currentState), '_', gst_element_state_get_name(newState)).utf8();
         GST_DEBUG_BIN_TO_DOT_FILE_WITH_TS(GST_BIN(m_pipeline.get()), GST_DEBUG_GRAPH_SHOW_ALL, dotFileName.data());
 
         if (!m_isLegacyPlaybin && currentState == GST_STATE_PAUSED && newState == GST_STATE_PLAYING)
             playbin3SendSelectStreamsIfAppropriate();
-
-#if USE(GSTREAMER_HOLEPUNCH)
-        if (currentState == GST_STATE_NULL && newState == GST_STATE_READY) {
-            // If we didn't create a video sink, store a reference to the created one.
-            if (!m_videoSink)
-                g_object_get(m_pipeline.get(), "video-sink", &m_videoSink.outPtr(), nullptr);
-
-            // Ensure that there's a buffer with the transparent rectangle available when playback is going to start.
-            pushNextHolePunchBuffer();
-        }
-#endif
 
         break;
     }
@@ -3844,6 +3846,7 @@ void MediaPlayerPrivateGStreamer::elementSetupCallback(MediaPlayerPrivateGStream
     std::call_once(onceFlag, [] {
         GRefPtr<GstElementFactory> westerosfactory = adoptGRef(gst_element_factory_find("westerossink"));
         if (westerosfactory) {
+            gst_object_unref(gst_plugin_feature_load(GST_PLUGIN_FEATURE(westerosfactory.get())));
             westerosSinkType = gst_element_factory_get_element_type(westerosfactory.get());
             for (auto *t = gst_element_factory_get_static_pad_templates(westerosfactory.get()); t != nullptr; t = g_list_next(t)) {
                GstStaticPadTemplate *padtemplate = (GstStaticPadTemplate*)t->data;
