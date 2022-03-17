@@ -22,26 +22,32 @@
 #include "BreakpadExceptionHandler.h"
 #include <client/linux/handler/exception_handler.h>
 #include <signal.h>
+#include <wtf/FileSystem.h>
 
 namespace WebKit
 {
 // called by 'google_breakpad::ExceptionHandler' on every crash
 static bool breakpadCallback(const google_breakpad::MinidumpDescriptor& descriptor, void* context, bool succeeded)
 {
-  (void) descriptor;
-  (void) context;
-  return succeeded;
+    (void) descriptor;
+    (void) context;
+    return succeeded;
 }
 
 void installExceptionHandler()
 {
 #ifdef SIGPIPE
-  signal (SIGPIPE, SIG_IGN);
+    signal (SIGPIPE, SIG_IGN);
 #endif
-  static google_breakpad::ExceptionHandler* excHandler = NULL;
-  delete excHandler;
-  const char* BREAKPAD_MINIDUMP_DIR = "/opt/minidumps";
-  excHandler = new google_breakpad::ExceptionHandler(google_breakpad::MinidumpDescriptor(BREAKPAD_MINIDUMP_DIR), NULL, breakpadCallback, NULL, true, -1);
+
+    static google_breakpad::ExceptionHandler* excHandler = NULL;
+
+    if (!FileSystem::fileIsDirectory(BREAKPAD_MINIDUMP_DIR, FileSystem::ShouldFollowSymbolicLinks::No)) {
+        WTFLogAlways("Breakpad dir \"%s\" doesn't exist", BREAKPAD_MINIDUMP_DIR);
+        return;
+    }
+
+    excHandler = new google_breakpad::ExceptionHandler(google_breakpad::MinidumpDescriptor(BREAKPAD_MINIDUMP_DIR), NULL, breakpadCallback, NULL, true, -1);
 }
 }
 #endif
