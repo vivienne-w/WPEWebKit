@@ -1308,10 +1308,10 @@ void AppendPipeline::cacheProtectionEvent(GstEvent* event)
     }
 
     GST_DEBUG("caching protection event %u on append pipeline appsink pad", GST_EVENT_SEQNUM(event));
-    GValue* eventValue = g_new0(GValue, 1);
-    g_value_init(eventValue, GST_TYPE_EVENT);
-    g_value_take_boxed(eventValue, event);
-    gst_value_list_append_and_take_value(&m_cachedProtectionEvents, eventValue);
+    GValue eventValue = G_VALUE_INIT;
+    g_value_init(&eventValue, GST_TYPE_EVENT);
+    g_value_take_boxed(&eventValue, event);
+    gst_value_list_append_and_take_value(&m_cachedProtectionEvents, &eventValue);
 }
 
 void AppendPipeline::handleProtectedBufferProbeInformation(GstPadProbeInfo* info)
