@@ -372,6 +372,17 @@ static void overrideDefaults()
         Options::thresholdForOMGOptimizeAfterWarmUp() = 1500;
         Options::thresholdForOMGOptimizeSoon() = 100;
     }
+
+#if CPU(ARM)
+    // With a tuning script, we found these to be optimal for JetStream2 on a
+    // Raspberry Pi 3
+    Options::maximumFunctionForCallInlineCandidateBytecodeCost() = 89;
+    Options::maximumOptimizationCandidateBytecodeCost() = 148387;
+    Options::maximumFunctionForClosureCallInlineCandidateBytecodeCost() = 31;
+    Options::maximumInliningCallerBytecodeCost() = 10734;
+    Options::maximumInliningDepth() = 6;
+    Options::maximumInliningRecursion() = 1;
+#endif
 }
 
 static void correctOptions()
