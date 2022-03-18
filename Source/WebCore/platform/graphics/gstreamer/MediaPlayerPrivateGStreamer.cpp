@@ -1533,17 +1533,34 @@ void MediaPlayerPrivateGStreamer::processBufferingStats(GstMessage* message)
     // (only when using in-memory buffering), so we get more realistic percentages.
     if (!m_downloadBuffer && m_vidfilter) {
         int originalBufferingPercentage = m_bufferingPercentage;
+        int correctedBufferingPercentage1 = m_bufferingPercentage;
+        int correctedBufferingPercentage2 = m_bufferingPercentage;
+
         GstObject *queue2 = GST_MESSAGE_SRC(message);
         guint maxSizeBytes = 0;
-        // Current-level-bytes seems to be inacurate, so we compute its value from the buffering percentage
+        // We don't trust the buffering percentage when it's 0, better rely on current-level-bytes and compute a new buffer level accordingly.
         g_object_get(queue2, "max-size-bytes", &maxSizeBytes, nullptr);
+        if (!originalBufferingPercentage) {
+            guint currentLevelBytes = 0;
+            g_object_get(queue2, "current-level-bytes", &currentLevelBytes, nullptr);
+            correctedBufferingPercentage1 = currentLevelBytes > maxSizeBytes ? 100 : (int)(currentLevelBytes * 100 / maxSizeBytes);
+            m_bufferingPercentage = correctedBufferingPercentage1;
+        }
 
         guint playpumpBufferedBytes = 0;
         g_object_get(GST_OBJECT(m_vidfilter.get()), "buffered-bytes", &playpumpBufferedBytes, nullptr);
 
+        // Current-level-bytes seems to be inacurate, so we compute its value from the buffering percentage.
         size_t currentLevelBytes = (size_t)maxSizeBytes * (size_t)m_bufferingPercentage / (size_t)100 + (size_t)playpumpBufferedBytes;
-        m_bufferingPercentage = currentLevelBytes > maxSizeBytes ? 100 : (int)(currentLevelBytes * 100 / maxSizeBytes);
-        GST_DEBUG("[Buffering] Buffering: %d%% (corrected to %d%% with playpump content).", originalBufferingPercentage, m_bufferingPercentage);
+        correctedBufferingPercentage2 = currentLevelBytes > maxSizeBytes ? 100 : (int)(currentLevelBytes * 100 / maxSizeBytes);
+        m_bufferingPercentage = correctedBufferingPercentage2;
+
+        if (!originalBufferingPercentage)
+            GST_DEBUG("[Buffering] Buffering: %d%% (corrected to %d%% with current-level-bytes and to %d%% with playpump content).",
+                originalBufferingPercentage, correctedBufferingPercentage1, correctedBufferingPercentage2);
+        else
+            GST_DEBUG("[Buffering] Buffering: %d%% (corrected to %d%% with playpump content).",
+                originalBufferingPercentage, correctedBufferingPercentage2);
     } else
 #endif
     GST_DEBUG("[Buffering] Buffering: %d%%.", m_bufferingPercentage);
