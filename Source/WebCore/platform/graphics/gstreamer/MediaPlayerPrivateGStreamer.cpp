@@ -1328,10 +1328,47 @@ void MediaPlayerPrivateGStreamer::handleMessage(GstMessage* message)
 #endif
 
 #if PLATFORM(BCM_NEXUS) || PLATFORM(BROADCOM)
-        if (currentState == GST_STATE_NULL && newState == GST_STATE_READY && g_strstr_len(GST_MESSAGE_SRC_NAME(message), 13, "brcmvidfilter"))
+        if (currentState == GST_STATE_NULL && newState == GST_STATE_READY && g_strstr_len(GST_MESSAGE_SRC_NAME(message), 13, "brcmvidfilter")) {
             m_vidfilter = GST_ELEMENT(GST_MESSAGE_SRC(message));
-        else if (currentState == GST_STATE_READY && newState == GST_STATE_NULL && g_strstr_len(GST_MESSAGE_SRC_NAME(message), 13, "brcmvidfilter"))
+
+            // Also get the multiqueue (if there's one) attached to the vidfilter. We'll need it later to correct the buffering level.
+            GstPad* sinkPad = nullptr;
+            GstIterator* iter = gst_element_iterate_sink_pads(m_vidfilter.get());
+            bool done = false;
+            while (!done) {
+                GValue item = G_VALUE_INIT;
+                switch (gst_iterator_next(iter, &item)) {
+                case GST_ITERATOR_OK: {
+                    sinkPad = static_cast<GstPad*>(g_value_get_object(&item));
+                    break;
+                }
+                case GST_ITERATOR_RESYNC:
+                    gst_iterator_resync(iter);
+                    break;
+                case GST_ITERATOR_ERROR:
+                    FALLTHROUGH;
+                case GST_ITERATOR_DONE:
+                    done = true;
+                    break;
+                }
+                g_value_unset(&item);
+            }
+            gst_iterator_free(iter);
+
+            if (sinkPad) {
+                GRefPtr<GstPad> peerSrcPad = adoptGRef(gst_pad_get_peer(sinkPad));
+                if (peerSrcPad) {
+                    GRefPtr<GstElement> peerElement = adoptGRef(GST_ELEMENT(gst_pad_get_parent(peerSrcPad.get())));
+                    // The multiqueue reference is useless if we can't access its stats (on older GStreamer versions).
+                    if (peerElement && g_strstr_len(GST_ELEMENT_NAME(peerElement.get()), 10, "multiqueue")
+                        && g_object_class_find_property(G_OBJECT_GET_CLASS(peerElement.get()), "stats"))
+                        m_multiqueue = peerElement;
+                }
+            }
+        } else if (currentState == GST_STATE_READY && newState == GST_STATE_NULL && g_strstr_len(GST_MESSAGE_SRC_NAME(message), 13, "brcmvidfilter")) {
             m_vidfilter = nullptr;
+            m_multiqueue = nullptr;
+        }
 #endif
 
         if (!messageSourceIsPlaybin || m_delayingLoad)
@@ -1535,9 +1572,9 @@ void MediaPlayerPrivateGStreamer::processBufferingStats(GstMessage* message)
         int originalBufferingPercentage = m_bufferingPercentage;
         int correctedBufferingPercentage1 = m_bufferingPercentage;
         int correctedBufferingPercentage2 = m_bufferingPercentage;
-
         GstObject *queue2 = GST_MESSAGE_SRC(message);
         guint maxSizeBytes = 0;
+
         // We don't trust the buffering percentage when it's 0, better rely on current-level-bytes and compute a new buffer level accordingly.
         g_object_get(queue2, "max-size-bytes", &maxSizeBytes, nullptr);
         if (!originalBufferingPercentage) {
@@ -1550,17 +1587,32 @@ void MediaPlayerPrivateGStreamer::processBufferingStats(GstMessage* message)
         guint playpumpBufferedBytes = 0;
         g_object_get(GST_OBJECT(m_vidfilter.get()), "buffered-bytes", &playpumpBufferedBytes, nullptr);
 
+        guint multiqueueBufferedBytes = 0;
+        if (m_multiqueue) {
+            GUniqueOutPtr<GstStructure> stats;
+            g_object_get(m_multiqueue.get(), "stats", &stats.outPtr(), nullptr);
+            const GValue* queues = gst_structure_get_value(stats.get(), "queues");
+            guint size = gst_value_array_get_size(queues);
+            for (guint i = 0; i < size; i++) {
+                guint bytes = 0;
+                if (gst_structure_get_uint(gst_value_get_structure(gst_value_array_get_value(queues, i)), "bytes", &bytes))
+                    multiqueueBufferedBytes += bytes;
+            }
+        }
+
         // Current-level-bytes seems to be inacurate, so we compute its value from the buffering percentage.
-        size_t currentLevelBytes = (size_t)maxSizeBytes * (size_t)m_bufferingPercentage / (size_t)100 + (size_t)playpumpBufferedBytes;
+        size_t currentLevelBytes = (size_t)maxSizeBytes * (size_t)m_bufferingPercentage / (size_t)100
+            + (size_t)playpumpBufferedBytes + (size_t)multiqueueBufferedBytes;
         correctedBufferingPercentage2 = currentLevelBytes > maxSizeBytes ? 100 : (int)(currentLevelBytes * 100 / maxSizeBytes);
         m_bufferingPercentage = correctedBufferingPercentage2;
 
+        const char* extraElements = m_multiqueue ? "playpump and multiqueue" : "playpump";
         if (!originalBufferingPercentage)
-            GST_DEBUG("[Buffering] Buffering: %d%% (corrected to %d%% with current-level-bytes and to %d%% with playpump content).",
-                originalBufferingPercentage, correctedBufferingPercentage1, correctedBufferingPercentage2);
+            GST_DEBUG("[Buffering] Buffering: %d%% (corrected to %d%% with current-level-bytes and to %d%% with %s content).",
+                originalBufferingPercentage, correctedBufferingPercentage1, correctedBufferingPercentage2, extraElements);
         else
-            GST_DEBUG("[Buffering] Buffering: %d%% (corrected to %d%% with playpump content).",
-                originalBufferingPercentage, correctedBufferingPercentage2);
+            GST_DEBUG("[Buffering] Buffering: %d%% (corrected to %d%% with %s content).",
+                originalBufferingPercentage, correctedBufferingPercentage2, extraElements);
     } else
 #endif
     GST_DEBUG("[Buffering] Buffering: %d%%.", m_bufferingPercentage);
