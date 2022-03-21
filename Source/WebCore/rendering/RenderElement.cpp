@@ -390,6 +390,18 @@ void RenderElement::initializeStyle()
     // have their parent set before getting a call to initializeStyle() :|
 }
 
+static inline bool shouldRepaintBecauseOfBorderChange(const RenderStyle& oldStyle, const RenderStyle& newStyle, StyleDifference diff)
+{
+    // Border width changes are resolved with a layout. But if the border width change doesn't cause a resize of the
+    // element, it won't be marked to be repainted. To avoid that, if we detect a change in the border width we
+    // already request a repaint.
+    return diff == StyleDifference::Layout
+        && (oldStyle.borderLeftWidth() != newStyle.borderLeftWidth()
+            || oldStyle.borderTopWidth() != newStyle.borderTopWidth()
+            || oldStyle.borderBottomWidth() != newStyle.borderBottomWidth()
+            || oldStyle.borderRightWidth() != newStyle.borderRightWidth());
+}
+
 void RenderElement::setStyle(RenderStyle&& style, StyleDifference minimalStyleDifference)
 {
     // FIXME: Should change RenderView so it can use initializeStyle too.
@@ -446,7 +458,7 @@ void RenderElement::setStyle(RenderStyle&& style, StyleDifference minimalStyleDi
             setNeedsSimplifiedNormalFlowLayout();
     }
 
-    if (updatedDiff == StyleDifference::RepaintLayer || shouldRepaintForStyleDifference(updatedDiff)) {
+    if (updatedDiff == StyleDifference::RepaintLayer || shouldRepaintForStyleDifference(updatedDiff) || shouldRepaintBecauseOfBorderChange(oldStyle, m_style, updatedDiff)) {
         // Do a repaint with the new style now, e.g., for example if we go from
         // not having an outline to having an outline.
         repaint();
