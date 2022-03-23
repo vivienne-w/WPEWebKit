@@ -36,18 +36,29 @@ static bool breakpadCallback(const google_breakpad::MinidumpDescriptor& descript
 
 void installExceptionHandler()
 {
+    static google_breakpad::ExceptionHandler* execptionHandler = NULL;
+    static String breakpadMinidumpDir(getenv("BREAKPAD_MINIDUMP_DIR"));
+
+#ifdef BREAKPAD_MINIDUMP_DIR
+    if (breakpadMinidumpDir.isEmpty())
+        breakpadMinidumpDir = String(BREAKPAD_MINIDUMP_DIR);
+#endif
+
+    if (breakpadMinidumpDir.isEmpty()) {
+        WTFLogAlways("Breakpad dir is not set or empty, not installing handler");
+        return;
+    }
+
+    if (!FileSystem::fileIsDirectory(breakpadMinidumpDir, FileSystem::ShouldFollowSymbolicLinks::No)) {
+        WTFLogAlways("Breakpad dir \"%s\" doesn't exist, not installing handler", breakpadMinidumpDir.utf8().data());
+        return;
+    }
+
 #ifdef SIGPIPE
     signal (SIGPIPE, SIG_IGN);
 #endif
 
-    static google_breakpad::ExceptionHandler* excHandler = NULL;
-
-    if (!FileSystem::fileIsDirectory(BREAKPAD_MINIDUMP_DIR, FileSystem::ShouldFollowSymbolicLinks::No)) {
-        WTFLogAlways("Breakpad dir \"%s\" doesn't exist", BREAKPAD_MINIDUMP_DIR);
-        return;
-    }
-
-    excHandler = new google_breakpad::ExceptionHandler(google_breakpad::MinidumpDescriptor(BREAKPAD_MINIDUMP_DIR), NULL, breakpadCallback, NULL, true, -1);
+    execptionHandler = new google_breakpad::ExceptionHandler(google_breakpad::MinidumpDescriptor(breakpadMinidumpDir.utf8().data()), NULL, breakpadCallback, NULL, true, -1);
 }
 }
 #endif
