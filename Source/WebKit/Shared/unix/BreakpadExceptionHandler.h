@@ -19,7 +19,7 @@
 
 #pragma once
 
-#if defined (USE_BREAKPAD)
+#if ENABLE(BREAKPAD)
 #include <WebKit/WKBase.h>
 
 namespace WebKit {
@@ -28,4 +28,4 @@ WK_EXPORT void installExceptionHandler();
 
 }  // namespace WebKit
 
-#endif  // defined (USE_BREAKPAD)
+#endif  // ENABLE(BREAKPAD)

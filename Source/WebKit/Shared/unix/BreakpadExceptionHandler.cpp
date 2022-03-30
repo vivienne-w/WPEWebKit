@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-#if defined (USE_BREAKPAD)
+#if ENABLE(BREAKPAD)
 #include "config.h"
 #include "BreakpadExceptionHandler.h"
 #include <client/linux/handler/exception_handler.h>

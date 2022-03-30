@@ -27,8 +27,8 @@
 
 #include <cstdlib>
 
-#if defined (USE_BREAKPAD)
-#include "BreakpadExceptionHandler.h"
+#if ENABLE(BREAKPAD)
+#include "unix/BreakpadExceptionHandler.h"
 #endif
 
 #if USE(GCRYPT)
@@ -39,7 +39,7 @@ using namespace WebKit;
 
 int main(int argc, char** argv)
 {
-#if defined (USE_BREAKPAD)
+#if ENABLE(BREAKPAD)
     installExceptionHandler();
 #endif
 

@@ -81,6 +81,7 @@ WEBKIT_OPTION_DEFINE(USE_OPENJPEG "Whether to enable support for JPEG2000 images
 WEBKIT_OPTION_DEFINE(USE_WOFF2 "Whether to enable support for WOFF2 Web Fonts." PUBLIC ON)
 WEBKIT_OPTION_DEFINE(ENABLE_WPE_QT_API "Whether to enable support for the Qt5/QML plugin" PUBLIC OFF)
 WEBKIT_OPTION_DEFINE(USE_SYSTEMD "Whether to enable journald logging" PUBLIC OFF)
+WEBKIT_OPTION_DEFINE(ENABLE_BREAKPAD "Whether or not enable breakpad minidump support." PUBLIC OFF)
 
 # Private options specific to the WPE port.
 WEBKIT_OPTION_DEFINE(USE_GSTREAMER_HOLEPUNCH "Whether to enable GStreamer holepunch" PRIVATE OFF)
@@ -199,7 +200,6 @@ endif ()
 
 if (ENABLE_BREAKPAD)
     find_package(Breakpad REQUIRED)
-    add_definitions(-DUSE_BREAKPAD=1)
 	if (BREAKPAD_MINIDUMP_DIR)
 		add_definitions(-DBREAKPAD_MINIDUMP_DIR="${BREAKPAD_MINIDUMP_DIR}")
     else ()
