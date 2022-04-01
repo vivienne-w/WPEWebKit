@@ -159,7 +159,9 @@ SoupNetworkSession::SoupNetworkSession(PAL::SessionID sessionID, SoupCookieJar* 
         setupProxy();
     setupLogger();
 
+#if ENABLE(NETWORK_CHANGE_DETECTION)
     g_signal_connect(g_network_monitor_get_default(), "network-changed", G_CALLBACK(networkDidChange), this);
+#endif
 }
 
 SoupNetworkSession::~SoupNetworkSession()
