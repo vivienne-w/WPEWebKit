@@ -258,8 +258,10 @@ static void webkit_media_src_class_init(WebKitMediaSrcClass* klass)
 static GstFlowReturn webkitMediaSrcChain(GstPad* pad, GstObject* parent, GstBuffer* buffer)
 {
     GRefPtr<WebKitMediaSrc> self = adoptGRef(WEBKIT_MEDIA_SRC(gst_object_get_parent(parent)));
-
-    return gst_flow_combiner_update_pad_flow(self->priv->flowCombiner.get(), pad, gst_proxy_pad_chain_default(pad, GST_OBJECT(self.get()), buffer));
+    GstFlowReturn ret = gst_proxy_pad_chain_default(pad, GST_OBJECT(self.get()), buffer);
+    if (ret != GST_FLOW_FLUSHING)
+        return gst_flow_combiner_update_pad_flow(self->priv->flowCombiner.get(), pad, ret);
+    return ret;
 }
 
 static void webkit_media_src_init(WebKitMediaSrc* source)
@@ -733,8 +735,7 @@ void webKitMediaSrcPrepareSeek(WebKitMediaSrc* source, const MediaTime& time)
 
     for (Stream* stream : source->priv->streams) {
         stream->appsrcNeedDataFlag = false;
-        // Don't allow samples away from the seekTime to be enqueued.
-        stream->lastEnqueuedTime = time;
+        stream->lastEnqueuedTime = MediaTime::invalidTime();
     }
 
     // The pending action will be performed in enabledAppsrcSeekData().
@@ -764,11 +765,8 @@ void webKitMediaSrcPrepareInitialSeek(WebKitMediaSrc* source, double rate, const
     source->priv->appsrcSeekDataCount = 0;
     source->priv->appsrcNeedDataCount = 0;
 
-    for (Stream* stream : source->priv->streams) {
+    for (Stream* stream : source->priv->streams)
         stream->appsrcNeedDataFlag = false;
-        // Don't allow samples away from the seekTime to be enqueued.
-        stream->lastEnqueuedTime = seekTime;
-    }
 
     // The pending action will be performed in enabledAppsrcSeekData().
     source->priv->appsrcSeekDataNextAction = MediaSourceSeekToTime;

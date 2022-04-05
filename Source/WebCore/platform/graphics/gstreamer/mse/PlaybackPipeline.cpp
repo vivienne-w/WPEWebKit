@@ -289,16 +289,33 @@ void PlaybackPipeline::markEndOfStream(MediaSourcePrivate::EndOfStreamStatus)
         gst_app_src_end_of_stream(appsrc);
 }
 
+GstPadProbeReturn segmentFixerProbe(GstPad*, GstPadProbeInfo* info, gpointer)
+{
+    GstEvent* event = GST_EVENT(info->data);
+
+    if (GST_EVENT_TYPE(event) != GST_EVENT_SEGMENT)
+        return GST_PAD_PROBE_OK;
+
+    GstSegment* segment = nullptr;
+    gst_event_parse_segment(event, const_cast<const GstSegment**>(&segment));
+
+    GST_TRACE("Fixed segment base time from %" GST_TIME_FORMAT " to %" GST_TIME_FORMAT,
+        GST_TIME_ARGS(segment->base), GST_TIME_ARGS(segment->start));
+
+    segment->base = segment->start;
+    segment->flags = static_cast<GstSegmentFlags>(0);
+
+    return GST_PAD_PROBE_REMOVE;
+}
+
 void PlaybackPipeline::flush(AtomString trackId)
 {
     ASSERT(WTF::isMainThread());
 
-    GST_DEBUG("flush: trackId=%s", trackId.string().utf8().data());
-
     GST_OBJECT_LOCK(m_webKitMediaSrc.get());
     Stream* stream = getStreamByTrackId(m_webKitMediaSrc.get(), trackId);
 
-    if (!stream) {
+    if (!stream || stream->lastEnqueuedTime.isInvalid()) {
         GST_OBJECT_UNLOCK(m_webKitMediaSrc.get());
         return;
     }
@@ -310,27 +327,60 @@ void PlaybackPipeline::flush(AtomString trackId)
     if (!appsrc)
         return;
 
+    GST_DEBUG_OBJECT(appsrc, "flush: trackId=%s", trackId.string().utf8().data());
+
     gint64 position = GST_CLOCK_TIME_NONE;
     GRefPtr<GstQuery> query = adoptGRef(gst_query_new_position(GST_FORMAT_TIME));
     if (gst_element_query(pipeline(), query.get()))
         gst_query_parse_position(query.get(), 0, &position);
 
-    GST_TRACE("Position: %" GST_TIME_FORMAT, GST_TIME_ARGS(position));
+    GST_DEBUG_OBJECT(appsrc, "Position: %" GST_TIME_FORMAT, GST_TIME_ARGS(position));
 
     if (static_cast<guint64>(position) == GST_CLOCK_TIME_NONE) {
         GST_DEBUG("Can't determine position, avoiding flush");
         return;
     }
 
+    double rate;
+    GstFormat format;
+    gint64 start = GST_CLOCK_TIME_NONE;
+    gint64 stop = GST_CLOCK_TIME_NONE;
+
+    query = adoptGRef(gst_query_new_segment(GST_FORMAT_TIME));
+    if (gst_element_query(pipeline(), query.get()))
+        gst_query_parse_segment(query.get(), &rate, &format, &start, &stop);
+
+    GST_DEBUG_OBJECT(appsrc, "segment: [%" GST_TIME_FORMAT ", %" GST_TIME_FORMAT "], rate: %f",
+        GST_TIME_ARGS(start), GST_TIME_ARGS(stop), rate);
+
     if (!gst_element_send_event(GST_ELEMENT(appsrc), gst_event_new_flush_start())) {
         GST_WARNING("Failed to send flush-start event for trackId=%s", trackId.string().utf8().data());
+        return;
+    }
+
+    GUniquePtr<GstSegment> segment(gst_segment_new());
+    gst_segment_init(segment.get(), GST_FORMAT_TIME);
+    gst_segment_do_seek(segment.get(), rate, GST_FORMAT_TIME, GST_SEEK_FLAG_NONE,
+        GST_SEEK_TYPE_SET, position, GST_SEEK_TYPE_SET, stop, nullptr);
+
+    GRefPtr<GstPad> sinkPad = gst_element_get_static_pad(appsrc, "src");
+    GRefPtr<GstPad> srcPad = sinkPad ? gst_pad_get_peer(sinkPad.get()) : nullptr;
+    if (srcPad)
+        gst_pad_add_probe(srcPad.get(), GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM, segmentFixerProbe, nullptr, nullptr);
+
+    GST_DEBUG_OBJECT(appsrc, "Sending new seamless segment: [%" GST_TIME_FORMAT ", %" GST_TIME_FORMAT "], rate: %f",
+        GST_TIME_ARGS(segment->start), GST_TIME_ARGS(segment->stop), segment->rate);
+
+    if (!gst_base_src_new_seamless_segment(GST_BASE_SRC(appsrc), segment->start, segment->stop, segment->start)) {
+        GST_WARNING("Failed to send seamless segment event for trackId=%s", trackId.string().utf8().data());
     }
 
     if (!gst_element_send_event(GST_ELEMENT(appsrc), gst_event_new_flush_stop(false))) {
         GST_WARNING("Failed to send flush-stop event for trackId=%s", trackId.string().utf8().data());
+        return;
     }
 
-    GST_DEBUG("trackId=%s flushed", trackId.string().utf8().data());
+    GST_DEBUG_OBJECT(appsrc, "trackId=%s flushed", trackId.string().utf8().data());
 }
 
 void PlaybackPipeline::enqueueSample(Ref<MediaSample>&& mediaSample)
