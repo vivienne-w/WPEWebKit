@@ -94,6 +94,7 @@ private:
 
     // FIXME: Reduce code duplication.
     void updateStates() override;
+    void updateReadyStateForSeekTarget();
 
     bool doSeek(const MediaTime&, float, GstSeekFlags) override;
     void maybeFinishSeek();
