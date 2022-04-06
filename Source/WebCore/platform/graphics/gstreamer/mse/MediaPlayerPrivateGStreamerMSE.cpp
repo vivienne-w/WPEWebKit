@@ -159,6 +159,18 @@ MediaTime MediaPlayerPrivateGStreamerMSE::durationMediaTime() const
     return m_mediaTimeDuration;
 }
 
+void MediaPlayerPrivateGStreamerMSE::updateReadyStateForSeekTarget() {
+    m_readyState = MediaPlayer::ReadyState::HaveMetadata;
+    if (isTimeBuffered(m_seekTime)) {
+        m_readyState = MediaPlayer::ReadyState::HaveCurrentData;
+        if (isTimeBuffered(m_seekTime + MediaTime(11, 10))) {
+            m_readyState = MediaPlayer::ReadyState::HaveFutureData;
+            if (isTimeBuffered(m_seekTime + MediaTime(5, 1)))
+                m_readyState = MediaPlayer::ReadyState::HaveEnoughData;
+        }
+    }
+}
+
 void MediaPlayerPrivateGStreamerMSE::seek(const MediaTime& time)
 {
     if (UNLIKELY(!m_pipeline || m_didErrorOccur))
@@ -184,6 +196,7 @@ void MediaPlayerPrivateGStreamerMSE::seek(const MediaTime& time)
 
     GST_DEBUG_OBJECT(pipeline(), "Seeking from %s to %s seconds", toString(current).utf8().data(), toString(time).utf8().data());
 
+    MediaPlayer::ReadyState oldReadyState = m_readyState;
     MediaTime previousSeekTime = m_seekTime;
     m_seekTime = time;
 
@@ -194,6 +207,11 @@ void MediaPlayerPrivateGStreamerMSE::seek(const MediaTime& time)
     }
 
     m_isEndReached = false;
+    if (m_isSeeking && oldReadyState > MediaPlayer::ReadyState::HaveMetadata) {
+        updateReadyStateForSeekTarget();
+        if (m_readyState != oldReadyState)
+            m_player->readyStateChanged();
+    }
     GST_DEBUG_OBJECT(pipeline(), "m_isSeeking=%s, m_seekTime=%s", boolForPrinting(m_isSeeking), toString(m_seekTime).utf8().data());
 }
 
@@ -530,7 +548,7 @@ void MediaPlayerPrivateGStreamerMSE::updateStates()
         case GST_STATE_PAUSED:
         case GST_STATE_PLAYING:
             if (seeking()) {
-                m_readyState = MediaPlayer::ReadyState::HaveMetadata;
+                updateReadyStateForSeekTarget();
                 // FIXME: Should we manage NetworkState too?
                 GST_DEBUG("m_readyState=%s", dumpReadyState(m_readyState));
             } else {
