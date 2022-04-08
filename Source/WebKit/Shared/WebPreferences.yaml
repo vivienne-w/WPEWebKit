@@ -1223,7 +1223,7 @@ IsSecureContextAttributeEnabled:
 
 SourceBufferChangeTypeEnabled:
   type: bool
-  defaultValue: true
+  defaultValue: false
   condition: ENABLE(MEDIA_SOURCE)
 
 KeygenElementEnabled:
