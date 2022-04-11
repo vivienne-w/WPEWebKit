@@ -133,6 +133,7 @@ UIProcess/API/glib/WebKitFormClient.cpp @no-unify
 UIProcess/API/glib/WebKitFormSubmissionRequest.cpp @no-unify
 UIProcess/API/glib/WebKitGeolocationManager.cpp @no-unify
 UIProcess/API/glib/WebKitGeolocationPermissionRequest.cpp @no-unify
+UIProcess/API/glib/WebKitInitialize.cpp @no-unify
 UIProcess/API/glib/WebKitInjectedBundleClient.cpp @no-unify
 UIProcess/API/glib/WebKitInputMethodContext.cpp @no-unify
 UIProcess/API/glib/WebKitInstallMissingMediaPluginsPermissionRequest.cpp @no-unify
@@ -197,6 +198,9 @@ UIProcess/geoclue/GeoclueGeolocationProvider.cpp
 UIProcess/glib/WebProcessPoolGLib.cpp
 UIProcess/glib/WebProcessProxyGLib.cpp
 UIProcess/glib/WebsiteDataStoreGLib.cpp @no-unify
+
+UIProcess/Inspector/glib/RemoteInspectorClient.cpp
+UIProcess/Inspector/glib/RemoteInspectorHTTPServer.cpp
 
 UIProcess/Launcher/glib/ProcessLauncherGLib.cpp
 UIProcess/Launcher/glib/BubblewrapLauncher.cpp

@@ -1,3 +1,127 @@
+2022-04-07  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK][WPE] RemoteInspector add support for IPv6
+        https://bugs.webkit.org/show_bug.cgi?id=238797
+
+        Reviewed by Adrian Perez de Castro.
+
+        Make it possible to connect to remote inspector server using IPv6 address.
+
+        * UIProcess/API/glib/WebKitInitialize.cpp:
+        (WebKit::initializeRemoteInspectorServer): Parse IPv6 address and build GSocketAddress to pass to inspector ot
+        HTTP server.
+        * UIProcess/API/gtk/WebKitRemoteInspectorProtocolHandler.cpp:
+        (WebKit::RemoteInspectorProtocolHandler::handleRequest): RemoteInspectorClient now expects host and port in a
+        single String.
+        * UIProcess/Inspector/glib/RemoteInspectorClient.cpp:
+        (WebKit::RemoteInspectorClient::RemoteInspectorClient): Receive the host and port in a String.
+        * UIProcess/Inspector/glib/RemoteInspectorClient.h:
+        * UIProcess/Inspector/glib/RemoteInspectorHTTPServer.cpp:
+        * UIProcess/Inspector/glib/RemoteInspectorHTTPServer.h:
+
+2022-03-08  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK][WPE] Web Inspector: make it possible to use the remote inspector from other browsers
+        https://bugs.webkit.org/show_bug.cgi?id=237601
+
+        Reviewed by Michael Catanzaro.
+
+        This is no longer possible since we switched to the new remote inspector. We don't want to bring the legacy
+        remote inspector back, but it should be possible to use a mixed approach, using a WebSocket for the inspector
+        protocol communication, but still using the new remote inspector code. This patch adds a simple HTTP browser to
+        server the inspector resources and open WebSocket connection to the inspector. It pretends to be a remote
+        inspector client, so we don't need any change in the current remote inspector implementation. The server is only
+        started when the env var WEBKIT_INSPECTOR_HTTP_SERVER is present, and the inspector server is started for the
+        same host but using a free port.
+
+        * PlatformWPE.cmake:
+        * SourcesGTK.txt:
+        * SourcesWPE.txt:
+        * UIProcess/API/glib/WebKitInitialize.cpp:
+        (WebKit::initializeRemoteInspectorServer): Start the HTTP server if the env var WEBKIT_INSPECTOR_HTTP_SERVER is present.
+        (WebKit::webkitInitialize): Just call initializeRemoteInspectorServer().
+        * UIProcess/API/gtk/WebKitRemoteInspectorProtocolHandler.cpp:
+        (WebKit::RemoteInspectorProtocolHandler::handleRequest): Use RemoteInspectorClient::buildTargetListPage().
+        * UIProcess/Inspector/glib/RemoteInspectorClient.cpp:
+        (WebKit::RemoteInspectorClient::inspect): Only call RemoteInspectorProxy::load() for UI inspector type.
+        (WebKit::RemoteInspectorClient::buildTargetListPage const): Build the target list page, using message handlers
+        for UI inspector and window.open for the HTTP inspector.
+        * UIProcess/Inspector/glib/RemoteInspectorClient.h:
+        (WebKit::RemoteInspectorClient::targets const): Deleted.
+        * UIProcess/Inspector/glib/RemoteInspectorHTTPServer.cpp: Added.
+        (WebKit::RemoteInspectorHTTPServer::singleton):
+        * UIProcess/Inspector/glib/RemoteInspectorHTTPServer.h: Added.
+
+2022-03-09  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK][WPE] Stop using the env var WEBKIT_INSPECTOR_SERVER to connect to the inspector
+        https://bugs.webkit.org/show_bug.cgi?id=237646
+
+        Reviewed by Adrian Perez de Castro.
+
+        Use it only in the UI process to start the server, but propagate the address to web process using creation
+        parameters.
+
+        * Shared/WebProcessCreationParameters.cpp:
+        (WebKit::WebProcessCreationParameters::encode const): Encode inspectorServerAddress.
+        (WebKit::WebProcessCreationParameters::decode): Decode inspectorServerAddress.
+        * Shared/WebProcessCreationParameters.h: Add inspectorServerAddress.
+        * UIProcess/API/glib/WebKitInitialize.cpp:
+        (WebKit::initializeRemoteInspectorServer): Set RemoteInspector::s_inspectorServerAddress if the server started
+        successfully.
+        * UIProcess/glib/WebProcessPoolGLib.cpp:
+        (WebKit::WebProcessPool::platformInitializeWebProcess): Set inspectorServerAddress parameter from
+        RemoteInspector::s_inspectorServerAddress value.
+        * WebProcess/glib/WebProcessGLib.cpp:
+        (WebKit::WebProcess::platformInitializeWebProcess): Set RemoteInspector::s_inspectorServerAddress from creation
+        parameter value.
+
+2020-09-08  Pablo Saavedra  <psaavedra@igalia.com>
+
+        [GLIB] RemoteInspectorServer is not started if WebKitWebContext is not created already created
+        https://bugs.webkit.org/show_bug.cgi?id=216120
+
+        Reviewed by Carlos Garcia Campos.
+
+        Added a WebKit/UIProcess/API/glib/WebKitInitialize what implements
+        its own webkitInitialize() to ensure the inspector server is
+        initialized as early as possible, before other api calls that would
+        depend on the inspector server being running.
+
+        The RemoteInspectorServer initialization is not longer
+        asociated to the initialization of the WebProcessPoolGLib.
+
+        The webkitInitialize() extends the shared InitializeWebKit2();
+        and also includes the initialization of the RemoteInspectorServer
+        so the initialization of the remote inspector server can be now
+        triggered by the initialization of many other API objects too:
+        WebKitInputMethodContext, WebKitSettings, WebKitUserContentManager,
+        WebKitWebContext, WebKitWebsiteDataManager,
+        WebKitUserContentFilterStore, WebKitWebViewBase.
+
+        * SourcesGTK.txt:
+        * SourcesWPE.txt:
+        * UIProcess/API/glib/WebKitInitialize.cpp: Added.
+        (WebKit::initializeRemoteInspectorServer):
+        (WebKit::webkitInitialize):
+        * UIProcess/API/glib/WebKitInitialize.h: Added.
+        * UIProcess/API/glib/WebKitInputMethodContext.cpp:
+        (webkit_input_method_context_class_init):
+        * UIProcess/API/glib/WebKitSettings.cpp:
+        (webkit_settings_class_init):
+        * UIProcess/API/glib/WebKitUserContentFilterStore.cpp:
+        (webkit_user_content_filter_store_class_init):
+        * UIProcess/API/glib/WebKitUserContentManager.cpp:
+        * UIProcess/API/glib/WebKitWebContext.cpp:
+        (webkit_web_context_class_init):
+        * UIProcess/API/glib/WebKitWebsiteDataManager.cpp:
+        (webkit_website_data_manager_class_init):
+        * UIProcess/API/gtk/WebKitWebViewBase.cpp:
+        (webkit_web_view_base_class_init):
+        * UIProcess/glib/WebProcessPoolGLib.cpp:
+        (WebKit::WebProcessPool::platformInitialize):
+        (WebKit::initializeRemoteInspectorServer): Deleted.
+
 2020-12-16  Youenn Fablet  <youenn@apple.com>
 
         Make sure WebKit WebSocketChannel handle suspend/resume correctly

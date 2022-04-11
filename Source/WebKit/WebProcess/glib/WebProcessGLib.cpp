@@ -30,6 +30,7 @@
 #include "WebKitExtensionManager.h"
 #include "WebKitWebExtensionPrivate.h"
 #include "WebProcessCreationParameters.h"
+#include <JavaScriptCore/RemoteInspector.h>
 
 #if USE(GSTREAMER)
 #include <WebCore/GStreamerCommon.h>
@@ -89,6 +90,9 @@ void WebProcess::platformInitializeWebProcess(WebProcessCreationParameters& para
 #if USE(GSTREAMER)
     WebCore::initializeGStreamer(WTFMove(parameters.gstreamerOptions));
 #endif
+
+    if (!parameters.inspectorServerAddress.isNull())
+        Inspector::RemoteInspector::setInspectorServerAddress(WTFMove(parameters.inspectorServerAddress));
 }
 
 void WebProcess::platformSetWebsiteDataStoreParameters(WebProcessDataStoreParameters&&)

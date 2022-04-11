@@ -44,6 +44,7 @@
 #include "WebInspectorProxy.h"
 #include "WebKit2Initialize.h"
 #include "WebKitEmojiChooser.h"
+#include "WebKitInitialize.h"
 #include "WebKitInputMethodContextImplGtk.h"
 #include "WebKitWebViewAccessible.h"
 #include "WebKitWebViewBasePrivate.h"
@@ -1472,9 +1473,9 @@ static void webkit_web_view_base_class_init(WebKitWebViewBaseClass* webkitWebVie
     containerClass->forall = webkitWebViewBaseContainerForall;
 
     // Before creating a WebKitWebViewBasePriv we need to be sure that WebKit is started.
-    // Usually starting a context triggers InitializeWebKit2, but in case
+    // Usually starting a context triggers webkitInitialize, but in case
     // we create a view without asking before for a default_context we get a crash.
-    WebKit::InitializeWebKit2();
+    WebKit::webkitInitialize();
 
     gtk_widget_class_set_css_name(widgetClass, "webkitwebview");
 }

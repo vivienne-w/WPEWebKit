@@ -114,6 +114,11 @@ public:
         virtual void requestAutomationSession(const String& sessionIdentifier, const SessionCapabilities&) = 0;
     };
 
+#if USE(GLIB)
+    static void setInspectorServerAddress(CString&& address) { s_inspectorServerAddress = WTFMove(address); }
+    static const CString& inspectorServerAddress() { return s_inspectorServerAddress; }
+#endif
+
     static void startDisabled();
     static RemoteInspector& singleton();
     friend class NeverDestroyed<RemoteInspector>;
@@ -236,6 +241,10 @@ private:
     String backendCommands() const;
 #endif
     static bool startEnabled;
+
+#if USE(GLIB)
+    static CString s_inspectorServerAddress;
+#endif
 
     // Targets can be registered from any thread at any time.
     // Any target can send messages over the XPC connection.

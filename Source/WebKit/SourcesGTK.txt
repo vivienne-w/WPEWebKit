@@ -146,6 +146,7 @@ UIProcess/API/glib/WebKitFormSubmissionRequest.cpp @no-unify
 UIProcess/API/glib/WebKitGeolocationManager.cpp @no-unify
 UIProcess/API/glib/WebKitGeolocationPermissionRequest.cpp @no-unify
 UIProcess/API/glib/WebKitIconLoadingClient.cpp @no-unify
+UIProcess/API/glib/WebKitInitialize.cpp @no-unify
 UIProcess/API/glib/WebKitInjectedBundleClient.cpp @no-unify
 UIProcess/API/glib/WebKitInputMethodContext.cpp @no-unify
 UIProcess/API/glib/WebKitInstallMissingMediaPluginsPermissionRequest.cpp @no-unify
@@ -216,6 +217,7 @@ UIProcess/CoordinatedGraphics/DrawingAreaProxyCoordinatedGraphics.cpp
 UIProcess/geoclue/GeoclueGeolocationProvider.cpp
 
 UIProcess/Inspector/glib/RemoteInspectorClient.cpp
+UIProcess/Inspector/glib/RemoteInspectorHTTPServer.cpp
 
 UIProcess/Inspector/gtk/RemoteWebInspectorProxyGtk.cpp
 UIProcess/Inspector/gtk/WebInspectorProxyGtk.cpp

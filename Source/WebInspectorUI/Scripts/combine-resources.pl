@@ -30,6 +30,7 @@ use File::Basename;
 use File::Path;
 
 our $inputDirectory;
+our $inputScriptName;
 our $outputDirectory;
 our $outputScriptName;
 our $outputStylesheetName;
@@ -46,6 +47,7 @@ GetOptions('output-dir=s' => \$outputDirectory,
            'input-dir=s' => \$inputDirectory,
            'input-html-dir=s' => \$htmlDirectory,
            'input-html=s' => \$htmlFile,
+           'input-script-name=s' => \$inputScriptName,
            'verbose' => \$verbose,
            'strip' => \$strip);
 
@@ -119,7 +121,13 @@ sub stripIncludedFilesMatchingPattern($)
 }
 
 my $inputDirectoryPattern = "(?!WebKitAdditions\/)(?!External\/)(?!Workers\/)[^\"]*";
-$inputDirectoryPattern = $inputDirectory . "\/[^\"]*" if $inputDirectory;
+if ($inputDirectory) {
+    if ($inputScriptName) {
+        $inputDirectoryPattern = $inputDirectory . "\/" . $inputScriptName;
+    } else {
+        $inputDirectoryPattern = $inputDirectory . "\/[^\"]*";
+    }
+}
 
 if (defined($strip)) {
     stripIncludedFilesMatchingPattern("<link rel=\"stylesheet\" href=\"($inputDirectoryPattern)\">");
