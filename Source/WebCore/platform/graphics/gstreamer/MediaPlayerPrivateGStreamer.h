@@ -295,6 +295,7 @@ private:
 #endif
 #if PLATFORM(BCM_NEXUS) || PLATFORM(BROADCOM)
     GRefPtr<GstElement> m_vidfilter;
+    GRefPtr<GstElement> m_multiqueue;
 #endif
     virtual bool isMediaSource() const { return false; }
 
