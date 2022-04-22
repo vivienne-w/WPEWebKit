@@ -108,6 +108,7 @@ private:
     void detachLayer(WebCore::CoordinatedGraphicsLayer*) override;
     void attachLayer(WebCore::CoordinatedGraphicsLayer*) override;
     Nicosia::PaintingEngine& paintingEngine() override;
+    bool nonCompositedWebGLEnabled() override { return m_nonCompositedWebGLEnabled; }
     void syncLayerState(WebCore::CoordinatedLayerID, WebCore::CoordinatedGraphicsLayerState&) override;
 
     // GraphicsLayerFactory

@@ -121,8 +121,7 @@ bool CompositingCoordinator::flushPendingLayerChanges()
     bool didSync = m_page->mainFrame().view()->flushCompositingStateIncludingSubframes();
 
     auto& coordinatedLayer = downcast<CoordinatedGraphicsLayer>(*m_rootLayer);
-    if (!m_nonCompositedWebGLEnabled)
-      coordinatedLayer.updateContentBuffersIncludingSubLayers();
+    coordinatedLayer.updateContentBuffersIncludingSubLayers();
     coordinatedLayer.syncPendingStateChangesIncludingSubLayers();
 
     flushPendingImageBackingChanges();
