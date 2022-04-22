@@ -131,6 +131,7 @@ public:
     void readyStateChanged();
 
     void trySignalAllSamplesEnqueued();
+    size_t memoryCost() const;
 
 #if !RELEASE_LOG_DISABLED
     const Logger& logger() const final { return m_logger.get(); }
@@ -249,7 +250,10 @@ private:
     double m_bufferedSinceLastMonitor { 0 };
     double m_averageBufferRate { 0 };
 
+    // Can only grow.
     size_t m_reportedExtraMemoryCost { 0 };
+    // Can grow and shrink.
+    size_t m_extraMemoryCost { 0 };
 
     MediaTime m_pendingRemoveStart;
     MediaTime m_pendingRemoveEnd;

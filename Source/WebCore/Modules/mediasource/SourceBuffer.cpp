@@ -498,6 +498,8 @@ void SourceBuffer::removedFromMediaSource()
 
     m_private->removedFromMediaSource();
     m_source = nullptr;
+    m_reportedExtraMemoryCost = 0;
+    m_extraMemoryCost = 0;
 }
 
 void SourceBuffer::seekToTime(const MediaTime& time)
@@ -914,6 +916,8 @@ void SourceBuffer::removeCodedFrames(const MediaTime& start, const MediaTime& en
     // No-op
 
     LOG(Media, "SourceBuffer::removeCodedFrames(%p) - buffered = %s", this, toString(m_buffered->ranges()).utf8().data());
+
+    reportExtraMemoryAllocated();
 }
 
 void SourceBuffer::removeTimerFired()
@@ -2354,6 +2358,8 @@ size_t SourceBuffer::extraMemoryCost() const
 void SourceBuffer::reportExtraMemoryAllocated()
 {
     size_t extraMemoryCost = this->extraMemoryCost();
+    m_extraMemoryCost = extraMemoryCost;
+
     if (extraMemoryCost <= m_reportedExtraMemoryCost)
         return;
 
@@ -2437,6 +2443,11 @@ ExceptionOr<void> SourceBuffer::setMode(AppendMode newMode)
     m_mode = newMode;
 
     return { };
+}
+
+size_t SourceBuffer::memoryCost() const
+{
+    return sizeof(SourceBuffer) + m_extraMemoryCost;
 }
 
 #if !RELEASE_LOG_DISABLED
