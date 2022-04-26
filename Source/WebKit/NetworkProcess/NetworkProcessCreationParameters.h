@@ -97,6 +97,8 @@ struct NetworkProcessCreationParameters {
     bool enableAdClickAttributionDebugMode { false };
     String hstsStorageDirectory;
     SandboxExtension::Handle hstsStorageDirectoryExtensionHandle;
+
+    uint32_t localStorageQuota { 0 };
 };
 
 } // namespace WebKit

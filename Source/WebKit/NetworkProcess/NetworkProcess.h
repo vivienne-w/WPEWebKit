@@ -586,6 +586,9 @@ private:
 
     static const Seconds defaultServiceWorkerFetchTimeout;
     Seconds m_serviceWorkerFetchTimeout { defaultServiceWorkerFetchTimeout };
+
+    // Suggested by https://www.w3.org/TR/webstorage/#disk-space
+    unsigned m_localStorageQuotaInBytes { 5 * 1024 * 1024 };
 };
 
 } // namespace WebKit

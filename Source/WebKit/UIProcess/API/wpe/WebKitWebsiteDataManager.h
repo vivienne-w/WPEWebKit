@@ -132,6 +132,13 @@ webkit_website_data_manager_clear_finish                               (WebKitWe
                                                                         GAsyncResult             *result,
                                                                         GError                  **error);
 
+WEBKIT_API guint32
+webkit_website_data_manager_get_local_storage_quota                    (WebKitWebsiteDataManager *manager);
+
+WEBKIT_API void
+webkit_website_data_manager_set_local_storage_quota                    (WebKitWebsiteDataManager *manager,
+                                                                        guint32 quota);
+
 G_END_DECLS
 
 #endif

@@ -43,6 +43,9 @@ class SecurityOrigin;
 class StorageArea;
 class StorageNamespace;
 
+// Suggested by the HTML5 spec.
+const unsigned defaultLocalStorageQuotaInBytes = 5 * 1024 * 1024;
+
 class StorageNamespaceProvider : public RefCounted<StorageNamespaceProvider> {
 public:
     WEBCORE_EXPORT StorageNamespaceProvider();
@@ -59,8 +62,8 @@ protected:
 
 private:
     friend class Internals;
-    WEBCORE_EXPORT StorageNamespace& localStorageNamespace(PAL::SessionID);
-    StorageNamespace& transientLocalStorageNamespace(SecurityOrigin&, PAL::SessionID);
+    WEBCORE_EXPORT StorageNamespace& localStorageNamespace(PAL::SessionID, unsigned quota = defaultLocalStorageQuotaInBytes);
+    StorageNamespace& transientLocalStorageNamespace(SecurityOrigin&, PAL::SessionID, unsigned quota = defaultLocalStorageQuotaInBytes);
 
     virtual Ref<StorageNamespace> createLocalStorageNamespace(unsigned quota, PAL::SessionID) = 0;
     virtual Ref<StorageNamespace> createTransientLocalStorageNamespace(SecurityOrigin&, unsigned quota, PAL::SessionID) = 0;

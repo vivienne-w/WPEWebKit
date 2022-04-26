@@ -7668,6 +7668,8 @@ WebPageCreationParameters WebPageProxy::creationParameters(WebProcessProxy& proc
     }
 #endif
 
+    parameters.localStorageQuota = m_websiteDataStore->localStorageQuota();
+
     return parameters;
 }
 

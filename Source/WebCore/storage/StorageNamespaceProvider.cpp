@@ -29,13 +29,11 @@
 #include "Document.h"
 #include "Page.h"
 #include "SecurityOriginData.h"
+#include "Settings.h"
 #include "StorageArea.h"
 #include "StorageNamespace.h"
 
 namespace WebCore {
-
-// Suggested by the HTML5 spec.
-unsigned localStorageDatabaseQuotaInBytes = 5 * 1024 * 1024;
 
 StorageNamespaceProvider::StorageNamespaceProvider()
 {
@@ -56,27 +54,27 @@ Ref<StorageArea> StorageNamespaceProvider::localStorageArea(Document& document)
     RefPtr<StorageNamespace> storageNamespace;
 
     if (transient)
-        storageNamespace = &transientLocalStorageNamespace(document.topOrigin(), document.page()->sessionID());
+        storageNamespace = &transientLocalStorageNamespace(document.topOrigin(), document.page()->sessionID(), document.page()->settings().localStorageQuota());
     else
-        storageNamespace = &localStorageNamespace(document.page()->sessionID());
+        storageNamespace = &localStorageNamespace(document.page()->sessionID(), document.page()->settings().localStorageQuota());
 
     return storageNamespace->storageArea(document.securityOrigin().data());
 }
 
-StorageNamespace& StorageNamespaceProvider::localStorageNamespace(PAL::SessionID sessionID)
+StorageNamespace& StorageNamespaceProvider::localStorageNamespace(PAL::SessionID sessionID, unsigned quota)
 {
     if (!m_localStorageNamespace)
-        m_localStorageNamespace = createLocalStorageNamespace(localStorageDatabaseQuotaInBytes, sessionID);
+        m_localStorageNamespace = createLocalStorageNamespace(quota, sessionID);
 
     ASSERT(m_localStorageNamespace->sessionID() == sessionID);
     return *m_localStorageNamespace;
 }
 
-StorageNamespace& StorageNamespaceProvider::transientLocalStorageNamespace(SecurityOrigin& securityOrigin, PAL::SessionID sessionID)
+StorageNamespace& StorageNamespaceProvider::transientLocalStorageNamespace(SecurityOrigin& securityOrigin, PAL::SessionID sessionID, unsigned quota)
 {
     auto& slot = m_transientLocalStorageNamespaces.add(securityOrigin.data(), nullptr).iterator->value;
     if (!slot)
-        slot = createTransientLocalStorageNamespace(securityOrigin, localStorageDatabaseQuotaInBytes, sessionID);
+        slot = createTransientLocalStorageNamespace(securityOrigin, quota, sessionID);
 
     ASSERT(slot->sessionID() == sessionID);
     return *slot;

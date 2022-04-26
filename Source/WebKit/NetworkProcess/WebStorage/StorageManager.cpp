@@ -45,10 +45,8 @@
 namespace WebKit {
 using namespace WebCore;
 
-// Suggested by https://www.w3.org/TR/webstorage/#disk-space
-const unsigned StorageManager::localStorageDatabaseQuotaInBytes = 5 * 1024 * 1024;
-
-StorageManager::StorageManager(String&& localStorageDirectory)
+StorageManager::StorageManager(String&& localStorageDirectory, unsigned quotaInBytes)
+    : m_quotaInBytes(quotaInBytes)
 {
     ASSERT(!RunLoop::isMain());
 
@@ -231,8 +229,8 @@ LocalStorageNamespace* StorageManager::getOrCreateLocalStorageNamespace(StorageN
     if (!m_localStorageNamespaces.isValidKey(storageNamespaceID))
         return nullptr;
 
-    return m_localStorageNamespaces.ensure(storageNamespaceID, [this, storageNamespaceID]() {
-        return makeUnique<LocalStorageNamespace>(*this, storageNamespaceID);
+    return m_localStorageNamespaces.ensure(storageNamespaceID, [this, storageNamespaceID, quota = m_quotaInBytes]() {
+        return makeUnique<LocalStorageNamespace>(*this, storageNamespaceID, quota);
     }).iterator->value.get();
 }
 
@@ -243,8 +241,8 @@ TransientLocalStorageNamespace* StorageManager::getOrCreateTransientLocalStorage
     if (!m_transientLocalStorageNamespaces.isValidKey({ storageNamespaceID, topLevelOrigin }))
         return nullptr;
 
-    return m_transientLocalStorageNamespaces.ensure({ storageNamespaceID, WTFMove(topLevelOrigin) }, [] {
-        return makeUnique<TransientLocalStorageNamespace>();
+    return m_transientLocalStorageNamespaces.ensure({ storageNamespaceID, WTFMove(topLevelOrigin) }, [quota = m_quotaInBytes] {
+        return makeUnique<TransientLocalStorageNamespace>(quota);
     }).iterator->value.get();
 }
 

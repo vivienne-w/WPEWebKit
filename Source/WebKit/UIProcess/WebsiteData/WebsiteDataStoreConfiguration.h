@@ -70,6 +70,9 @@ public:
     const String& localStorageDirectory() const { return m_localStorageDirectory; }
     void setLocalStorageDirectory(String&& directory) { m_localStorageDirectory = WTFMove(directory); }
 
+    const uint32_t localStorageQuota() const { return m_localStorageQuota; }
+    void setLocalStorageQuota(uint32_t quota) { m_localStorageQuota = quota; }
+
     const String& boundInterfaceIdentifier() const { return m_boundInterfaceIdentifier; }
     void setBoundInterfaceIdentifier(String&& identifier) { m_boundInterfaceIdentifier = WTFMove(identifier); }
 
@@ -191,6 +194,7 @@ private:
     bool m_suppressesConnectionTerminationOnSystemChange { false };
     bool m_allowsServerPreconnect { true };
     unsigned m_testSpeedMultiplier { 1 };
+    uint32_t m_localStorageQuota { 5 * 1024 * 1024 };
 #if PLATFORM(COCOA)
     RetainPtr<CFDictionaryRef> m_proxyConfiguration;
 #endif

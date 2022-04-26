@@ -39,7 +39,7 @@ class TransientLocalStorageNamespace {
     WTF_MAKE_NONCOPYABLE(TransientLocalStorageNamespace);
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    TransientLocalStorageNamespace();
+    TransientLocalStorageNamespace(unsigned quota);
     ~TransientLocalStorageNamespace();
 
     StorageArea& getOrCreateStorageArea(WebCore::SecurityOriginData&&, Ref<WorkQueue>&&);

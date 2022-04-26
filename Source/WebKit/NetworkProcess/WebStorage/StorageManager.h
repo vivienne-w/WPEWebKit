@@ -54,7 +54,7 @@ class StorageManager {
     WTF_MAKE_NONCOPYABLE(StorageManager);
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    explicit StorageManager(String&& localStorageDirectory);
+    explicit StorageManager(String&& localStorageDirectory, unsigned quotaInBytes);
     ~StorageManager();
 
     void createSessionStorageNamespace(StorageNamespaceIdentifier, unsigned quotaInBytes);
@@ -77,8 +77,6 @@ public:
     
     LocalStorageDatabaseTracker* localStorageDatabaseTracker() const { return m_localStorageDatabaseTracker.get(); }
     
-    static const unsigned localStorageDatabaseQuotaInBytes;
-
     StorageArea* createLocalStorageArea(StorageNamespaceIdentifier, WebCore::SecurityOriginData&&, Ref<WorkQueue>&&);
     StorageArea* createTransientLocalStorageArea(StorageNamespaceIdentifier, WebCore::SecurityOriginData&&, WebCore::SecurityOriginData&&, Ref<WorkQueue>&&);
     StorageArea* createSessionStorageArea(StorageNamespaceIdentifier, WebCore::SecurityOriginData&&, Ref<WorkQueue>&&);
@@ -94,6 +92,7 @@ private:
     HashMap<StorageNamespaceIdentifier, std::unique_ptr<LocalStorageNamespace>> m_localStorageNamespaces;
     HashMap<std::pair<StorageNamespaceIdentifier, WebCore::SecurityOriginData>, std::unique_ptr<TransientLocalStorageNamespace>> m_transientLocalStorageNamespaces;
     HashMap<StorageNamespaceIdentifier, std::unique_ptr<SessionStorageNamespace>> m_sessionStorageNamespaces;
+    unsigned m_quotaInBytes;
 };
 
 } // namespace WebKit

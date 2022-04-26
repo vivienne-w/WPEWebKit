@@ -652,6 +652,8 @@ NetworkProcessProxy& WebProcessPool::ensureNetworkProcess(WebsiteDataStore* with
 
     parameters.defaultDataStoreParameters.networkSessionParameters.resourceLoadStatisticsManualPrevalentResource = manualPrevalentResource;
 
+    parameters.localStorageQuota = withWebsiteDataStore ? withWebsiteDataStore->localStorageQuota() : (m_websiteDataStore ? m_websiteDataStore->localStorageQuota() : 0);
+
     // Add any platform specific parameters
     platformInitializeNetworkProcess(parameters);
 

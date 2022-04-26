@@ -56,7 +56,7 @@ StorageManagerSet::~StorageManagerSet()
     waitUntilTasksFinished();
 }
 
-void StorageManagerSet::add(PAL::SessionID sessionID, const String& localStorageDirectory, SandboxExtension::Handle& localStorageDirectoryHandle)
+void StorageManagerSet::add(PAL::SessionID sessionID, const String& localStorageDirectory, SandboxExtension::Handle& localStorageDirectoryHandle, unsigned quota)
 {
     ASSERT(RunLoop::isMain());
 
@@ -64,9 +64,9 @@ void StorageManagerSet::add(PAL::SessionID sessionID, const String& localStorage
         if (!sessionID.isEphemeral())
             SandboxExtension::consumePermanently(localStorageDirectoryHandle);
 
-        m_queue->dispatch([this, protectedThis = makeRef(*this), sessionID, localStorageDirectory = localStorageDirectory.isolatedCopy()]() mutable {
+        m_queue->dispatch([this, protectedThis = makeRef(*this), sessionID, localStorageDirectory = localStorageDirectory.isolatedCopy(), quota]() mutable {
             m_storageManagers.ensure(sessionID, [&]() mutable {
-                return makeUnique<StorageManager>(WTFMove(localStorageDirectory));
+                return makeUnique<StorageManager>(WTFMove(localStorageDirectory), quota);
             });
         });
     }

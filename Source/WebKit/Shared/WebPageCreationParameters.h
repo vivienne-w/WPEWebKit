@@ -219,6 +219,8 @@ struct WebPageCreationParameters {
 #if PLATFORM(GTK)
     String themeName;
 #endif
+
+    uint32_t localStorageQuota;
 };
 
 } // namespace WebKit
