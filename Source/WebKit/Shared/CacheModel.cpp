@@ -202,6 +202,22 @@ void calculateURLCacheSizes(CacheModel cacheModel, uint64_t diskFreeSize, unsign
     default:
         ASSERT_NOT_REACHED();
     };
+
+    String s(std::getenv("WPE_DISK_CACHE_SIZE"));
+    if (!s.isEmpty()) {
+        String value = s.stripWhiteSpace().convertToLowercaseWithoutLocale();
+        size_t units = 1;
+        if (value.endsWith('k'))
+            units = 1024;
+        else if (value.endsWith('m'))
+            units = 1024 * 1024;
+        if (units != 1)
+            value = value.substring(0, value.length()-1);
+        bool ok = false;
+        size_t size = size_t(value.toUInt64(&ok) * units);
+        if (ok)
+            urlCacheDiskCapacity = (unsigned long)(size);
+    }
 }
 
 } // namespace WebKit
