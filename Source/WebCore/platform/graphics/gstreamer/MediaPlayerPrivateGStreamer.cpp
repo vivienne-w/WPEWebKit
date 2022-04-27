@@ -3253,6 +3253,16 @@ void MediaPlayerPrivateGStreamer::flushCurrentBuffer()
 }
 #endif
 
+void MediaPlayerPrivateGStreamer::setVisible(bool visible)
+{
+    if (m_visible != visible) {
+        if ((m_visible = visible))
+            platformShow();
+        else
+            platformHide();
+    }
+}
+
 void MediaPlayerPrivateGStreamer::setSize(const IntSize& size)
 {
     m_size = size;
@@ -3477,14 +3487,14 @@ static void setRectangleToVideoSink(GstElement* videoSink, const IntRect& rect, 
     static Lock mutex;
     static bool isVisible = true;
 
-    if (!videoSink)
-        return;
+    LockHolder holder(mutex);
+    isVisible = changeVisibleState ? newVisibility : isVisible;
 
     if (!isVisible && !changeVisibleState)
         return;
 
-    LockHolder holder(mutex);
-    isVisible = changeVisibleState ? newVisibility : isVisible;
+    if (!videoSink)
+        return;
 
 #if USE(WESTEROS_SINK) || USE(WPEWEBKIT_PLATFORM_BCM_NEXUS)
     // Valid for brcmvideosink and westerossink.
