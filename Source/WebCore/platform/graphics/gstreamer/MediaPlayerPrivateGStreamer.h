@@ -167,7 +167,7 @@ public:
     void setMuted(bool) final;
     MediaPlayer::NetworkState networkState() const final;
     MediaPlayer::ReadyState readyState() const final;
-    void setVisible(bool) final { }
+    void setVisible(bool) override;
     void setSize(const IntSize&) final;
     // Prefer MediaTime based methods over float based.
     float duration() const final { return durationMediaTime().toFloat(); }
@@ -571,6 +571,7 @@ private:
 
     String m_errorMessage;
     bool m_didTryToRecoverPlayingState { false };
+    bool m_visible { false };
 };
 
 }

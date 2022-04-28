@@ -5811,13 +5811,8 @@ void HTMLMediaElement::visibilityStateChanged()
 
     updateSleepDisabling();
     m_mediaSession->visibilityChanged();
-    if (m_player) {
+    if (m_player)
         m_player->setVisible(!m_elementIsHidden);
-        if (m_elementIsHidden)
-            m_player->platformHide();
-        else
-            m_player->platformShow();
-    }
 
     // A suspended and hidden view must resume playback when the view is resumed (despite only audio will
     // work). The code below prevents that behavior requiring the player to be visible in oder to resume
