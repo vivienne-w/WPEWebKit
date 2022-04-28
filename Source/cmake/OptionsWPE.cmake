@@ -81,6 +81,7 @@ WEBKIT_OPTION_DEFINE(USE_OPENJPEG "Whether to enable support for JPEG2000 images
 WEBKIT_OPTION_DEFINE(USE_WOFF2 "Whether to enable support for WOFF2 Web Fonts." PUBLIC ON)
 WEBKIT_OPTION_DEFINE(ENABLE_WPE_QT_API "Whether to enable support for the Qt5/QML plugin" PUBLIC OFF)
 WEBKIT_OPTION_DEFINE(USE_SYSTEMD "Whether to enable journald logging" PUBLIC OFF)
+WEBKIT_OPTION_DEFINE(ENABLE_BREAKPAD "Whether or not enable breakpad minidump support." PUBLIC OFF)
 
 # Private options specific to the WPE port.
 WEBKIT_OPTION_DEFINE(USE_GSTREAMER_HOLEPUNCH "Whether to enable GStreamer holepunch" PRIVATE OFF)
@@ -195,6 +196,15 @@ if (USE_SYSTEMD)
     else ()
         message(FATAL_ERROR "libsystemd is needed for USE_SYSTEMD")
     endif ()
+endif ()
+
+if (ENABLE_BREAKPAD)
+    find_package(Breakpad REQUIRED)
+	if (BREAKPAD_MINIDUMP_DIR)
+		add_definitions(-DBREAKPAD_MINIDUMP_DIR="${BREAKPAD_MINIDUMP_DIR}")
+    else ()
+        message(STATUS "BREAKPAD_MINIDUMP_DIR is not set")
+	endif ()
 endif ()
 
 add_definitions(-DBUILDING_WPE__=1)

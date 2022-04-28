@@ -13,6 +13,7 @@ global:
     "WebKit::WebKitExtensionManager::initialize(WebKit::InjectedBundle*, API::Object*)";
     "WebKit::WebKitExtensionManager::singleton()";
     "WebKit::WebProcessMain(int, char**)";
+    "WebKit::installExceptionHandler()";
   };
 local:
   *;

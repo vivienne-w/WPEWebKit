@@ -27,6 +27,10 @@
 
 #include <cstdlib>
 
+#if ENABLE(BREAKPAD)
+#include "unix/BreakpadExceptionHandler.h"
+#endif
+
 #if USE(GCRYPT)
 #include <pal/crypto/gcrypt/Initialization.h>
 #endif
@@ -35,6 +39,10 @@ using namespace WebKit;
 
 int main(int argc, char** argv)
 {
+#if ENABLE(BREAKPAD)
+    installExceptionHandler();
+#endif
+
 #if USE(GCRYPT)
     PAL::GCrypt::initialize();
 #endif
