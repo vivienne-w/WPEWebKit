@@ -263,7 +263,6 @@ public:
 
     const WebsiteDataStoreConfiguration& configuration() { return m_configuration.get(); }
     const uint32_t localStorageQuota() const { return m_resolvedConfiguration->localStorageQuota(); }
-    void setLocalStorageQuota(uint32_t quota) { m_resolvedConfiguration->setLocalStorageQuota(quota); }
 
     WebsiteDataStoreClient& client() { return m_client.get(); }
     void setClient(UniqueRef<WebsiteDataStoreClient>&& client) { m_client = WTFMove(client); }

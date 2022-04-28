@@ -229,8 +229,8 @@ LocalStorageNamespace* StorageManager::getOrCreateLocalStorageNamespace(StorageN
     if (!m_localStorageNamespaces.isValidKey(storageNamespaceID))
         return nullptr;
 
-    return m_localStorageNamespaces.ensure(storageNamespaceID, [this, storageNamespaceID, quota = m_quotaInBytes]() {
-        return makeUnique<LocalStorageNamespace>(*this, storageNamespaceID, quota);
+    return m_localStorageNamespaces.ensure(storageNamespaceID, [this, storageNamespaceID]() {
+        return makeUnique<LocalStorageNamespace>(*this, storageNamespaceID, m_quotaInBytes);
     }).iterator->value.get();
 }
 
