@@ -732,6 +732,8 @@ WebPage::WebPage(PageIdentifier pageID, WebPageCreationParameters&& parameters)
     send(Messages::WebPageProxy::DidCreateContextForVisibilityPropagation(m_contextForVisibilityPropagation->contextID()));
 #endif
 
+    m_page->settings().setLocalStorageQuota(parameters.localStorageQuota);
+
     updateThrottleState();
 }
 

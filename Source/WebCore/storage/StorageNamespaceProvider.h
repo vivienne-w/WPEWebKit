@@ -59,8 +59,8 @@ protected:
 
 private:
     friend class Internals;
-    WEBCORE_EXPORT StorageNamespace& localStorageNamespace(PAL::SessionID);
-    StorageNamespace& transientLocalStorageNamespace(SecurityOrigin&, PAL::SessionID);
+    WEBCORE_EXPORT StorageNamespace& localStorageNamespace(PAL::SessionID, unsigned quota);
+    StorageNamespace& transientLocalStorageNamespace(SecurityOrigin&, PAL::SessionID, unsigned quota);
 
     virtual Ref<StorageNamespace> createLocalStorageNamespace(unsigned quota, PAL::SessionID) = 0;
     virtual Ref<StorageNamespace> createTransientLocalStorageNamespace(SecurityOrigin&, unsigned quota, PAL::SessionID) = 0;

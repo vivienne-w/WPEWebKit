@@ -262,6 +262,7 @@ public:
     void didCreateNetworkProcess();
 
     const WebsiteDataStoreConfiguration& configuration() { return m_configuration.get(); }
+    const uint32_t localStorageQuota() const { return m_resolvedConfiguration->localStorageQuota(); }
 
     WebsiteDataStoreClient& client() { return m_client.get(); }
     void setClient(UniqueRef<WebsiteDataStoreClient>&& client) { m_client = WTFMove(client); }

@@ -42,7 +42,7 @@ class LocalStorageNamespace : public CanMakeWeakPtr<LocalStorageNamespace> {
     WTF_MAKE_NONCOPYABLE(LocalStorageNamespace);
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    LocalStorageNamespace(StorageManager&, StorageNamespaceIdentifier);
+    LocalStorageNamespace(StorageManager&, StorageNamespaceIdentifier, unsigned quota);
     ~LocalStorageNamespace();
 
     StorageManager* storageManager() const { return &m_storageManager; }

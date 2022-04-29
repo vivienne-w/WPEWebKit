@@ -35,9 +35,9 @@ namespace WebKit {
 using namespace WebCore;
 
 // We should investigate a way to share it with WebCore.
-LocalStorageNamespace::LocalStorageNamespace(StorageManager& storageManager, StorageNamespaceIdentifier storageNamespaceID)
+LocalStorageNamespace::LocalStorageNamespace(StorageManager& storageManager, StorageNamespaceIdentifier storageNamespaceID, unsigned quota)
     : m_storageManager(storageManager)
-    , m_quotaInBytes(StorageManager::localStorageDatabaseQuotaInBytes)
+    , m_quotaInBytes(quota)
 {
     ASSERT(!RunLoop::isMain());
 }

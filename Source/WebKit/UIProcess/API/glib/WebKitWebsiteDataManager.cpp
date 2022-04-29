@@ -87,7 +87,8 @@ enum {
     PROP_INDEXEDDB_DIRECTORY,
     PROP_WEBSQL_DIRECTORY,
     PROP_HSTS_CACHE_DIRECTORY,
-    PROP_IS_EPHEMERAL
+    PROP_IS_EPHEMERAL,
+    PROP_LOCAL_STORAGE_QUOTA,
 };
 
 struct _WebKitWebsiteDataManagerPrivate {
@@ -108,6 +109,8 @@ struct _WebKitWebsiteDataManagerPrivate {
 
     GRefPtr<WebKitCookieManager> cookieManager;
     Vector<WebProcessPool*> processPools;
+
+    unsigned localStorageQuota { 5 * 1024 * 1024 };
 };
 
 WEBKIT_DEFINE_TYPE(WebKitWebsiteDataManager, webkit_website_data_manager, G_TYPE_OBJECT)
@@ -183,6 +186,9 @@ static void webkitWebsiteDataManagerSetProperty(GObject* object, guint propID, c
     case PROP_IS_EPHEMERAL:
         if (g_value_get_boolean(value))
             manager->priv->websiteDataStore = WebKit::WebsiteDataStore::createNonPersistent();
+        break;
+    case PROP_LOCAL_STORAGE_QUOTA:
+        manager->priv->localStorageQuota = g_value_get_uint(value);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID(object, propID, paramSpec);
@@ -382,6 +388,21 @@ static void webkit_website_data_manager_class_init(WebKitWebsiteDataManagerClass
             _("Whether the WebKitWebsiteDataManager is ephemeral"),
             FALSE,
             static_cast<GParamFlags>(WEBKIT_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY)));
+
+    /**
+     * WebKitWebsiteDataManager:local-storage-quota:
+     *
+     * Quota for local storage (in bytes)
+     *
+     */
+    g_object_class_install_property(
+        gObjectClass,
+        PROP_LOCAL_STORAGE_QUOTA,
+        g_param_spec_uint("local-storage-quota",
+            _("Local storage quota"),
+            _("The maximum size of local storage in bytes"),
+            1, G_MAXUINT, 5 * 1024 * 1024,
+            static_cast<GParamFlags>(WEBKIT_PARAM_WRITABLE | G_PARAM_CONSTRUCT_ONLY)));
 }
 
 WebKit::WebsiteDataStore& webkitWebsiteDataManagerGetDataStore(WebKitWebsiteDataManager* manager)
@@ -402,6 +423,7 @@ WebKit::WebsiteDataStore& webkitWebsiteDataManagerGetDataStore(WebKitWebsiteData
         configuration->setHSTSStorageDirectory(!priv->hstsCacheDirectory ?
             WebKit::WebsiteDataStore::defaultHSTSDirectory() : FileSystem::stringFromFileSystemRepresentation(priv->hstsCacheDirectory.get()));
         configuration->setMediaKeysStorageDirectory(WebKit::WebsiteDataStore::defaultMediaKeysStorageDirectory());
+        configuration->setLocalStorageQuota(priv->localStorageQuota);
         priv->websiteDataStore = WebKit::WebsiteDataStore::create(WTFMove(configuration), PAL::SessionID::defaultSessionID());
     }
 
@@ -882,3 +904,4 @@ gboolean webkit_website_data_manager_clear_finish(WebKitWebsiteDataManager* mana
 
     return g_task_propagate_boolean(G_TASK(result), error);
 }
+

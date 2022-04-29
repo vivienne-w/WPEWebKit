@@ -315,6 +315,9 @@ void NetworkProcess::initializeNetworkProcess(NetworkProcessCreationParameters&&
     WTF::Thread::setCurrentThreadIsUserInitiated();
     AtomString::init();
 
+    if (parameters.localStorageQuota)
+        m_localStorageQuotaInBytes = parameters.localStorageQuota;
+
     m_suppressMemoryPressureHandler = parameters.shouldSuppressMemoryPressureHandler;
     if (!m_suppressMemoryPressureHandler) {
         auto& memoryPressureHandler = MemoryPressureHandler::singleton();
@@ -351,7 +354,7 @@ void NetworkProcess::initializeNetworkProcess(NetworkProcessCreationParameters&&
     }
 #endif
 
-    m_storageManagerSet->add(sessionID, parameters.defaultDataStoreParameters.localStorageDirectory, parameters.defaultDataStoreParameters.localStorageDirectoryExtensionHandle);
+    m_storageManagerSet->add(sessionID, parameters.defaultDataStoreParameters.localStorageDirectory, parameters.defaultDataStoreParameters.localStorageDirectoryExtensionHandle, m_localStorageQuotaInBytes);
 
     auto* defaultSession = networkSession(PAL::SessionID::defaultSessionID());
     auto* defaultStorageSession = defaultSession->networkStorageSession();
@@ -444,7 +447,7 @@ void NetworkProcess::addWebsiteDataStore(WebsiteDataStoreParameters&& parameters
         addServiceWorkerSession(sessionID, parameters.serviceWorkerProcessTerminationDelayEnabled, WTFMove(parameters.serviceWorkerRegistrationDirectory), parameters.serviceWorkerRegistrationDirectoryExtensionHandle);
 #endif
 
-    m_storageManagerSet->add(sessionID, parameters.localStorageDirectory, parameters.localStorageDirectoryExtensionHandle);
+    m_storageManagerSet->add(sessionID, parameters.localStorageDirectory, parameters.localStorageDirectoryExtensionHandle, m_localStorageQuotaInBytes);
 
     RemoteNetworkingContext::ensureWebsiteDataStoreSession(*this, WTFMove(parameters));
 }

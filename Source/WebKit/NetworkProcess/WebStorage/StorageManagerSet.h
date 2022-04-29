@@ -50,7 +50,7 @@ public:
     static Ref<StorageManagerSet> create();
     ~StorageManagerSet();
 
-    void add(PAL::SessionID, const String& localStorageDirectory, SandboxExtension::Handle& localStorageDirectoryHandle);
+    void add(PAL::SessionID, const String& localStorageDirectory, SandboxExtension::Handle& localStorageDirectoryHandle, unsigned quota);
     void remove(PAL::SessionID);
     bool contains(PAL::SessionID);
 

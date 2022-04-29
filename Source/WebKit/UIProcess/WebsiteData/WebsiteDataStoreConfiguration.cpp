@@ -70,6 +70,7 @@ Ref<WebsiteDataStoreConfiguration> WebsiteDataStoreConfiguration::copy() const
     copy->m_hstsStorageDirectory = this->m_hstsStorageDirectory;
 #endif
     copy->m_localStorageDirectory = this->m_localStorageDirectory;
+    copy->m_localStorageQuota = this->m_localStorageQuota;
     copy->m_mediaKeysStorageDirectory = this->m_mediaKeysStorageDirectory;
     copy->m_deviceIdHashSaltsStorageDirectory = this->m_deviceIdHashSaltsStorageDirectory;
     copy->m_resourceLoadStatisticsDirectory = this->m_resourceLoadStatisticsDirectory;

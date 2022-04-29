@@ -33,8 +33,8 @@ namespace WebKit {
 
 using namespace WebCore;
 
-TransientLocalStorageNamespace::TransientLocalStorageNamespace()
-    : m_quotaInBytes(StorageManager::localStorageDatabaseQuotaInBytes)
+TransientLocalStorageNamespace::TransientLocalStorageNamespace(unsigned quota)
+    : m_quotaInBytes(quota)
 {
     ASSERT(!RunLoop::isMain());
 }

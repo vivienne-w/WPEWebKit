@@ -77,6 +77,7 @@ void NetworkProcessCreationParameters::encode(IPC::Encoder& encoder) const
     encoder << enableAdClickAttributionDebugMode;
     encoder << hstsStorageDirectory;
     encoder << hstsStorageDirectoryExtensionHandle;
+    encoder << localStorageQuota;
 }
 
 bool NetworkProcessCreationParameters::decode(IPC::Decoder& decoder, NetworkProcessCreationParameters& result)
@@ -177,6 +178,9 @@ bool NetworkProcessCreationParameters::decode(IPC::Decoder& decoder, NetworkProc
         return false;
 
     if (!decoder.decode(result.hstsStorageDirectoryExtensionHandle))
+        return false;
+
+    if (!decoder.decode(result.localStorageQuota))
         return false;
 
     return true;
