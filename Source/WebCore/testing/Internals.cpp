@@ -2540,7 +2540,7 @@ uint64_t Internals::storageAreaMapCount() const
     if (!page)
         return 0;
 
-    return page->storageNamespaceProvider().localStorageNamespace(page->sessionID(), 5 * 1024 * 1024).storageAreaMapCountForTesting();
+    return page->storageNamespaceProvider().localStorageNamespace(page->sessionID(), page->settings().localStorageQuota()).storageAreaMapCountForTesting();
 }
 
 uint64_t Internals::elementIdentifier(Element& element) const
