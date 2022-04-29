@@ -175,6 +175,17 @@ void SQLiteDatabase::useWALJournalMode()
             LOG_ERROR("SQLite database failed to set journal_mode to WAL, error: %s", lastErrorMsg());
     }
 
+    // prevent -wal file from growing indefinitely
+    // wal_autocheckpoint value is a number of pages after which checkpoint should be run
+    static String walAutoCheckpointEnv(getenv("WPE_WAL_AUTOCHECKPOINT"));
+    if (!walAutoCheckpointEnv.isEmpty()) {
+        String statement = "PRAGMA wal_autocheckpoint=" + walAutoCheckpointEnv + ";";
+        SQLiteStatement autocheckpointStatement(*this, statement);
+        if (!autocheckpointStatement.executeCommand()) {
+            LOG_ERROR("SQLite database failed to set wal_autocheckpoint, error: %s", lastErrorMsg());
+        }
+    }
+
     {
         SQLiteTransactionInProgressAutoCounter transactionCounter;
         SQLiteStatement checkpointStatement(*this, "PRAGMA wal_checkpoint(TRUNCATE)"_s);
