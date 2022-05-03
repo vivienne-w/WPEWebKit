@@ -208,9 +208,9 @@ void calculateURLCacheSizes(CacheModel cacheModel, uint64_t diskFreeSize, unsign
         String value = s.stripWhiteSpace().convertToLowercaseWithoutLocale();
         size_t units = 1;
         if (value.endsWith('k'))
-            units = 1024;
+            units = KB;
         else if (value.endsWith('m'))
-            units = 1024 * 1024;
+            units = MB;
         if (units != 1)
             value = value.substring(0, value.length()-1);
         bool ok = false;
