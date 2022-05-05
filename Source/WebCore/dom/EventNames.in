@@ -61,6 +61,7 @@ RTCDataChannelEvent conditional=WEB_RTC
 RTCDTMFToneChangeEvent conditional=WEB_RTC
 RTCPeerConnectionIceEvent conditional=WEB_RTC
 RTCTrackEvent conditional=WEB_RTC
+SpeechSynthesisErrorEvent conditional=SPEECH_SYNTHESIS
 SpeechSynthesisEvent conditional=SPEECH_SYNTHESIS
 WebGLContextEvent conditional=WEBGL
 StorageEvent

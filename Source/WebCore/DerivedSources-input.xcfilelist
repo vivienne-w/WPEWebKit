@@ -259,7 +259,11 @@ $(PROJECT_DIR)/Modules/remoteplayback/RemotePlayback.idl
 $(PROJECT_DIR)/Modules/remoteplayback/RemotePlaybackAvailabilityCallback.idl
 $(PROJECT_DIR)/Modules/speech/DOMWindowSpeechSynthesis.idl
 $(PROJECT_DIR)/Modules/speech/SpeechSynthesis.idl
+$(PROJECT_DIR)/Modules/speech/SpeechSynthesisErrorCode.idl
+$(PROJECT_DIR)/Modules/speech/SpeechSynthesisErrorEvent.idl
+$(PROJECT_DIR)/Modules/speech/SpeechSynthesisErrorEventInit.idl
 $(PROJECT_DIR)/Modules/speech/SpeechSynthesisEvent.idl
+$(PROJECT_DIR)/Modules/speech/SpeechSynthesisEventInit.idl
 $(PROJECT_DIR)/Modules/speech/SpeechSynthesisUtterance.idl
 $(PROJECT_DIR)/Modules/speech/SpeechSynthesisVoice.idl
 $(PROJECT_DIR)/Modules/streams/ByteLengthQueuingStrategy.idl

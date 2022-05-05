@@ -24,8 +24,8 @@
  */
  
 [
-    NoInterfaceObject,
-    Conditional=SPEECH_SYNTHESIS
+    Conditional=SPEECH_SYNTHESIS,
+    Exposed=Window
 ] interface SpeechSynthesisVoice {
     readonly attribute DOMString voiceURI;
     readonly attribute DOMString name;

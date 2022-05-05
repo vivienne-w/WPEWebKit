@@ -284,6 +284,7 @@ namespace WebCore {
     macro(validatemerchant) \
     macro(versionchange) \
     macro(visibilitychange) \
+    macro(voiceschanged) \
     macro(volumechange) \
     macro(vrdisplayactivate) \
     macro(vrdisplayblur) \

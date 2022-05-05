@@ -25,11 +25,13 @@
  
 [
     Conditional=SPEECH_SYNTHESIS,
-    NoInterfaceObject,
-] interface SpeechSynthesis  {
+    Exposed=Window,
+] interface SpeechSynthesis : EventTarget {
     readonly attribute boolean pending;
     readonly attribute boolean speaking;
     readonly attribute boolean paused;
+
+    attribute EventHandler onvoiceschanged;
 
     void speak(SpeechSynthesisUtterance utterance);
     void cancel();
