@@ -60,6 +60,13 @@ WEBKIT_OPTION_DEFINE(USE_GSTREAMER_HOLEPUNCH "Whether to enable GStreamer holepu
 WEBKIT_OPTION_DEFINE(USE_EXTERNAL_HOLEPUNCH "Whether to enable external holepunch" PRIVATE OFF)
 WEBKIT_OPTION_DEFINE(ENABLE_NETWORK_CHANGE_DETECTION "Whether to reset existent connections on network interface changes" PRIVATE OFF)
 
+# In some very low end devices, LayerFlush and DisplayRefreshMonitor timers can starve
+# MainThread timers because they have a bigger priority, causing problems. This option
+# reduces the priority of the former timers so they are the same than the MainThreadSharedTimer
+# priority. This will reduce the framerate, but will allow the MainThreadSharedTimer
+# callbacks to be processed.
+WEBKIT_OPTION_DEFINE(ENABLE_FRAME_TIMERS_PRIORITY_REDUCTION "Whether to reduce the priority of the timers that trigger new frames" PRIVATE OFF)
+
 if (CMAKE_SYSTEM_NAME MATCHES "Linux")
     WEBKIT_OPTION_DEFAULT_PORT_VALUE(ENABLE_MEMORY_SAMPLER PRIVATE ON)
     WEBKIT_OPTION_DEFAULT_PORT_VALUE(ENABLE_RESOURCE_USAGE PRIVATE ON)

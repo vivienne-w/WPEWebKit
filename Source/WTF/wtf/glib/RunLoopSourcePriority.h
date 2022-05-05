@@ -95,8 +95,13 @@ enum RunLoopSourcePriority {
     JavascriptTimer = -60,
     MainThreadSharedTimer = -60,
 
+#if ENABLE(FRAME_TIMERS_PRIORITY_REDUCTION)
+    LayerFlushTimer = -60,
+    DisplayRefreshMonitorTimer = -60,
+#else
     LayerFlushTimer = -70,
     DisplayRefreshMonitorTimer = -70,
+#endif
 
     CompositingThreadUpdateTimer = -70,
 
