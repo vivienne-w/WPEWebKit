@@ -215,7 +215,9 @@ AppendPipeline::AppendPipeline(SourceBufferPrivateGStreamer& sourceBufferPrivate
         return GST_FLOW_OK;
     }), this);
     g_signal_connect(m_appsink.get(), "eos", G_CALLBACK(+[](GstElement*, AppendPipeline* appendPipeline) {
-        if (appendPipeline->m_errorReceived)
+        // Just ignore EOS when having more than one pad. It likely means that one of the pads is
+        // going to be removed and the remaining one will be reattached.
+        if (appendPipeline->m_errorReceived || appendPipeline->m_demux->numsrcpads > 1)
             return;
 
         GST_ERROR("AppendPipeline's appsink received EOS. This is usually caused by an invalid initialization segment.");
@@ -800,12 +802,90 @@ void AppendPipeline::connectDemuxerSrcPadToAppsink(GstPad* demuxerSrcPad)
     m_playerPrivate->trackDetected(*this, m_track, true);
 }
 
-void AppendPipeline::disconnectDemuxerSrcPadFromAppsinkFromAnyThread(GstPad*)
+void AppendPipeline::disconnectDemuxerSrcPadFromAppsinkFromAnyThread(GstPad* demuxerSrcPad)
 {
     // Note: This function can be called either from the streaming thread (e.g. if a strange initialization segment with
     // incompatible tracks is appended and the srcpad disconnected) or -- more usually -- from the main thread, when
     // a state change is made to bring the demuxer down. (State change operations run in the main thread.)
     GST_DEBUG_BIN_TO_DOT_FILE_WITH_TS(GST_BIN(m_pipeline.get()), GST_DEBUG_GRAPH_SHOW_ALL, "pad-removed-before");
+
+    auto getPadType = [](GstPad *pad) -> const char* {
+        auto padCaps = adoptGRef(gst_pad_get_current_caps(pad));
+        return padCaps ? capsMediaType(padCaps.get()) : nullptr;
+    };
+
+    const char* demuxerSrcPadType = getPadType(demuxerSrcPad);
+
+    auto oldPeerPad = adoptGRef(gst_element_get_static_pad(m_appsink.get(), "sink"));
+    while (gst_pad_is_linked(oldPeerPad.get())) {
+        // Get sink pad of the parser before appsink.
+        // All the expected elements between the demuxer and appsink are supposed to have pads named "sink".
+        oldPeerPad = adoptGRef(gst_pad_get_peer(oldPeerPad.get()));
+        auto element = adoptGRef(gst_pad_get_parent_element(oldPeerPad.get()));
+        oldPeerPad = adoptGRef(gst_element_get_static_pad(element.get(), "sink"));
+        ASSERT(oldPeerPad);
+    }
+
+    const char* oldPeerPadType = getPadType(oldPeerPad.get());
+
+    GstPad* remainingPad = nullptr;
+    // Check if a pad compatible with the appsink is being removed and, if so, look for a remaining compatible pad.
+    if (oldPeerPadType && !g_strcmp0(oldPeerPadType, demuxerSrcPadType)) {
+        // If there are multiple pads present check if any pad matching pipeline stream type exists. If only one pad exists, connect it as main pad.
+        if (GstIterator* iter = gst_element_iterate_src_pads(m_demux.get())) {
+            bool done = false;
+            while (!done) {
+                GValue item = G_VALUE_INIT;
+                switch (gst_iterator_next(iter, &item)) {
+                case GST_ITERATOR_OK:
+                    {
+                        GstPad* pad = static_cast<GstPad*>(g_value_get_object(&item));
+                        const char* padType = getPadType(pad);
+                        if (padType && !g_strcmp0(padType, oldPeerPadType)) {
+                            if (remainingPad) {
+                                remainingPad = nullptr;
+                                done = true;
+                            } else {
+                                remainingPad = pad;
+                            }
+                        }
+                    }
+                break;
+                case GST_ITERATOR_RESYNC:
+                    remainingPad = nullptr;
+                    gst_iterator_resync (iter);
+                    break;
+                case GST_ITERATOR_ERROR:
+                    FALLTHROUGH;
+                case GST_ITERATOR_DONE:
+                    done = true;
+                    break;
+                }
+            }
+            gst_iterator_free (iter);
+        }
+    }
+
+    if (remainingPad) {
+        auto probeId = GPOINTER_TO_ULONG(g_object_get_data(G_OBJECT(remainingPad), "blackHoleProbeId"));
+        if (remainingPad && probeId) {
+            gst_pad_remove_probe(remainingPad, probeId);
+
+            GST_DEBUG("The remaining compatible pad has a blackHoleProbe, reconnecting as main pad. oldPad: %" GST_PTR_FORMAT ", newPad: %" GST_PTR_FORMAT ", peerPad: %" GST_PTR_FORMAT, demuxerSrcPad, remainingPad, oldPeerPad.get());
+
+            gst_pad_link(remainingPad, oldPeerPad.get());
+            if (m_parser)
+                gst_element_set_state(m_parser.get(), GST_STATE_NULL);
+            gst_element_set_state(m_appsink.get(), GST_STATE_NULL);
+            gst_element_set_state(m_appsink.get(), GST_STATE_PLAYING);
+            if (m_parser)
+                gst_element_set_state(m_parser.get(), GST_STATE_PLAYING);
+
+            GST_DEBUG_BIN_TO_DOT_FILE_WITH_TS(GST_BIN(m_pipeline.get()), GST_DEBUG_GRAPH_SHOW_ALL, "webkit-after-relink");
+
+            return;
+        }
+    }
 
     GST_DEBUG("Disconnecting appsink");
 
