@@ -1,3 +1,28 @@
+2022-05-06  Lauro Moura  <lmoura@igalia.com>
+
+        [GLIB] Add Speech synthesis stubs
+        Need the bug URL (OOPS!).
+
+        Reviewed by NOBODY (OOPS!).
+
+        * UIProcess/Cocoa/WebPageProxyCocoa.mm: Moved the generic bits to the
+        shared WebPageProxy to share with GLIB ports.
+        (WebKit::WebPageProxy::didStartSpeaking): Deleted.
+        (WebKit::WebPageProxy::didFinishSpeaking): Deleted.
+        (WebKit::WebPageProxy::didPauseSpeaking): Deleted.
+        (WebKit::WebPageProxy::didResumeSpeaking): Deleted.
+        (WebKit::WebPageProxy::speakingErrorOccurred): Deleted.
+        (WebKit::WebPageProxy::boundaryEventOccurred): Deleted.
+        (WebKit::WebPageProxy::voicesDidChange): Deleted.
+        * UIProcess/WebPageProxy.cpp:
+        (WebKit::WebPageProxy::didStartSpeaking):
+        (WebKit::WebPageProxy::didFinishSpeaking):
+        (WebKit::WebPageProxy::didPauseSpeaking):
+        (WebKit::WebPageProxy::didResumeSpeaking):
+        (WebKit::WebPageProxy::speakingErrorOccurred):
+        (WebKit::WebPageProxy::boundaryEventOccurred):
+        (WebKit::WebPageProxy::voicesDidChange):
+
 2022-04-07  Carlos Garcia Campos  <cgarcia@igalia.com>
 
         [GTK][WPE] RemoteInspector add support for IPv6
