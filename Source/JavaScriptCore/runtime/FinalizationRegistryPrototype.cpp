@@ -45,7 +45,7 @@ void FinalizationRegistryPrototype::finishCreation(VM& vm, JSGlobalObject* globa
     // We can't make this a property name because it's a resevered word in C++...
     JSC_NATIVE_FUNCTION_WITHOUT_TRANSITION(Identifier::fromString(vm, "register"), protoFuncFinalizationRegistryRegister, static_cast<unsigned>(PropertyAttribute::DontEnum), 2);
     JSC_NATIVE_FUNCTION_WITHOUT_TRANSITION(Identifier::fromString(vm, "unregister"), protoFuncFinalizationRegistryUnregister, static_cast<unsigned>(PropertyAttribute::DontEnum), 1);
-    JSC_TO_STRING_TAG_WITHOUT_TRANSITION();
+    putDirectWithoutTransition(vm, vm.propertyNames->toStringTagSymbol, jsNontrivialString(vm, "FinalizationRegistry"_s), PropertyAttribute::DontEnum | PropertyAttribute::ReadOnly);
 }
 
 ALWAYS_INLINE static JSFinalizationRegistry* getFinalizationRegistry(VM& vm, JSGlobalObject* globalObject, JSValue value)

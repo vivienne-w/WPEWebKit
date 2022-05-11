@@ -64,7 +64,6 @@
 #include "ObjectConstructor.h"
 #include "ParserError.h"
 #include "ProfilerDatabase.h"
-#include "PromiseTimer.h"
 #include "ProtoCallFrame.h"
 #include "ReleaseHeapAccessScope.h"
 #include "SamplingProfiler.h"

@@ -33,13 +33,6 @@ class FinalizationRegistryPrototype final : public JSNonFinalObject {
 public:
     using Base = JSNonFinalObject;
 
-    template<typename CellType, SubspaceAccess>
-    static IsoSubspace* subspaceFor(VM& vm)
-    {
-        STATIC_ASSERT_ISO_SUBSPACE_SHARABLE(FinalizationRegistryPrototype, Base);
-        return &vm.plainObjectSpace;
-    }
-
     static FinalizationRegistryPrototype* create(VM& vm, JSGlobalObject* globalObject, Structure* structure)
     {
         FinalizationRegistryPrototype* prototype = new (NotNull, allocateCell<FinalizationRegistryPrototype>(vm.heap)) FinalizationRegistryPrototype(vm, structure);

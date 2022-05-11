@@ -66,13 +66,12 @@ static EncodedJSValue JSC_HOST_CALL constructFinalizationRegistry(JSGlobalObject
     VM& vm = globalObject->vm();
     auto scope = DECLARE_THROW_SCOPE(vm);
 
-    if (!callFrame->argument(0).isCallable(vm))
+    if (!callFrame->argument(0).isFunction(vm))
         return throwVMTypeError(globalObject, scope, "First argument to FinalizationRegistry should be a function"_s);
 
     JSObject* newTarget = asObject(callFrame->newTarget());
-    Structure* finalizationRegistryStructure = callFrame->jsCallee() == newTarget
-        ? globalObject->finalizationRegistryStructure()
-        : InternalFunction::createSubclassStructure(globalObject, newTarget, getFunctionRealm(vm, newTarget)->finalizationRegistryStructure());
+
+    Structure* finalizationRegistryStructure = InternalFunction::createSubclassStructure(globalObject, callFrame->jsCallee(), newTarget, globalObject->finalizationRegistryStructure());
     RETURN_IF_EXCEPTION(scope, encodedJSValue());
     RELEASE_AND_RETURN(scope, JSValue::encode(JSFinalizationRegistry::create(vm, finalizationRegistryStructure, callFrame->uncheckedArgument(0).getObject())));
 }
