@@ -128,8 +128,10 @@ WEBKIT_OPTION_END()
 
 if (USE_SOUP2)
     set(SOUP_MINIMUM_VERSION 2.54.0)
+    set(SOUP_API_VERSION 2.4)
 else ()
     set(SOUP_MINIMUM_VERSION 3.0.0)
+    set(SOUP_API_VERSION 3.0)
 endif ()
 find_package(LibSoup ${SOUP_MINIMUM_VERSION} REQUIRED)
 
