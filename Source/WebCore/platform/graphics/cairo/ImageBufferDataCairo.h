@@ -79,6 +79,12 @@ public:
     void swapBuffersIfNeeded() override;
 #endif
 
+    void createCompositorBuffer();
+
+    RefPtr<cairo_surface_t> m_compositorSurface;
+    uint32_t m_compositorTexture;
+    RefPtr<cairo_t> m_compositorCr;
+
 #if USE(NICOSIA)
     RefPtr<Nicosia::ContentLayer> m_nicosiaLayer;
 #else
