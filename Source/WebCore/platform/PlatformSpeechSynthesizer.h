@@ -38,6 +38,22 @@ OBJC_CLASS WebSpeechSynthesisWrapper;
 
 namespace WebCore {
 
+enum class SpeechError : uint8_t {
+    None,
+    Canceled,
+    Interrupted,
+    AudioBusy,
+    AudioHardware,
+    Network,
+    SynthesisUnavailable,
+    SynthesisFailed,
+    LanguageUnavailable,
+    VoiceUnavailable,
+    TextTooLong,
+    InvalidArgument,
+    NotAllowed
+};
+
 enum class SpeechBoundary : uint8_t {
     SpeechWordBoundary,
     SpeechSentenceBoundary
@@ -51,7 +67,7 @@ public:
     virtual void didFinishSpeaking(PlatformSpeechSynthesisUtterance&) = 0;
     virtual void didPauseSpeaking(PlatformSpeechSynthesisUtterance&) = 0;
     virtual void didResumeSpeaking(PlatformSpeechSynthesisUtterance&) = 0;
-    virtual void speakingErrorOccurred(PlatformSpeechSynthesisUtterance&) = 0;
+    virtual void speakingErrorOccurred(PlatformSpeechSynthesisUtterance&, SpeechError) = 0;
     virtual void boundaryEventOccurred(PlatformSpeechSynthesisUtterance&, SpeechBoundary, unsigned charIndex, unsigned charLength) = 0;
     virtual void voicesDidChange() = 0;
 protected:

@@ -73,7 +73,7 @@ private:
     void didPauseSpeaking(PlatformSpeechSynthesisUtterance&) override;
     void didResumeSpeaking(PlatformSpeechSynthesisUtterance&) override;
     void didFinishSpeaking(PlatformSpeechSynthesisUtterance&) override;
-    void speakingErrorOccurred(PlatformSpeechSynthesisUtterance&) override;
+    void speakingErrorOccurred(PlatformSpeechSynthesisUtterance&, SpeechError) override;
     void boundaryEventOccurred(PlatformSpeechSynthesisUtterance&, SpeechBoundary, unsigned charIndex, unsigned charLength) override;
 
     // SpeechSynthesisClient override methods
@@ -84,9 +84,9 @@ private:
     void speakingErrorOccurred() override;
     void boundaryEventOccurred(bool wordBoundary, unsigned charIndex, unsigned charLength) override;
     void voicesChanged() override;
-    
+
     void startSpeakingImmediately(SpeechSynthesisUtterance&);
-    void handleSpeakingCompleted(SpeechSynthesisUtterance&, bool errorOccurred);
+    void handleSpeakingCompleted(SpeechSynthesisUtterance&, bool errorOccurred, SpeechError error = SpeechError::None);
     void fireEvent(const AtomString& type, SpeechSynthesisUtterance&, unsigned long charIndex, unsigned long charLength, const String& name) const;
     void fireErrorEvent(const AtomString& type, SpeechSynthesisUtterance&, SpeechSynthesisErrorCode) const;
 
@@ -99,14 +99,14 @@ private:
 
     bool userGestureRequiredForSpeechStart() const { return m_restrictions & RequireUserGestureForSpeechStartRestriction; }
     void removeBehaviorRestriction(BehaviorRestrictions restriction) { m_restrictions &= ~restriction; }
-    
+
     ScriptExecutionContext* scriptExecutionContext() const final { return ContextDestructionObserver::scriptExecutionContext(); }
     EventTargetInterface eventTargetInterface() const final { return SpeechSynthesisEventTargetInterfaceType; }
     void refEventTarget() final { ref(); }
     void derefEventTarget() final { deref(); }
-    
+
     PlatformSpeechSynthesizer& ensurePlatformSpeechSynthesizer();
-    
+
     std::unique_ptr<PlatformSpeechSynthesizer> m_platformSpeechSynthesizer;
     Vector<Ref<SpeechSynthesisVoice>> m_voiceList;
     RefPtr<SpeechSynthesisUtterance> m_currentSpeechUtterance;
