@@ -49,6 +49,7 @@
 #include "JITStubRoutineSet.h"
 #include "JITWorklist.h"
 #include "JSCInlines.h"
+#include "JSFinalizationRegistry.h"
 #include "JSGlobalObject.h"
 #include "JSLock.h"
 #include "JSVirtualMachineInternal.h"
@@ -620,6 +621,8 @@ void Heap::finalizeUnconditionalFinalizers()
         finalizeMarkedUnconditionalFinalizers<JSWeakObjectRef>(*vm().m_weakObjectRefSpace);
     if (vm().m_errorInstanceSpace)
         finalizeMarkedUnconditionalFinalizers<ErrorInstance>(*vm().m_errorInstanceSpace);
+    if (vm().m_finalizationRegistrySpace)
+        finalizeMarkedUnconditionalFinalizers<JSFinalizationRegistry>(*vm().m_finalizationRegistrySpace);
 
 #if ENABLE(WEBASSEMBLY)
     if (vm().m_webAssemblyCodeBlockSpace)

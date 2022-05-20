@@ -45,6 +45,7 @@
 #include "DOMAttributeGetterSetter.h"
 #include "DateInstance.h"
 #include "DebuggerScope.h"
+#include "DeferredWorkTimer.h"
 #include "DirectEvalExecutable.h"
 #include "Disassembler.h"
 #include "DoublePredictionFuzzerAgent.h"
@@ -98,6 +99,7 @@
 #include "JSCallee.h"
 #include "JSCustomGetterSetterFunction.h"
 #include "JSDestructibleObjectHeapCellType.h"
+#include "JSFinalizationRegistry.h"
 #include "JSFunction.h"
 #include "JSGlobalLexicalEnvironment.h"
 #include "JSGlobalObject.h"
@@ -149,7 +151,6 @@
 #include "ProfilerDatabase.h"
 #include "ProgramCodeBlock.h"
 #include "ProgramExecutable.h"
-#include "PromiseTimer.h"
 #include "PropertyMapHashTable.h"
 #include "ProxyRevoke.h"
 #include "RandomizingFuzzerAgent.h"
@@ -319,6 +320,7 @@ VM::VM(VMType vmType, HeapType heapType)
     , callbackObjectHeapCellType(IsoHeapCellType::create<JSCallbackObject<JSNonFinalObject>>())
     , dateInstanceHeapCellType(IsoHeapCellType::create<DateInstance>())
     , errorInstanceHeapCellType(IsoHeapCellType::create<ErrorInstance>())
+    , finalizationRegistryCellType(IsoHeapCellType::create<JSFinalizationRegistry>())
     , globalLexicalEnvironmentHeapCellType(IsoHeapCellType::create<JSGlobalLexicalEnvironment>())
     , globalObjectHeapCellType(IsoHeapCellType::create<JSGlobalObject>())
     , jsModuleRecordHeapCellType(IsoHeapCellType::create<JSModuleRecord>())
@@ -398,7 +400,7 @@ VM::VM(VMType vmType, HeapType heapType)
     , clientData(0)
     , topEntryFrame(nullptr)
     , topCallFrame(CallFrame::noCaller())
-    , promiseTimer(PromiseTimer::create(*this))
+    , deferredWorkTimer(DeferredWorkTimer::create(*this))
     , m_atomStringTable(vmType == Default ? Thread::current().atomStringTable() : new AtomStringTable)
     , propertyNames(nullptr)
     , emptyList(new ArgList)
@@ -598,7 +600,7 @@ VM::~VM()
     auto destructionLocker = holdLock(s_destructionLock.read());
     
     Gigacage::removePrimitiveDisableCallback(primitiveGigacageDisabledCallback, this);
-    promiseTimer->stopRunningTasks();
+    deferredWorkTimer->stopRunningTasks();
 #if ENABLE(WEBASSEMBLY)
     if (Wasm::Worklist* worklist = Wasm::existingWorklistOrNull())
         worklist->stopAllPlansForContext(wasmContext);
@@ -1496,6 +1498,7 @@ DYNAMIC_ISO_SUBSPACE_DEFINE_MEMBER_SLOW(weakMapSpace, weakMapHeapCellType.get(),
 DYNAMIC_ISO_SUBSPACE_DEFINE_MEMBER_SLOW(weakSetSpace, weakSetHeapCellType.get(), JSWeakSet) // Hash:0x4c781b30
 DYNAMIC_ISO_SUBSPACE_DEFINE_MEMBER_SLOW(weakObjectRefSpace, cellHeapCellType.get(), JSWeakObjectRef) // Hash:0x8ec68f1f
 DYNAMIC_ISO_SUBSPACE_DEFINE_MEMBER_SLOW(withScopeSpace, cellHeapCellType.get(), JSWithScope)
+DYNAMIC_ISO_SUBSPACE_DEFINE_MEMBER_SLOW(finalizationRegistrySpace, finalizationRegistryCellType.get(), JSFinalizationRegistry)
 #if JSC_OBJC_API_ENABLED
 DYNAMIC_ISO_SUBSPACE_DEFINE_MEMBER_SLOW(apiWrapperObjectSpace, apiWrapperObjectHeapCellType.get(), JSCallbackObject<JSAPIWrapperObject>)
 DYNAMIC_ISO_SUBSPACE_DEFINE_MEMBER_SLOW(objCCallbackFunctionSpace, objCCallbackFunctionHeapCellType.get(), ObjCCallbackFunction) // Hash:0x10f610b8
