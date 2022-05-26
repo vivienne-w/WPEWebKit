@@ -1,3 +1,44 @@
+2022-03-10  Chris Fleizach  <cfleizach@apple.com>
+
+        AX: Support updated WebSpeech API
+        https://bugs.webkit.org/show_bug.cgi?id=237614
+        <rdar://problem/89981851>
+
+        Reviewed by Andres Gonzalez.
+
+        * UIProcess/Cocoa/WebPageProxyCocoa.mm:
+        (WebKit::WebPageProxy::boundaryEventOccurred):
+        * UIProcess/WebPageProxy.h:
+        * WebProcess/WebPage/WebPage.cpp:
+        (WebKit::WebPage::boundaryEventOccurred):
+        * WebProcess/WebPage/WebPage.h:
+        * WebProcess/WebPage/WebPage.messages.in:
+
+2022-05-06  Lauro Moura  <lmoura@igalia.com>
+
+        [GLIB] Add Speech synthesis stubs
+        Need the bug URL (OOPS!).
+
+        Reviewed by NOBODY (OOPS!).
+
+        * UIProcess/Cocoa/WebPageProxyCocoa.mm: Moved the generic bits to the
+        shared WebPageProxy to share with GLIB ports.
+        (WebKit::WebPageProxy::didStartSpeaking): Deleted.
+        (WebKit::WebPageProxy::didFinishSpeaking): Deleted.
+        (WebKit::WebPageProxy::didPauseSpeaking): Deleted.
+        (WebKit::WebPageProxy::didResumeSpeaking): Deleted.
+        (WebKit::WebPageProxy::speakingErrorOccurred): Deleted.
+        (WebKit::WebPageProxy::boundaryEventOccurred): Deleted.
+        (WebKit::WebPageProxy::voicesDidChange): Deleted.
+        * UIProcess/WebPageProxy.cpp:
+        (WebKit::WebPageProxy::didStartSpeaking):
+        (WebKit::WebPageProxy::didFinishSpeaking):
+        (WebKit::WebPageProxy::didPauseSpeaking):
+        (WebKit::WebPageProxy::didResumeSpeaking):
+        (WebKit::WebPageProxy::speakingErrorOccurred):
+        (WebKit::WebPageProxy::boundaryEventOccurred):
+        (WebKit::WebPageProxy::voicesDidChange):
+
 2022-04-07  Carlos Garcia Campos  <cgarcia@igalia.com>
 
         [GTK][WPE] RemoteInspector add support for IPv6

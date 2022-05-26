@@ -216,6 +216,7 @@ Modules/remoteplayback/RemotePlayback.cpp
 
 Modules/speech/DOMWindowSpeechSynthesis.cpp
 Modules/speech/SpeechSynthesis.cpp
+Modules/speech/SpeechSynthesisErrorEvent.cpp
 Modules/speech/SpeechSynthesisEvent.cpp
 Modules/speech/SpeechSynthesisUtterance.cpp
 Modules/speech/SpeechSynthesisVoice.cpp
@@ -3411,7 +3412,11 @@ JSSlotable.cpp
 JSSourceBuffer.cpp
 JSSourceBufferList.cpp
 JSSpeechSynthesis.cpp
+JSSpeechSynthesisErrorCode.cpp
+JSSpeechSynthesisErrorEvent.cpp
+JSSpeechSynthesisErrorEventInit.cpp
 JSSpeechSynthesisEvent.cpp
+JSSpeechSynthesisEventInit.cpp
 JSSpeechSynthesisUtterance.cpp
 JSSpeechSynthesisVoice.cpp
 JSStaticRange.cpp
