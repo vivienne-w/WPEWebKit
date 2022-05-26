@@ -585,6 +585,9 @@ webkit_web_view_is_web_process_responsive_finish     (WebKitWebView             
                                                       GAsyncResult              *result,
                                                       GError                    **error);
 
+WEBKIT_API pid_t
+webkit_web_view_get_web_process_identifier           (WebKitWebView             *web_view);
+
 WEBKIT_API void
 webkit_web_view_terminate_web_process                (WebKitWebView             *web_view);
 
