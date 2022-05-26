@@ -575,6 +575,17 @@ WEBKIT_API gboolean
 webkit_web_view_get_is_web_process_responsive        (WebKitWebView             *web_view);
 
 WEBKIT_API void
+webkit_web_view_is_web_process_responsive_async      (WebKitWebView             *web_view,
+                                                      GCancellable              *cancellable,
+                                                      GAsyncReadyCallback       callback,
+                                                      gpointer                  user_data);
+
+WEBKIT_API gboolean
+webkit_web_view_is_web_process_responsive_finish     (WebKitWebView             *web_view,
+                                                      GAsyncResult              *result,
+                                                      GError                    **error);
+
+WEBKIT_API void
 webkit_web_view_terminate_web_process                (WebKitWebView             *web_view);
 
 G_END_DECLS
