@@ -7130,6 +7130,21 @@ void WebPageProxy::frameSetLargestFrameChanged(const Optional<FrameIdentifier>& 
     m_frameSetLargestFrame = frame;
 }
 
+void WebPageProxy::isWebProcessResponsive(CompletionHandler<void (bool)>&& callback)
+{
+    if (m_isClosed) {
+        if (callback) {
+            RunLoop::main().dispatch([callback = WTFMove(callback)]() mutable {
+                bool isWebProcessResponsive = true;
+                callback(isWebProcessResponsive);
+            });
+        }
+        return;
+    }
+
+    process().isResponsive(WTFMove(callback));
+}
+
 void WebPageProxy::processDidBecomeUnresponsive()
 {
     RELEASE_LOG_IF_ALLOWED(Process, "processDidBecomeUnresponsive:");
