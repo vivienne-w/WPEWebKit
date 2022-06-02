@@ -1014,16 +1014,6 @@ void SourceBuffer::evictCodedFrames(size_t newDataSize, const Seconds& timeChunk
 
     while (rangeStart > minimumRangeStart) {
 
-        // Do not evict data from the time range that contains currentTime.
-        size_t startTimeRange = buffered.find(rangeStart);
-        if (currentTimeRange != notFound && startTimeRange == currentTimeRange) {
-            size_t endTimeRange = buffered.find(rangeEnd);
-            if (currentTimeRange != notFound && endTimeRange == currentTimeRange)
-                break;
-
-            rangeEnd = buffered.start(endTimeRange);
-        }
-
         // 4. For each range in removal ranges, run the coded frame removal algorithm with start and
         // end equal to the removal range start and end timestamp respectively.
         removeCodedFrames(std::max(minimumRangeStart, rangeStart), rangeEnd);
