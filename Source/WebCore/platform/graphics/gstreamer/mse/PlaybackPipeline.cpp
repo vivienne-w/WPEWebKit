@@ -286,9 +286,10 @@ void PlaybackPipeline::markEndOfStream(MediaSourcePrivate::EndOfStreamStatus)
         gst_app_src_end_of_stream(appsrc);
 }
 
-GstPadProbeReturn segmentFixerProbe(GstPad*, GstPadProbeInfo* info, gpointer)
+GstPadProbeReturn segmentFixerProbe(GstPad*, GstPadProbeInfo* info, gpointer userData)
 {
     GstEvent* event = GST_EVENT(info->data);
+    GstClockTime pipelineRunningTime = *static_cast<GstClockTime*>(userData);
 
     if (GST_EVENT_TYPE(event) != GST_EVENT_SEGMENT)
         return GST_PAD_PROBE_OK;
@@ -297,9 +298,9 @@ GstPadProbeReturn segmentFixerProbe(GstPad*, GstPadProbeInfo* info, gpointer)
     gst_event_parse_segment(event, const_cast<const GstSegment**>(&segment));
 
     GST_TRACE("Fixed segment base time from %" GST_TIME_FORMAT " to %" GST_TIME_FORMAT,
-        GST_TIME_ARGS(segment->base), GST_TIME_ARGS(segment->start));
+        GST_TIME_ARGS(segment->base), GST_TIME_ARGS(pipelineRunningTime));
 
-    segment->base = segment->start;
+    segment->base = pipelineRunningTime;
     segment->flags = static_cast<GstSegmentFlags>(0);
 
     return GST_PAD_PROBE_REMOVE;
@@ -359,6 +360,19 @@ void PlaybackPipeline::flush(AtomString trackId)
     if (!gst_element_send_event(GST_ELEMENT(appsrc), gst_event_new_flush_start()))
         GST_WARNING("Failed to send flush-start event for trackId=%s", trackId.string().utf8().data());
 
+    GRefPtr<GstElement> videoSink = m_player->videoSink();
+    while (GST_IS_BIN(videoSink.get())) {
+        GUniquePtr<GstIterator> iter(gst_bin_iterate_sinks(GST_BIN_CAST(videoSink.get())));
+        GValue returnValue = G_VALUE_INIT;
+        auto result = gst_iterator_next(iter.get(), &returnValue);
+        ASSERT(result == GST_ITERATOR_OK);
+        videoSink = adoptGRef(GST_ELEMENT(g_value_dup_object(&returnValue)));
+        g_value_unset(&returnValue);
+    }
+    ASSERT(GST_IS_BASE_SINK(videoSink.get()));
+
+    GstClockTime* pipelineRunningTime = g_new(GstClockTime, 1);
+    *pipelineRunningTime = gst_segment_to_running_time(&GST_BASE_SINK_CAST(videoSink.get())->segment, GST_FORMAT_TIME, position);
     GUniquePtr<GstSegment> segment(gst_segment_new());
     gst_segment_init(segment.get(), GST_FORMAT_TIME);
     gst_segment_do_seek(segment.get(), rate, GST_FORMAT_TIME, GST_SEEK_FLAG_NONE,
@@ -367,7 +381,7 @@ void PlaybackPipeline::flush(AtomString trackId)
     GRefPtr<GstPad> sinkPad = gst_element_get_static_pad(appsrc, "src");
     GRefPtr<GstPad> srcPad = sinkPad ? gst_pad_get_peer(sinkPad.get()) : nullptr;
     if (srcPad)
-        gst_pad_add_probe(srcPad.get(), GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM, segmentFixerProbe, nullptr, nullptr);
+        gst_pad_add_probe(srcPad.get(), GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM, segmentFixerProbe, pipelineRunningTime, g_free);
 
     GST_DEBUG_OBJECT(appsrc, "Sending new seamless segment: [%" GST_TIME_FORMAT ", %" GST_TIME_FORMAT "], rate: %f",
         GST_TIME_ARGS(segment->start), GST_TIME_ARGS(segment->stop), segment->rate);

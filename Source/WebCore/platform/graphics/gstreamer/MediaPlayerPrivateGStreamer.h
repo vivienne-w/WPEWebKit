@@ -247,6 +247,8 @@ public:
     const Logger& mediaPlayerLogger() { return logger(); }
 #endif
 
+    GstElement* videoSink() const { return m_videoSink.get(); }
+
 protected:
     enum MainThreadNotification {
         VideoChanged = 1 << 0,
@@ -288,8 +290,6 @@ protected:
     void swapBuffersIfNeeded() final;
 #endif
 #endif
-
-    GstElement* videoSink() const { return m_videoSink.get(); }
 
     void setStreamVolumeElement(GstStreamVolume*);
 
