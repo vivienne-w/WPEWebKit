@@ -9730,7 +9730,7 @@ void WebPageProxy::didResumeSpeaking(WebCore::PlatformSpeechSynthesisUtterance&)
         speechSynthesisData().speakingResumedCompletionHandler();
 }
 
-void WebPageProxy::speakingErrorOccurred(WebCore::PlatformSpeechSynthesisUtterance&)
+void WebPageProxy::speakingErrorOccurred(WebCore::PlatformSpeechSynthesisUtterance&, WebCore::SpeechError)
 {
     send(Messages::WebPage::SpeakingErrorOccurred());
 }
