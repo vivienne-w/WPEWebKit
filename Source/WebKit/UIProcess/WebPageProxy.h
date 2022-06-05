@@ -218,6 +218,7 @@ enum class NotificationDirection : uint8_t;
 enum class RouteSharingPolicy : uint8_t;
 enum class ShouldSample : bool;
 enum class ShouldTreatAsContinuingLoad : bool;
+enum class SpeechSynthesisErrorCode;
 enum class WritingDirection : uint8_t;
 
 struct ApplicationManifest;
@@ -2227,7 +2228,7 @@ private:
     void didFinishSpeaking(WebCore::PlatformSpeechSynthesisUtterance&) override;
     void didPauseSpeaking(WebCore::PlatformSpeechSynthesisUtterance&) override;
     void didResumeSpeaking(WebCore::PlatformSpeechSynthesisUtterance&) override;
-    void speakingErrorOccurred(WebCore::PlatformSpeechSynthesisUtterance&, WebCore::SpeechError) override;
+    void speakingErrorOccurred(WebCore::PlatformSpeechSynthesisUtterance&, Optional<WebCore::SpeechSynthesisErrorCode>) override;
     void boundaryEventOccurred(WebCore::PlatformSpeechSynthesisUtterance&, WebCore::SpeechBoundary, unsigned charIndex, unsigned charLength) override;
     void voicesDidChange() override;
 

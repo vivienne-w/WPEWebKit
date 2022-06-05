@@ -75,7 +75,7 @@ void PlatformSpeechSynthesizerMock::cancel()
         return;
 
     m_speakingFinishedTimer.stop();
-    client()->speakingErrorOccurred(*m_utterance, WebCore::SpeechError::Canceled);
+    client()->speakingErrorOccurred(*m_utterance, WebCore::SpeechSynthesisErrorCode::Canceled);
     m_utterance = nullptr;
 }
 

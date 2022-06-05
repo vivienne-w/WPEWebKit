@@ -73,7 +73,7 @@ private:
     void didPauseSpeaking(PlatformSpeechSynthesisUtterance&) override;
     void didResumeSpeaking(PlatformSpeechSynthesisUtterance&) override;
     void didFinishSpeaking(PlatformSpeechSynthesisUtterance&) override;
-    void speakingErrorOccurred(PlatformSpeechSynthesisUtterance&, SpeechError) override;
+    void speakingErrorOccurred(PlatformSpeechSynthesisUtterance&, Optional<SpeechSynthesisErrorCode>) override;
     void boundaryEventOccurred(PlatformSpeechSynthesisUtterance&, SpeechBoundary, unsigned charIndex, unsigned charLength) override;
 
     // SpeechSynthesisClient override methods
@@ -86,7 +86,7 @@ private:
     void voicesChanged() override;
 
     void startSpeakingImmediately(SpeechSynthesisUtterance&);
-    void handleSpeakingCompleted(SpeechSynthesisUtterance&, bool errorOccurred, SpeechError error = SpeechError::None);
+    void handleSpeakingCompleted(SpeechSynthesisUtterance&, bool errorOccurred, Optional<SpeechSynthesisErrorCode> = WTF::nullopt);
     void fireEvent(const AtomString& type, SpeechSynthesisUtterance&, unsigned long charIndex, unsigned long charLength, const String& name) const;
     void fireErrorEvent(const AtomString& type, SpeechSynthesisUtterance&, SpeechSynthesisErrorCode) const;
 
