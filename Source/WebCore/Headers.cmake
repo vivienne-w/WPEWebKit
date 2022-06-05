@@ -109,6 +109,16 @@ set(WebCore_PRIVATE_FRAMEWORK_HEADERS
     Modules/plugins/PluginReplacement.h
     Modules/plugins/YouTubePluginReplacement.h
 
+    Modules/speech/DOMWindowSpeechSynthesis.h
+    Modules/speech/SpeechSynthesisErrorCode.h
+    Modules/speech/SpeechSynthesisErrorEvent.h
+    Modules/speech/SpeechSynthesisErrorEventInit.h
+    Modules/speech/SpeechSynthesisEvent.h
+    Modules/speech/SpeechSynthesisEventInit.h
+    Modules/speech/SpeechSynthesis.h
+    Modules/speech/SpeechSynthesisUtterance.h
+    Modules/speech/SpeechSynthesisVoice.h
+
     Modules/streams/ReadableStreamChunk.h
     Modules/streams/ReadableStreamSink.h
     Modules/streams/ReadableStreamSource.h
