@@ -48,7 +48,7 @@ public:
     size_t sizeInBytes() const override { return m_size; }
     FloatSize presentationSize() const override { return m_presentationSize; }
     void offsetTimestampsBy(const MediaTime&) override;
-    void setTimestamps(const MediaTime&, const MediaTime&) override { }
+    void setTimestamps(const MediaTime&, const MediaTime&) override;
     bool isDivisable() const override { return false; }
     std::pair<RefPtr<MediaSample>, RefPtr<MediaSample>> divide(const MediaTime&) override  { return { nullptr, nullptr }; }
     Ref<MediaSample> createNonDisplayingCopy() const override;

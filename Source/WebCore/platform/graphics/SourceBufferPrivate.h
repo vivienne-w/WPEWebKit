@@ -55,6 +55,7 @@ public:
     virtual MediaPlayer::ReadyState readyState() const = 0;
     virtual void setReadyState(MediaPlayer::ReadyState) = 0;
 
+    virtual MediaTime timeFudgeFactor() const { return { 1, 10 }; }
     virtual void flush(const AtomString&) { }
     virtual void enqueueSample(Ref<MediaSample>&&, const AtomString&) { }
     virtual void allSamplesInTrackEnqueued(const AtomString&) { }
