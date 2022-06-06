@@ -38,9 +38,10 @@ MediaSampleGStreamer::MediaSampleGStreamer(GRefPtr<GstSample>&& sample, const Fl
     , m_trackId(trackId)
     , m_presentationSize(presentationSize)
 {
-    const GstClockTime minimumDuration = 1000; // 1 us
     ASSERT(sample);
-    GstBuffer* buffer = gst_sample_get_buffer(sample.get());
+    const GstClockTime minimumDuration = 1000; // 1 us
+    m_sample = sample;
+    auto* buffer = gst_sample_get_buffer(m_sample.get());
     RELEASE_ASSERT(buffer);
 
     auto createMediaTime =
@@ -69,7 +70,8 @@ MediaSampleGStreamer::MediaSampleGStreamer(GRefPtr<GstSample>&& sample, const Fl
     }
 
     m_size = gst_buffer_get_size(buffer);
-    m_sample = sample;
+    m_sample = adoptGRef(gst_sample_new(buffer, gst_sample_get_caps(m_sample.get()), nullptr,
+        gst_sample_get_info(m_sample.get()) ? gst_structure_copy(gst_sample_get_info(m_sample.get())) : nullptr));
 
     if (GST_BUFFER_FLAG_IS_SET(buffer, GST_BUFFER_FLAG_DELTA_UNIT))
         m_flags = MediaSample::None;
@@ -151,6 +153,16 @@ void MediaSampleGStreamer::extendToTheBeginning()
     ASSERT(m_dts == MediaTime::zeroTime());
     m_duration += m_pts;
     m_pts = MediaTime::zeroTime();
+}
+
+void MediaSampleGStreamer::setTimestamps(const MediaTime& presentationTime, const MediaTime& decodeTime)
+{
+    m_pts = presentationTime;
+    m_dts = decodeTime;
+    if (auto* buffer = gst_sample_get_buffer(m_sample.get())) {
+        GST_BUFFER_PTS(buffer) = toGstClockTime(m_pts);
+        GST_BUFFER_DTS(buffer) = toGstClockTime(m_dts);
+    }
 }
 
 void MediaSampleGStreamer::offsetTimestampsBy(const MediaTime& timestampOffset)
