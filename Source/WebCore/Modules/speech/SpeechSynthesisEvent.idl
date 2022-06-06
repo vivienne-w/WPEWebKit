@@ -24,10 +24,9 @@
  */
  
 [
-    Conditional=SPEECH_SYNTHESIS
+    Conditional=SPEECH_SYNTHESIS,
+    Constructor(DOMString type, SpeechSynthesisEventInit eventInitDict)
 ] interface SpeechSynthesisEvent : Event {
-    constructor(DOMString type, SpeechSynthesisEventInit eventInitDict);
-
     readonly attribute SpeechSynthesisUtterance utterance;
     readonly attribute unsigned long charIndex;
     readonly attribute unsigned long charLength;
