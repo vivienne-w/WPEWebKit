@@ -160,7 +160,7 @@
         return;
 
     [m_synthesizer stopSpeakingAtBoundary:NSSpeechImmediateBoundary];
-    m_synthesizerObject->client()->speakingErrorOccurred(*m_utterance, WebCore::SpeechError::None);
+    m_synthesizerObject->client()->speakingErrorOccurred(*m_utterance, WTF::nullopt);
     m_utterance = 0;
 }
 
@@ -185,7 +185,7 @@
     if (finishedSpeaking)
         m_synthesizerObject->client()->didFinishSpeaking(*utterance);
     else
-        m_synthesizerObject->client()->speakingErrorOccurred(*utterance, WebCore::SpeechError::None);
+        m_synthesizerObject->client()->speakingErrorOccurred(*utterance, WTF::nullopt);
 }
 
 - (void)speechSynthesizer:(NSSpeechSynthesizer *)sender willSpeakWord:(NSRange)characterRange ofString:(NSString *)string
