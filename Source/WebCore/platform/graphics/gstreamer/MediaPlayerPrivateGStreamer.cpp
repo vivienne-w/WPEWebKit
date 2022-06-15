@@ -195,11 +195,19 @@ MediaPlayerPrivateGStreamer::MediaPlayerPrivateGStreamer(MediaPlayer* player)
 #if USE(GLIB)
     m_readyTimerHandler.setPriority(G_PRIORITY_DEFAULT_IDLE);
 #endif
+    m_checkMemoryTimeoutId = g_timeout_add(1000, [](gpointer userData) -> gboolean {
+        MediaPlayerPrivateGStreamer* player = static_cast<MediaPlayerPrivateGStreamer*>(userData);
+        player->checkMemory();
+        return G_SOURCE_CONTINUE;
+    }, this);
 }
 
 MediaPlayerPrivateGStreamer::~MediaPlayerPrivateGStreamer()
 {
     GST_DEBUG("Disposing player");
+
+    if (m_checkMemoryTimeoutId)
+        g_source_remove(m_checkMemoryTimeoutId);
 
 #if ENABLE(VIDEO_TRACK)
     for (auto& track : m_audioTracks.values())
@@ -250,6 +258,73 @@ MediaPlayerPrivateGStreamer::~MediaPlayerPrivateGStreamer()
         gst_bus_remove_signal_watch(bus.get());
         gst_bus_set_sync_handler(bus.get(), nullptr, nullptr, nullptr);
         g_signal_handlers_disconnect_matched(m_pipeline.get(), G_SIGNAL_MATCH_DATA, 0, 0, nullptr, nullptr, this);
+    }
+}
+
+static inline String nextToken(FILE* file)
+{
+    if (!file)
+        return String();
+
+    static const unsigned bufferSize = 128;
+    char buffer[bufferSize] = {0, };
+    unsigned index = 0;
+    while (index < bufferSize) {
+        int ch = fgetc(file);
+        if (ch == EOF || (isASCIISpace(ch) && index)) // Break on non-initial ASCII space.
+            break;
+        if (!isASCIISpace(ch)) {
+            buffer[index] = ch;
+            index++;
+        }
+    }
+
+    return String(buffer);
+}
+
+static bool readToken(const char* filename, const char* key, size_t fileUnits, size_t &result)
+{
+    FILE* file = fopen(filename, "r");
+    if (!file)
+        return false;
+
+    bool validValue = false;
+    String token;
+    do {
+        token = nextToken(file);
+        if (token.isEmpty())
+            break;
+
+        if (!key) {
+            result = token.toUInt64(&validValue) * fileUnits;
+            break;
+        }
+
+        if (token == key) {
+            result = nextToken(file).toUInt64(&validValue) * fileUnits;
+            break;
+        }
+    } while (!token.isEmpty());
+
+    fclose(file);
+    return validValue;
+}
+
+void MediaPlayerPrivateGStreamer::checkMemory()
+{
+    size_t rss = 0;
+    if (readToken("/proc/self/status", "VmRSS:", KB, rss)) {
+        GST_DEBUG("### Memory: %zu", rss);
+        if (rss > 200 * MB && m_pipeline) {
+            if (++m_checkMemoryDumpCount >= 10) {
+                g_source_remove(m_checkMemoryTimeoutId);
+                m_checkMemoryTimeoutId = 0;
+            }
+
+            GST_WARNING("### High memory detected (%zu), dumping pipeline (%d/10)", rss, m_checkMemoryDumpCount);
+
+            GST_DEBUG_BIN_TO_DOT_FILE_WITH_TS(GST_BIN(m_pipeline.get()), GST_DEBUG_GRAPH_SHOW_ALL, "high-memory");
+        }
     }
 }
 

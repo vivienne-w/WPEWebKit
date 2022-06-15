@@ -802,7 +802,7 @@ static void webKitWebSrcNeedData(WebKitWebSrc* src)
 {
     WebKitWebSrcPrivate* priv = src->priv;
 
-    GST_LOG_OBJECT(src, "Need more data");
+    GST_WARNING_OBJECT(src, "### need-data");
 
     if (!priv->paused)
         return;
@@ -820,7 +820,7 @@ static void webKitWebSrcEnoughData(WebKitWebSrc* src)
 {
     WebKitWebSrcPrivate* priv = src->priv;
 
-    GST_DEBUG_OBJECT(src, "Have enough data");
+    GST_WARNING_OBJECT(src, "### enough-data");
 
     if (priv->paused)
         return;

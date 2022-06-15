@@ -65,6 +65,10 @@ public:
     explicit MediaPlayerPrivateGStreamer(MediaPlayer*);
     virtual ~MediaPlayerPrivateGStreamer();
 
+    void checkMemory();
+    guint m_checkMemoryTimeoutId = 0;
+    int m_checkMemoryDumpCount = 0;
+
     static void registerMediaEngine(MediaEngineRegistrar);
     void handleMessage(GstMessage*);
     void handlePluginInstallerResult(GstInstallPluginsReturn);
