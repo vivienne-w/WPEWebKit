@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019 Igalia S.L. All rights reserved.
+ * Copyright (C) 2020 Igalia S.L. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,14 +23,16 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-// https://html.spec.whatwg.org/multipage/dom.html#htmlorsvgelement
-// FIXME: update above link when this change has been implemented:
-// https://github.com/whatwg/html/issues/4702
-[
-    NoInterfaceObject,
-] interface HTMLOrForeignElement {
-    readonly attribute DOMStringMap dataset; // FIXME: Should be [SameObject].
-    [CEReactions, ImplementedAs=tabIndexForBindings] attribute long tabIndex;
-    void focus(optional FocusOptions options);
-    void blur();
+#pragma once
+
+#include "FocusDirection.h"
+
+namespace WebCore {
+
+struct FocusOptions {
+    bool restorePreviousSelection { true };
+    FocusDirection direction { FocusDirectionNone };
+    bool preventScroll { false };
 };
+
+} // namespace WebCore
