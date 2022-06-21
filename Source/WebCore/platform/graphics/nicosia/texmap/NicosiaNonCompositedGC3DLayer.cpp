@@ -94,6 +94,7 @@ PlatformGraphicsContextGL NonCompositedGC3DLayer::platformContext() const
 void NonCompositedGC3DLayer::swapBuffersIfNeeded()
 {
     ASSERT(s_windowContext);
+    makeContextCurrent();
     s_windowContext->swapBuffers();
 }
 
