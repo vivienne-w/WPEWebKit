@@ -111,6 +111,7 @@ if (!window.InspectorFrontendHost) {
 
         loaded()
         {
+            WI.updateVisibilityState(true);
         }
 
         closeWindow()
