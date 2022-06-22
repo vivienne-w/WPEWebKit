@@ -39,16 +39,18 @@ namespace Inspector {
 GRefPtr<GBytes> backendCommands()
 {
 #if PLATFORM(WPE)
-    static std::once_flag flag;
-    std::call_once(flag, [] {
+    static bool moduleLoaded = false;
+
+    if (!moduleLoaded) {
         GModule* resourcesModule = g_module_open(PKGLIBDIR G_DIR_SEPARATOR_S "libWPEWebInspectorResources.so", G_MODULE_BIND_LAZY);
         if (!resourcesModule) {
             WTFLogAlways("Error loading libWPEWebInspectorResources.so: %s", g_module_error());
-            return;
+            return nullptr;
         }
 
         g_module_make_resident(resourcesModule);
-    });
+        moduleLoaded = true;
+    }
 #endif
     GRefPtr<GBytes> bytes = adoptGRef(g_resources_lookup_data(INSPECTOR_BACKEND_COMMANDS_PATH, G_RESOURCE_LOOKUP_FLAGS_NONE, nullptr));
     ASSERT(bytes);
@@ -60,6 +62,9 @@ const CString& backendCommandsHash()
     static CString hexDigest;
     if (hexDigest.isNull()) {
         auto bytes = backendCommands();
+        if (!bytes)
+            return hexDigest;
+
         size_t dataSize;
         gconstpointer data = g_bytes_get_data(bytes.get(), &dataSize);
         ASSERT(dataSize);
