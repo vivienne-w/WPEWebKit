@@ -2955,7 +2955,7 @@ static RefPtr<Element> findFirstProgramaticallyFocusableElementInComposedTree(El
     return nullptr;
 }
 
-void Element::focus(bool restorePreviousSelection, FocusDirection direction)
+void Element::focus(const FocusOptions& options)
 {
     if (!isConnected())
         return;
@@ -2996,7 +2996,7 @@ void Element::focus(bool restorePreviousSelection, FocusDirection direction)
         // Focus and change event handlers can cause us to lose our last ref.
         // If a focus event handler changes the focus to a different node it
         // does not make sense to continue and update appearence.
-        if (!page->focusController().setFocusedElement(newTarget.get(), *document->frame(), direction))
+        if (!page->focusController().setFocusedElement(newTarget.get(), *document->frame(), options.direction))
             return;
     }
 
@@ -3014,7 +3014,8 @@ void Element::focus(bool restorePreviousSelection, FocusDirection direction)
     if (!target)
         return;
 
-    target->updateFocusAppearance(restorePreviousSelection ? SelectionRestorationMode::Restore : SelectionRestorationMode::SetDefault, revealMode);
+    if (!options.preventScroll)
+        target->updateFocusAppearance(options.restorePreviousSelection ? SelectionRestorationMode::Restore : SelectionRestorationMode::SetDefault, revealMode);
 }
 
 // https://html.spec.whatwg.org/#focus-processing-model
