@@ -789,6 +789,7 @@ void WebGLRenderingContextBase::initializeNewContext()
     m_context->reshape(canvasSize.width(), canvasSize.height());
     m_context->viewport(0, 0, canvasSize.width(), canvasSize.height());
     m_context->scissor(0, 0, canvasSize.width(), canvasSize.height());
+    m_context->disable(GraphicsContextGL::SCISSOR_TEST);
 }
 
 void WebGLRenderingContextBase::setupFlags()
