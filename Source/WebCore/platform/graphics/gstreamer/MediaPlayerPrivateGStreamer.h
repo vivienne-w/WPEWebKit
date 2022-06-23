@@ -572,6 +572,9 @@ private:
     String m_errorMessage;
     bool m_didTryToRecoverPlayingState { false };
     bool m_visible { false };
+
+public:
+    gulong debugProbeIds[10] = { 0 };
 };
 
 }
