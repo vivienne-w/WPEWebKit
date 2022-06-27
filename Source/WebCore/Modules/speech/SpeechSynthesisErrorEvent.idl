@@ -26,9 +26,8 @@
 // https://wicg.github.io/speech-api/#speechsynthesiserrorevent
 [
     Conditional=SPEECH_SYNTHESIS,
-    Exposed=Window
+    Exposed=Window,
+    Constructor(DOMString type, SpeechSynthesisErrorEventInit eventInitDict)
 ] interface SpeechSynthesisErrorEvent : SpeechSynthesisEvent {
-    constructor(DOMString type, SpeechSynthesisErrorEventInit eventInitDict);
-
     readonly attribute SpeechSynthesisErrorCode error;
 };
