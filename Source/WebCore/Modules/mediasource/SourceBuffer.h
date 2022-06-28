@@ -187,7 +187,7 @@ private:
     void reenqueueMediaForTime(TrackBuffer&, const AtomString& trackID, const MediaTime&);
     void provideMediaData(TrackBuffer&, const AtomString& trackID);
     void didDropSample();
-    void evictCodedFrames(size_t newDataSize, const Seconds& timeChunkAsSeconds = 30_s);
+    void evictCodedFrames(size_t newDataSize);
     size_t maximumBufferSize() const;
 
     void monitorBufferingRate();

@@ -87,6 +87,9 @@ static const double ExponentialMovingAverageCoefficient = 0.1;
 // FIXME(135867): Make this gap detection logic less arbitrary.
 static const MediaTime discontinuityTolerance = MediaTime(1, 1);
 
+static const unsigned evictionAlgorithmInitialTimeChunk = 30000;
+static const unsigned evictionAlgorithmTimeChunkLowThreshold = 100;
+
 struct SourceBuffer::TrackBuffer {
     MediaTime lastDecodeTimestamp;
     MediaTime greatestDecodeDuration;
@@ -947,7 +950,7 @@ void SourceBuffer::removeTimerFired()
     scheduleEvent(eventNames().updateendEvent);
 }
 
-void SourceBuffer::evictCodedFrames(size_t newDataSize, const Seconds& timeChunkAsSeconds)
+void SourceBuffer::evictCodedFrames(size_t newDataSize)
 {
     // 3.5.13 Coded Frame Eviction Algorithm
     // http://www.w3.org/TR/media-source/#sourcebuffer-coded-frame-eviction
@@ -975,9 +978,6 @@ void SourceBuffer::evictCodedFrames(size_t newDataSize, const Seconds& timeChunk
     // NOTE: begin by removing data from the beginning of the buffered ranges, timeChunk seconds at
     // a time, up to timeChunk seconds before currentTime.
     MediaTime currentTime = m_source->currentTime();
-    uint64_t timeChunkAsInteger = timeChunkAsSeconds.secondsAs<uint64_t>();
-    MediaTime timeChunk = MediaTime(timeChunkAsInteger, 1);
-    MediaTime maximumRangeEnd = currentTime - timeChunk;
 
 #if !RELEASE_LOG_DISABLED
     DEBUG_LOG(LOGIDENTIFIER, "currentTime = ", m_source->currentTime(), ", require ", extraMemoryCost() + newDataSize, " bytes, maximum buffer size is ", maximumBufferSize);
@@ -985,20 +985,29 @@ void SourceBuffer::evictCodedFrames(size_t newDataSize, const Seconds& timeChunk
 #endif
 
     const auto& buffered = m_buffered->ranges();
-    MediaTime rangeStart = buffered.minimumBufferedTime();
-    MediaTime rangeEnd = rangeStart + timeChunk;
-    while (rangeStart < maximumRangeEnd) {
-        // 4. For each range in removal ranges, run the coded frame removal algorithm with start and
-        // end equal to the removal range start and end timestamp respectively.
-        removeCodedFrames(rangeStart, std::min(rangeEnd, maximumRangeEnd));
-        if (extraMemoryCost() + newDataSize < maximumBufferSize) {
-            m_bufferFull = false;
-            break;
+
+    unsigned timeChunkAsMilliseconds = evictionAlgorithmInitialTimeChunk;
+    do {
+        MediaTime timeChunk = MediaTime(timeChunkAsMilliseconds, 1000);
+        MediaTime rangeStart = buffered.minimumBufferedTime();
+        MediaTime rangeEnd = rangeStart + timeChunk;
+        MediaTime maximumRangeEnd = currentTime - timeChunk;
+        while (rangeStart < maximumRangeEnd) {
+            // 4. For each range in removal ranges, run the coded frame removal algorithm with start and
+            // end equal to the removal range start and end timestamp respectively.
+            MediaTime realRangeEnd = std::min(rangeEnd, maximumRangeEnd);
+            removeCodedFrames(rangeStart, realRangeEnd);
+            if (extraMemoryCost() + newDataSize < maximumBufferSize) {
+                m_bufferFull = false;
+                break;
+            }
+
+            rangeStart += timeChunk;
+            rangeEnd += timeChunk;
         }
 
-        rangeStart += timeChunk;
-        rangeEnd += timeChunk;
-    }
+        timeChunkAsMilliseconds /= 2;
+    } while (timeChunkAsMilliseconds >= evictionAlgorithmTimeChunkLowThreshold && m_bufferFull);
 
     if (!m_bufferFull) {
         DEBUG_LOG(LOGIDENTIFIER, "evicted ", initialBufferedSize - extraMemoryCost());
@@ -1006,34 +1015,37 @@ void SourceBuffer::evictCodedFrames(size_t newDataSize, const Seconds& timeChunk
     }
 
 
-    MediaTime minimumRangeStart = currentTime + timeChunk;
-    size_t currentTimeRange = buffered.find(currentTime);
+    timeChunkAsMilliseconds = evictionAlgorithmInitialTimeChunk;
+    do {
+        MediaTime timeChunk = MediaTime(timeChunkAsMilliseconds, 1000);
+        MediaTime minimumRangeStart = currentTime + timeChunk;
+        MediaTime rangeEnd = buffered.maximumBufferedTime();
+        MediaTime rangeStart = rangeEnd - timeChunk;
 
-    rangeEnd = buffered.maximumBufferedTime();
-    rangeStart = rangeEnd - timeChunk;
+        while (rangeStart > minimumRangeStart) {
 
-    while (rangeStart > minimumRangeStart) {
+            // 4. For each range in removal ranges, run the coded frame removal algorithm with start and
+            // end equal to the removal range start and end timestamp respectively.
+            MediaTime realRangeStart = std::max(minimumRangeStart, rangeStart);
+            removeCodedFrames(realRangeStart, rangeEnd);
+            if (extraMemoryCost() + newDataSize < maximumBufferSize) {
+                m_bufferFull = false;
+                break;
+            }
 
-        // 4. For each range in removal ranges, run the coded frame removal algorithm with start and
-        // end equal to the removal range start and end timestamp respectively.
-        removeCodedFrames(std::max(minimumRangeStart, rangeStart), rangeEnd);
-        if (extraMemoryCost() + newDataSize < maximumBufferSize) {
-            m_bufferFull = false;
-            break;
+            rangeStart -= timeChunk;
+            rangeEnd -= timeChunk;
         }
 
-        rangeStart -= timeChunk;
-        rangeEnd -= timeChunk;
+        timeChunkAsMilliseconds /= 2;
+    } while (timeChunkAsMilliseconds >= evictionAlgorithmTimeChunkLowThreshold && m_bufferFull);
+
+    if (!m_bufferFull) {
+        DEBUG_LOG(LOGIDENTIFIER, "evicted ", initialBufferedSize - extraMemoryCost());
+        return;
     }
 
-    if (m_bufferFull) {
-        timeChunkAsInteger /= 2;
-        if (timeChunkAsInteger >= 1)
-            evictCodedFrames(newDataSize, Seconds(timeChunkAsInteger));
-        else
-            ERROR_LOG(LOGIDENTIFIER, "FAILED to free enough after evicting ", initialBufferedSize - extraMemoryCost());
-    } else
-        DEBUG_LOG(LOGIDENTIFIER, "evicted ", initialBufferedSize - extraMemoryCost());
+    ERROR_LOG(LOGIDENTIFIER, "FAILED to free enough after evicting ", initialBufferedSize - extraMemoryCost());
 }
 
 size_t SourceBuffer::maxBufferSizeVideo = 0;
