@@ -112,6 +112,7 @@ public:
     size_t m_resourceDataSize { 0 };
     cairo_surface_t* m_surface { nullptr };
     bool m_expectedWebProcessCrash { false };
+    bool m_closeCalled { false };
 
 #if PLATFORM(GTK)
     GtkWidget* m_parentWindow { nullptr };

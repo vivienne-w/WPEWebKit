@@ -497,6 +497,13 @@ WEBKIT_API void
 webkit_settings_set_allow_display_of_insecure_content          (WebKitSettings *settings,
                                                                 gboolean        allowed);
 
+WEBKIT_API gboolean
+webkit_settings_get_allow_scripts_to_close_windows              (WebKitSettings *settings);
+
+WEBKIT_API void
+webkit_settings_set_allow_scripts_to_close_windows              (WebKitSettings *settings,
+                                                                gboolean        allowed);
+
 G_END_DECLS
 
 #endif /* WebKitSettings_h */
