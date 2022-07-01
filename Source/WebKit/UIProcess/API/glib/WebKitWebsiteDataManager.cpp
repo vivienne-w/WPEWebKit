@@ -89,6 +89,7 @@ enum {
     PROP_HSTS_CACHE_DIRECTORY,
     PROP_IS_EPHEMERAL,
     PROP_LOCAL_STORAGE_QUOTA,
+    PROP_PER_ORIGIN_STORAGE_QUOTA,
 };
 
 struct _WebKitWebsiteDataManagerPrivate {
@@ -111,6 +112,7 @@ struct _WebKitWebsiteDataManagerPrivate {
     Vector<WebProcessPool*> processPools;
 
     unsigned localStorageQuota { 5 * 1024 * 1024 };
+    guint64 perOriginStorageQuota { 0 };
 };
 
 WEBKIT_DEFINE_TYPE(WebKitWebsiteDataManager, webkit_website_data_manager, G_TYPE_OBJECT)
@@ -189,6 +191,9 @@ static void webkitWebsiteDataManagerSetProperty(GObject* object, guint propID, c
         break;
     case PROP_LOCAL_STORAGE_QUOTA:
         manager->priv->localStorageQuota = g_value_get_uint(value);
+        break;
+    case PROP_PER_ORIGIN_STORAGE_QUOTA:
+        manager->priv->perOriginStorageQuota = g_value_get_uint64(value);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID(object, propID, paramSpec);
@@ -403,6 +408,22 @@ static void webkit_website_data_manager_class_init(WebKitWebsiteDataManagerClass
             _("The maximum size of local storage in bytes"),
             1, G_MAXUINT, 5 * 1024 * 1024,
             static_cast<GParamFlags>(WEBKIT_PARAM_WRITABLE | G_PARAM_CONSTRUCT_ONLY)));
+
+    /**
+     * WebKitWebsiteDataManager:per-origin-storage-quota:
+     *
+     * Max size of origin data storage. This includes CacheStorage and IndexedDB.
+     * Value of 0 means no change so whatever the default value is it will be used.
+     *
+     */
+    g_object_class_install_property(
+    gObjectClass,
+    PROP_PER_ORIGIN_STORAGE_QUOTA,
+    g_param_spec_uint64("per-origin-storage-quota",
+        _("Per origin storage quota"),
+        _("The maximum size of storage per origin (CacheStora and IndexedDB)"),
+        0, G_MAXUINT64, 0,
+        static_cast<GParamFlags>(WEBKIT_PARAM_WRITABLE | G_PARAM_CONSTRUCT_ONLY)));
 }
 
 WebKit::WebsiteDataStore& webkitWebsiteDataManagerGetDataStore(WebKitWebsiteDataManager* manager)
@@ -424,6 +445,9 @@ WebKit::WebsiteDataStore& webkitWebsiteDataManagerGetDataStore(WebKitWebsiteData
             WebKit::WebsiteDataStore::defaultHSTSDirectory() : FileSystem::stringFromFileSystemRepresentation(priv->hstsCacheDirectory.get()));
         configuration->setMediaKeysStorageDirectory(WebKit::WebsiteDataStore::defaultMediaKeysStorageDirectory());
         configuration->setLocalStorageQuota(priv->localStorageQuota);
+        if (priv->perOriginStorageQuota > 0)
+            configuration->setPerOriginStorageQuota(priv->perOriginStorageQuota);
+        // else use default from StorageQuotamanager (that is 1G)
         priv->websiteDataStore = WebKit::WebsiteDataStore::create(WTFMove(configuration), PAL::SessionID::defaultSessionID());
     }
 

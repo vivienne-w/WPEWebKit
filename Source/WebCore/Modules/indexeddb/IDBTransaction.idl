@@ -27,6 +27,7 @@
 [
     ActiveDOMObject,
     Conditional=INDEXED_DATABASE,
+    EnabledAtRuntime=Databases,
     JSCustomMarkFunction,
     SkipVTableValidation,
 ] interface IDBTransaction : EventTarget {

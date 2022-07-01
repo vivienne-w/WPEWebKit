@@ -30,6 +30,7 @@
 [
     ActiveDOMObject,
     Conditional=INDEXED_DATABASE,
+    EnabledAtRuntime=Databases,
     GenerateIsReachable=Impl,
     JSCustomMarkFunction,
     SkipVTableValidation,

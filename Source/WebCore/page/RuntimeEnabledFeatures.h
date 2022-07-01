@@ -215,6 +215,9 @@ public:
     bool attachmentElementEnabled() const { return m_isAttachmentElementEnabled; }
 #endif
 
+    void setDatabasesEnabled(bool isEnabled) { m_areDatabasesEnabled = isEnabled; }
+    bool databasesEnabled() const { return m_areDatabasesEnabled; }
+
 #if ENABLE(INDEXED_DATABASE_IN_WORKERS)
     void setIndexedDBWorkersEnabled(bool isEnabled) { m_isIndexedDBWorkersEnabled = isEnabled; }
     bool indexedDBWorkersEnabled() const { return m_isIndexedDBWorkersEnabled; }
@@ -449,6 +452,7 @@ private:
     bool m_keygenElementEnabled { false };
     bool m_pageAtRuleSupportEnabled { false };
     bool m_highlightAPIEnabled { false };
+    bool m_areDatabasesEnabled { true };
 
 #if ENABLE(LAYOUT_FORMATTING_CONTEXT)
     bool m_layoutFormattingContextEnabled { false };

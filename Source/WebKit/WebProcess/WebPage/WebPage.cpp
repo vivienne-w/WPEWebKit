@@ -3620,7 +3620,7 @@ void WebPage::updatePreferences(const WebPreferencesStore& store)
     settings.setDataDetectorTypes(static_cast<DataDetectorTypes>(store.getUInt32ValueForKey(WebPreferencesKey::dataDetectorTypesKey())));
 #endif
 
-    DatabaseManager::singleton().setIsAvailable(store.getBoolValueForKey(WebPreferencesKey::databasesEnabledKey()));
+    DatabaseManager::singleton().setIsAvailable(RuntimeEnabledFeatures::sharedFeatures().databasesEnabled());
 
     m_tabToLinks = store.getBoolValueForKey(WebPreferencesKey::tabsToLinksKey());
     m_asynchronousPluginInitializationEnabled = store.getBoolValueForKey(WebPreferencesKey::asynchronousPluginInitializationEnabledKey());
