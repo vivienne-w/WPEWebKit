@@ -1948,6 +1948,13 @@ NonCompositedWebGLEnabled:
     defaultValue: false
     condition: PLATFORM(WPE)
 
+AllowScriptsToCloseWindows:
+    type: bool
+    defaultValue: false
+    humanReadableName: "Allow Scripts to Close Windows"
+    humanReadableDescription: "Enable whether scripts can close already opened windows"
+    condition: PLATFORM(WPE)
+
 # Deprecated
 
 ICECandidateFilteringEnabled:

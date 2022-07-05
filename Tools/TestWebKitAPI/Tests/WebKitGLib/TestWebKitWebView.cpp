@@ -1427,6 +1427,64 @@ static void testWebViewTerminateUnresponsiveWebProcess(WebViewTerminateWebProces
     g_assert_true(webkit_web_view_get_is_web_process_responsive(test->m_webView));
 }
 
+static void testWebViewAllowScriptsToCloseWindows(WebViewTest* test, gconstpointer)
+{
+    static const char* closeHTML =
+        "<html>"
+        " <body>"
+        "  <script>"
+        "    window.close();"
+        "  </script>"
+        " </body>"
+        "</html>";
+
+
+    // Per https://html.spec.whatwg.org/multipage/window-object.html#dom-window-close
+    // the browsing context history must contain at least two documents to avoid being
+    // considered script-closable.
+    test->loadURI(gServer->getURIForPath("/").data());
+    test->waitUntilLoadFinished();
+    test->loadURI("about:blank");
+    test->waitUntilLoadFinished();
+
+    WebKitSettings* defaultSettings = webkit_web_view_get_settings(test->m_webView);
+    g_assert_false(webkit_settings_get_allow_scripts_to_close_windows(defaultSettings));
+
+    bool prop_value;
+    g_object_get(G_OBJECT(defaultSettings), "allow-scripts-to-close-windows", &prop_value, nullptr);
+    g_assert_false(prop_value);
+
+    g_signal_connect(test->m_webView, "close", G_CALLBACK(+[](WebKitWebView* view, gpointer userData) {
+        auto* test = static_cast<WebViewTest*>(userData);
+        test->m_closeCalled = true;
+        g_main_loop_quit(test->m_mainLoop);
+    }), test);
+    auto timeoutID = g_timeout_add(2000, [](gpointer userData) -> gboolean {
+        g_main_loop_quit(static_cast<GMainLoop*>(userData));
+        return G_SOURCE_REMOVE;
+    }, test->m_mainLoop);
+    test->loadHtml(closeHTML, nullptr);
+    g_main_loop_run(test->m_mainLoop);
+    if (test->m_closeCalled)
+        g_source_remove(timeoutID);
+    g_assert_false(test->m_closeCalled);
+
+
+    webkit_settings_set_allow_scripts_to_close_windows(defaultSettings, true);
+    g_object_get(G_OBJECT(defaultSettings), "allow-scripts-to-close-windows", &prop_value, nullptr);
+    g_assert_true(prop_value);
+    webkit_web_view_set_settings(test->m_webView, defaultSettings);
+
+    test->loadHtml(closeHTML, nullptr);
+    g_main_loop_run(test->m_mainLoop);
+
+    g_assert_true(test->m_closeCalled);
+
+    g_object_set(G_OBJECT(defaultSettings), "allow-scripts-to-close-windows", false, nullptr);
+    g_object_get(G_OBJECT(defaultSettings), "allow-scripts-to-close-windows", &prop_value, nullptr);
+    g_assert_false(prop_value);
+}
+
 #if USE(SOUP2)
 static void serverCallback(SoupServer* server, SoupMessage* message, const char* path, GHashTable*, SoupClientContext*, gpointer)
 #else
@@ -1492,6 +1550,7 @@ void beforeAll()
     WebViewTest::add("WebKitWebView", "is-web-process-responsive", testWebViewIsWebProcessResponsive);
     WebViewTerminateWebProcessTest::add("WebKitWebView", "terminate-web-process", testWebViewTerminateWebProcess);
     WebViewTerminateWebProcessTest::add("WebKitWebView", "terminate-unresponsive-web-process", testWebViewTerminateUnresponsiveWebProcess);
+    WebViewTest::add("WebKitWebView", "allow-scripts-to-close-windows", testWebViewAllowScriptsToCloseWindows);
 }
 
 void afterAll()

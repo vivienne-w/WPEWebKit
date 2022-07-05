@@ -179,6 +179,9 @@ enum {
     PROP_ENABLE_WEBSECURITY,
     PROP_ALLOW_RUNNING_OF_INSECURE_CONTENT,
     PROP_ALLOW_DISPLAY_OF_INSECURE_CONTENT,
+#if PLATFORM(WPE)
+    PROP_ALLOW_SCRIPTS_TO_CLOSE_WINDOWS,
+#endif
 };
 
 static void webKitSettingsDispose(GObject* object)
@@ -426,6 +429,11 @@ static void webKitSettingsSetProperty(GObject* object, guint propId, const GValu
     case PROP_ALLOW_DISPLAY_OF_INSECURE_CONTENT:
         webkit_settings_set_allow_display_of_insecure_content(settings, g_value_get_boolean(value));
         break;
+#if PLATFORM(WPE)
+    case PROP_ALLOW_SCRIPTS_TO_CLOSE_WINDOWS:
+        webkit_settings_set_allow_scripts_to_close_windows(settings, g_value_get_boolean(value));
+        break;
+#endif
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID(object, propId, paramSpec);
         break;
@@ -634,6 +642,11 @@ static void webKitSettingsGetProperty(GObject* object, guint propId, GValue* val
     case PROP_ALLOW_DISPLAY_OF_INSECURE_CONTENT:
         g_value_set_boolean(value, webkit_settings_get_allow_display_of_insecure_content(settings));
         break;
+#if PLATFORM(WPE)
+    case PROP_ALLOW_SCRIPTS_TO_CLOSE_WINDOWS:
+        g_value_set_boolean(value, webkit_settings_get_allow_scripts_to_close_windows(settings));
+        break;
+#endif
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID(object, propId, paramSpec);
         break;
@@ -1654,6 +1667,20 @@ static void webkit_settings_class_init(WebKitSettingsClass* klass)
             FALSE,
             readWriteConstructParamFlags));
 
+#if PLATFORM(WPE)
+    /**
+     * WebKitSettings:allow-scripts-to-close-windows:
+     *
+     * Allow scripts to close windows they did not open
+     */
+    g_object_class_install_property(gObjectClass,
+        PROP_ALLOW_SCRIPTS_TO_CLOSE_WINDOWS,
+        g_param_spec_boolean("allow-scripts-to-close-windows",
+            _("Allow scripts to close windows"),
+            _("Whether scripts can close windows they did not open."),
+            FALSE,
+            readWriteConstructParamFlags));
+#endif
 
 }
 
@@ -4105,3 +4132,42 @@ void webkit_settings_set_allow_display_of_insecure_content(WebKitSettings* setti
     g_object_notify(G_OBJECT(settings), "allow-display-of-insecure-content");
 }
 
+#if PLATFORM(WPE)
+
+/**
+ * webkit_settings_get_allow_scripts_to_close_windows:
+ * @settings: a #WebKitSettings
+ *
+ * Get the #WebKitSettings:allow-scripts-to-close-windows property.
+ *
+ * Returns: %TRUE If script can close windows not opened by them or %FALSE otherwise.
+ */
+gboolean webkit_settings_get_allow_scripts_to_close_windows (WebKitSettings *settings)
+{
+    g_return_val_if_fail(WEBKIT_IS_SETTINGS(settings), FALSE);
+
+    return settings->priv->preferences->allowScriptsToCloseWindows();
+}
+
+/**
+ * webkit_settings_set_allow_scripts_to_close_windows
+ * @settings: a #WebKitSettings
+ * @allowed: Value to be set
+ *
+ * Set the #WebKitSettings:allow-scripts-to-close-windows property.
+ */
+WEBKIT_API void
+webkit_settings_set_allow_scripts_to_close_windows(WebKitSettings *settings, gboolean allowed)
+{
+    g_return_if_fail(WEBKIT_IS_SETTINGS(settings));
+
+    WebKitSettingsPrivate* priv = settings->priv;
+    bool currentValue = priv->preferences->allowScriptsToCloseWindows();
+    if (currentValue == allowed)
+        return;
+
+    priv->preferences->setAllowScriptsToCloseWindows(allowed);
+    g_object_notify(G_OBJECT(settings), "allow-scripts-to-close-windows");
+}
+
+#endif

@@ -42,6 +42,7 @@ static const char** ignoreHosts;
 static gboolean headlessMode;
 static gboolean privateMode;
 static gboolean automationMode;
+static gboolean allowScriptsToCloseWindows;
 static gboolean ignoreTLSErrors;
 static const char* contentFilter;
 static const char* cookiesFile;
@@ -55,6 +56,7 @@ static const GOptionEntry commandLineOptions[] =
     { "headless", 'h', 0, G_OPTION_ARG_NONE, &headlessMode, "Run in headless mode", nullptr },
     { "private", 'p', 0, G_OPTION_ARG_NONE, &privateMode, "Run in private browsing mode", nullptr },
     { "automation", 0, 0, G_OPTION_ARG_NONE, &automationMode, "Run in automation mode", nullptr },
+    { "allow-scripts-to-close-windows", 0, 0, G_OPTION_ARG_NONE, &allowScriptsToCloseWindows, "Allow scripts to close windows", nullptr },
     { "cookies-file", 'c', 0, G_OPTION_ARG_FILENAME, &cookiesFile, "Persistent cookie storage database file", "FILE" },
     { "cookies-policy", 0, 0, G_OPTION_ARG_STRING, &cookiesPolicy, "Cookies accept policy (always, never, no-third-party). Default: no-third-party", "POLICY" },
     { "proxy", 0, 0, G_OPTION_ARG_STRING, &proxy, "Set proxy", "PROXY" },
@@ -147,8 +149,14 @@ static void filterSavedCallback(WebKitUserContentFilterStore *store, GAsyncResul
     g_main_loop_quit(data->mainLoop);
 }
 
-static void webViewClose(WebKitWebView* webView, gpointer)
+static void webViewClose(WebKitWebView* webView, gpointer userData)
 {
+    // Assume quitting when closing the main window
+    if (userData) {
+        GMainLoop* loop = static_cast<GMainLoop*>(userData);
+        g_main_loop_quit(loop);
+        return;
+    }
     g_object_unref(webView);
 }
 
@@ -273,6 +281,7 @@ int main(int argc, char *argv[])
         "enable-webgl", TRUE,
         "enable-media-stream", TRUE,
         "enable-encrypted-media", TRUE,
+        "allow-scripts-to-close-windows", allowScriptsToCloseWindows,
         nullptr);
 
     auto* backendPtr = backend.get();
@@ -301,6 +310,7 @@ int main(int argc, char *argv[])
     g_signal_connect(webContext, "automation-started", G_CALLBACK(automationStartedCallback), webView);
     g_signal_connect(webView, "permission-request", G_CALLBACK(decidePermissionRequest), nullptr);
     g_signal_connect(webView, "create", G_CALLBACK(createWebView), nullptr);
+    g_signal_connect(webView, "close", G_CALLBACK(webViewClose), loop);
 
     if (ignoreTLSErrors)
         webkit_web_context_set_tls_errors_policy(webContext, WEBKIT_TLS_ERRORS_POLICY_IGNORE);

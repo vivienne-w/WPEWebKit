@@ -3667,6 +3667,8 @@ void WebPage::updatePreferences(const WebPreferencesStore& store)
 
     settings.setLayoutViewportHeightExpansionFactor(store.getDoubleValueForKey(WebPreferencesKey::layoutViewportHeightExpansionFactorKey()));
 
+    settings.setAllowScriptsToCloseWindows(store.getBoolValueForKey(WebPreferencesKey::allowScriptsToCloseWindowsKey()));
+
     if (m_drawingArea)
         m_drawingArea->updatePreferences(store);
 
