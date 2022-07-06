@@ -193,6 +193,9 @@ private:
     bool filtersCanBeComposited(const FilterOperations&) const;
     bool canHaveBackingStore() const;
 
+    void updateAnimationScaleFactor();
+    void updateAnimationOrTransformScaleFactor();
+
     Nicosia::PlatformLayer::LayerID m_id;
     GraphicsLayerTransform m_layerTransform;
     TransformationMatrix m_cachedInverseTransform;
@@ -241,6 +244,9 @@ private:
     } m_nicosia;
 
     RefPtr<AnimatedBackingStoreHost> m_animatedBackingStoreHost;
+
+    float m_animationScaleFactor { 1.0 };
+    float m_animationOrTransformScaleFactor { 1.0 };
 };
 
 } // namespace WebCore
