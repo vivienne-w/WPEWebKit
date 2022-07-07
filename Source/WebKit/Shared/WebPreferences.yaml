@@ -88,7 +88,9 @@ LocalStorageEnabled:
 DatabasesEnabled:
   type: bool
   defaultValue: true
-  webcoreBinding: custom
+  humanReadableName: "DatabasesEnabled"
+  humanReadableDescription: "Controls availailability of HTML5 databases (indexedDB, webdatabase(deprecated))"
+  webcoreBinding: RuntimeEnabledFeatures
 
 XSSAuditorEnabled:
   type: bool

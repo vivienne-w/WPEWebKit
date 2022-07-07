@@ -248,8 +248,8 @@ private:
 
     void exceededDatabaseQuota(WebPageProxy*, WebFrameProxy*, API::SecurityOrigin*, const String&, const String&, unsigned long long /*currentQuota*/, unsigned long long /*currentOriginUsage*/, unsigned long long /*currentDatabaseUsage*/, unsigned long long /*expectedUsage*/, Function<void(unsigned long long)>&& completionHandler) final
     {
-        static const unsigned long long defaultQuota = 5 * 1024 * 1204; // 5 MB
-        // FIXME: Provide API for this.
+        static const unsigned long long defaultQuota = 5 * 1024 * 1024; // 5 MB
+        // FIXME: Provide API for this. This value will enlarge per origin storage quota if anything lower was used
         completionHandler(defaultQuota);
     }
 

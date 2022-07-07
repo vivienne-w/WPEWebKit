@@ -25,6 +25,7 @@
 
 [
     Conditional=INDEXED_DATABASE,
+    EnabledAtRuntime=Databases,
     SkipVTableValidation,
 ] interface IDBFactory {
     [CallWith=ScriptExecutionContext, MayThrowException] IDBOpenDBRequest open(DOMString name, optional [EnforceRange] unsigned long long version);
