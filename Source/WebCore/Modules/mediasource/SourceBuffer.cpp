@@ -1010,8 +1010,8 @@ void SourceBuffer::evictCodedFrames(size_t newDataSize)
                 break;
             }
 
-            rangeStart += timeChunk;
-            rangeEnd += timeChunk;
+            rangeStart = realRangeEnd;
+            rangeEnd = rangeStart + timeChunk;
         }
 
         timeChunkAsMilliseconds /= 2;
@@ -1038,7 +1038,7 @@ void SourceBuffer::evictCodedFrames(size_t newDataSize)
         MediaTime rangeStart = rangeEnd - timeChunk;
         size_t currentTimeRange = buffered.find(currentTime);
 
-        while (rangeStart > minimumRangeStart) {
+        while (rangeEnd > minimumRangeStart) {
 
             // Do not evict data from the time range that contains currentTime.
             size_t startTimeRange = buffered.find(rangeStart);
@@ -1057,8 +1057,8 @@ void SourceBuffer::evictCodedFrames(size_t newDataSize)
                 break;
             }
 
-            rangeStart -= timeChunk;
-            rangeEnd -= timeChunk;
+            rangeEnd = realRangeStart;
+            rangeStart = rangeEnd - timeChunk;
         }
 
         timeChunkAsMilliseconds /= 2;
