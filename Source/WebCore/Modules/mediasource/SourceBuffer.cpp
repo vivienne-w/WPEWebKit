@@ -885,7 +885,15 @@ void SourceBuffer::removeCodedFrames(const MediaTime& start, const MediaTime& en
         auto& lastSample = *minmaxDecodeTimeIterPair.second->second;
         auto removeDecodeStart = trackBuffer.samples.decodeOrder().findSampleWithDecodeKey({firstSample.decodeTime(), firstSample.presentationTime()});
         auto removeDecodeLast = trackBuffer.samples.decodeOrder().findSampleWithDecodeKey({lastSample.decodeTime(), lastSample.presentationTime()});
-        auto removeDecodeEnd = trackBuffer.samples.decodeOrder().findSyncSampleAfterDecodeIterator(removeDecodeLast);
+        auto removeDecodeEnd = trackBuffer.samples.decodeOrder().end();
+        auto removeDecodeEndReverse = trackBuffer.samples.decodeOrder().findSyncSamplePriorToPresentationTime(removeDecodeLast->first.second);
+        if (removeDecodeEndReverse != trackBuffer.samples.decodeOrder().rend()) {
+            removeDecodeEnd = trackBuffer.samples.decodeOrder().findSampleWithDecodeKey(removeDecodeEndReverse->first);
+            ASSERT(removeDecodeEnd != trackBuffer.samples.decodeOrder().end());
+        }
+
+        if (removeDecodeEnd != trackBuffer.samples.decodeOrder().end() && removeDecodeStart->first.second >= removeDecodeEnd->first.second)
+            return;
 
         DecodeOrderSampleMap::MapType erasedSamples(removeDecodeStart, removeDecodeEnd);
         PlatformTimeRanges erasedRanges = removeSamplesFromTrackBuffer(erasedSamples, trackBuffer, this, "removeCodedFrames");
@@ -912,7 +920,7 @@ void SourceBuffer::removeCodedFrames(const MediaTime& start, const MediaTime& en
         if (m_active && currentMediaTime >= start && currentMediaTime < end && m_private->readyState() > MediaPlayer::ReadyState::HaveMetadata)
             m_private->setReadyState(MediaPlayer::ReadyState::HaveMetadata);
     }
-    
+
     updateBufferedFromTrackBuffers();
 
     // 4. If buffer full flag equals true and this object is ready to accept more bytes, then set the buffer full flag to false.
@@ -1008,6 +1016,13 @@ void SourceBuffer::evictCodedFrames(size_t newDataSize)
 
         timeChunkAsMilliseconds /= 2;
     } while (timeChunkAsMilliseconds >= evictionAlgorithmTimeChunkLowThreshold && m_bufferFull);
+
+#if !LOG_DISABLED
+    if (!m_buffered->contain(currentTime.toDouble())) {
+        WARNING_LOG(LOGIDENTIFIER, "buffer ranges do not contain current time");
+        ASSERT_NOT_REACHED();
+    }
+#endif
 
     if (!m_bufferFull) {
         DEBUG_LOG(LOGIDENTIFIER, "evicted ", initialBufferedSize - extraMemoryCost());
