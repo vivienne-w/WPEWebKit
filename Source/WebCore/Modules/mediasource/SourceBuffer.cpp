@@ -1029,7 +1029,7 @@ void SourceBuffer::evictCodedFrames(size_t newDataSize)
         return;
     }
 
-
+#if !USE(GSTREAMER)
     timeChunkAsMilliseconds = evictionAlgorithmInitialTimeChunk;
     do {
         MediaTime timeChunk = MediaTime(timeChunkAsMilliseconds, 1000);
@@ -1068,6 +1068,7 @@ void SourceBuffer::evictCodedFrames(size_t newDataSize)
         DEBUG_LOG(LOGIDENTIFIER, "evicted ", initialBufferedSize - extraMemoryCost());
         return;
     }
+#endif
 
     ERROR_LOG(LOGIDENTIFIER, "FAILED to free enough after evicting ", initialBufferedSize - extraMemoryCost());
 }
