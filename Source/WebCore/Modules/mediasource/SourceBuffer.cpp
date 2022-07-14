@@ -1010,7 +1010,10 @@ void SourceBuffer::evictCodedFrames(size_t newDataSize)
                 break;
             }
 
-            rangeStart = realRangeEnd;
+            MediaTime newRangeStart = buffered.minimumBufferedTime();
+            if (newRangeStart == rangeStart)
+                break;
+            rangeStart = newRangeStart;
             rangeEnd = rangeStart + timeChunk;
         }
 
@@ -1057,7 +1060,10 @@ void SourceBuffer::evictCodedFrames(size_t newDataSize)
                 break;
             }
 
-            rangeEnd = realRangeStart;
+            MediaTime newRangeEnd = buffered.maximumBufferedTime();
+            if (newRangeEnd == rangeEnd)
+                break;
+            rangeEnd = newRangeEnd;
             rangeStart = rangeEnd - timeChunk;
         }
 
