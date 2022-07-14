@@ -822,7 +822,7 @@ static PlatformTimeRanges removeSamplesFromTrackBuffer(const DecodeOrderSampleMa
     return erasedRanges;
 }
 
-void SourceBuffer::removeCodedFrames(const MediaTime& start, const MediaTime& end)
+void SourceBuffer::removeCodedFrames(const MediaTime& start, const MediaTime& end, RemoveCodedFramesFlavor flavor)
 {
     DEBUG_LOG(LOGIDENTIFIER, "start = ", start, ", end = ", end);
 
@@ -885,15 +885,14 @@ void SourceBuffer::removeCodedFrames(const MediaTime& start, const MediaTime& en
         auto& lastSample = *minmaxDecodeTimeIterPair.second->second;
         auto removeDecodeStart = trackBuffer.samples.decodeOrder().findSampleWithDecodeKey({firstSample.decodeTime(), firstSample.presentationTime()});
         auto removeDecodeLast = trackBuffer.samples.decodeOrder().findSampleWithDecodeKey({lastSample.decodeTime(), lastSample.presentationTime()});
-        auto removeDecodeEnd = trackBuffer.samples.decodeOrder().end();
-        auto removeDecodeEndReverse = trackBuffer.samples.decodeOrder().findSyncSamplePriorToPresentationTime(removeDecodeLast->first.second);
-        if (removeDecodeEndReverse != trackBuffer.samples.decodeOrder().rend()) {
+        auto removeDecodeEnd = trackBuffer.samples.decodeOrder().findSyncSampleAfterDecodeIterator(removeDecodeLast);
+        if (flavor == RemoveCodedFramesFlavor::SyncPriorToEnd && removeDecodeEnd != trackBuffer.samples.decodeOrder().end() && removeDecodeEnd->first.second > end) {
+            auto removeDecodeEndReverse = trackBuffer.samples.decodeOrder().findSyncSamplePriorToPresentationTime(removeDecodeLast->first.second);
             removeDecodeEnd = trackBuffer.samples.decodeOrder().findSampleWithDecodeKey(removeDecodeEndReverse->first);
             ASSERT(removeDecodeEnd != trackBuffer.samples.decodeOrder().end());
+            if (removeDecodeEnd != trackBuffer.samples.decodeOrder().end() && removeDecodeStart->first.second >= removeDecodeEnd->first.second)
+                return;
         }
-
-        if (removeDecodeEnd != trackBuffer.samples.decodeOrder().end() && removeDecodeStart->first.second >= removeDecodeEnd->first.second)
-            return;
 
         DecodeOrderSampleMap::MapType erasedSamples(removeDecodeStart, removeDecodeEnd);
         PlatformTimeRanges erasedRanges = removeSamplesFromTrackBuffer(erasedSamples, trackBuffer, this, "removeCodedFrames");
@@ -1004,7 +1003,8 @@ void SourceBuffer::evictCodedFrames(size_t newDataSize)
             // 4. For each range in removal ranges, run the coded frame removal algorithm with start and
             // end equal to the removal range start and end timestamp respectively.
             MediaTime realRangeEnd = std::min(rangeEnd, maximumRangeEnd);
-            removeCodedFrames(rangeStart, realRangeEnd);
+            // We want to ensure we are not removing currentTime if it falls just between end and the sync sample after it.
+            removeCodedFrames(rangeStart, realRangeEnd, RemoveCodedFramesFlavor::SyncPriorToEnd);
             if (extraMemoryCost() + newDataSize < maximumBufferSize) {
                 m_bufferFull = false;
                 break;

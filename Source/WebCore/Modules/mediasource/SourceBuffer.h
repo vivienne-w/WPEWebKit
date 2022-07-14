@@ -193,7 +193,9 @@ private:
     void monitorBufferingRate();
 
     void removeTimerFired();
-    void removeCodedFrames(const MediaTime& start, const MediaTime& end);
+
+    enum class RemoveCodedFramesFlavor { SyncAfterEnd, SyncPriorToEnd };
+    void removeCodedFrames(const MediaTime& start, const MediaTime& end, RemoveCodedFramesFlavor flavor = RemoveCodedFramesFlavor::SyncAfterEnd);
 
     size_t extraMemoryCost() const;
     void reportExtraMemoryAllocated();
