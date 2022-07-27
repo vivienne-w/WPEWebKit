@@ -248,6 +248,7 @@ public:
 #endif
 
     GstElement* videoSink() const { return m_videoSink.get(); }
+    GstElement* audioSink() const;
 
 protected:
     enum MainThreadNotification {
@@ -421,7 +422,6 @@ private:
 
     GstElement* createVideoSink();
     GstElement* createAudioSink();
-    GstElement* audioSink() const;
 
     friend class MediaPlayerFactoryGStreamer;
     static void getSupportedTypes(HashSet<String, ASCIICaseInsensitiveHash>&);
