@@ -88,7 +88,7 @@ static const double ExponentialMovingAverageCoefficient = 0.1;
 static const MediaTime discontinuityTolerance = MediaTime(1, 1);
 
 static const unsigned evictionAlgorithmInitialTimeChunk = 30000;
-static const unsigned evictionAlgorithmTimeChunkLowThreshold = 100;
+static const unsigned evictionAlgorithmTimeChunkLowThreshold = 3000;
 
 struct SourceBuffer::TrackBuffer {
     MediaTime lastDecodeTimestamp;
