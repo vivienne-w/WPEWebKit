@@ -387,9 +387,8 @@ void PlaybackPipeline::enqueueSample(Ref<MediaSample>&& mediaSample)
 
     AtomString trackId = mediaSample->trackID();
 
-    GST_TRACE("enqueing sample trackId=%s PTS=%f presentationSize=%.0fx%.0f at %" GST_TIME_FORMAT " duration: %" GST_TIME_FORMAT,
-        trackId.string().utf8().data(), mediaSample->presentationTime().toFloat(),
-        mediaSample->presentationSize().width(), mediaSample->presentationSize().height(),
+    GST_TRACE("enqueing sample trackId=%s %s at %" GST_TIME_FORMAT,
+        trackId.string().utf8().data(), mediaSample->toJSONString().utf8().data(), 
         GST_TIME_ARGS(WebCore::toGstClockTime(mediaSample->presentationTime())),
         GST_TIME_ARGS(WebCore::toGstClockTime(mediaSample->duration())));
 
