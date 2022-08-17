@@ -2157,21 +2157,21 @@ void HTMLMediaElement::noneSupported()
 
 void HTMLMediaElement::mediaLoadingFailedFatally(MediaPlayer::NetworkState error)
 {
-    // 1 - The user agent should cancel the fetching process.
-    stopPeriodicTimers();
-    m_loadState = WaitingForSource;
+    // https://html.spec.whatwg.org/#loading-the-media-resource:dom-media-have_nothing-2
+    // 17 March 2021
+
+    const String playerErrMsg = m_player ? m_player->lastErrorMessage() : ""_s;
 
     const auto getErrorMessage = [&] (String&& defaultMessage) {
-        String message = WTFMove(defaultMessage);
-        if (!m_player)
-            return message;
-
-        auto lastErrorMessage = m_player->lastErrorMessage();
-        if (!lastErrorMessage)
-            return message;
-
-        return makeString(message, ": ", lastErrorMessage);
+        if (playerErrMsg.isEmpty())
+            return WTFMove(defaultMessage);
+        return makeString(WTFMove(defaultMessage), ": ", playerErrMsg);
     };
+
+    ERROR_LOG(LOGIDENTIFIER, "error = ", static_cast<int>(error));
+
+    // 1 - The user agent should cancel the fetching process.
+    clearMediaPlayer();
 
     // 2 - Set the error attribute to a new MediaError object whose code attribute is
     // set to MEDIA_ERR_NETWORK/MEDIA_ERR_DECODE.
@@ -2182,20 +2182,14 @@ void HTMLMediaElement::mediaLoadingFailedFatally(MediaPlayer::NetworkState error
     else
         ASSERT_NOT_REACHED();
 
-    // 3 - Queue a task to fire a simple event named error at the media element.
-    scheduleEvent(eventNames().errorEvent);
+    // 3 - Set the element's networkState attribute to the NETWORK_IDLE value.
+    m_networkState = NETWORK_IDLE;
 
-#if ENABLE(MEDIA_SOURCE)
-    detachMediaSource();
-#endif
-
-    // 4 - Set the element's networkState attribute to the NETWORK_EMPTY value and queue a
-    // task to fire a simple event called emptied at the element.
-    m_networkState = NETWORK_EMPTY;
-    scheduleEvent(eventNames().emptiedEvent);
-
-    // 5 - Set the element's delaying-the-load-event flag to false. This stops delaying the load event.
+    // 4 - Set the element's delaying-the-load-event flag to false. This stops delaying the load event.
     setShouldDelayLoadEvent(false);
+
+    // 5 - Fire an event named error at the media element.
+    dispatchEvent(Event::create(eventNames().errorEvent, Event::CanBubble::No, Event::IsCancelable::No));
 
     // 6 - Abort the overall resource selection algorithm.
     m_currentSourceNode = nullptr;
