@@ -875,6 +875,8 @@ void RenderLayer::contentChanged(ContentChangeType changeType)
 
     if (auto* backing = this->backing())
         backing->contentChanged(changeType);
+    else if (changeType == VideoChanged)
+        compositor().scheduleCompositingLayerUpdate();
 }
 
 bool RenderLayer::canRender3DTransforms() const
