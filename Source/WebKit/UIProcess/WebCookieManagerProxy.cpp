@@ -245,4 +245,20 @@ void WebCookieManagerProxy::getHTTPCookieAcceptPolicy(PAL::SessionID, Completion
     });
 }
 
+void WebCookieManagerProxy::setCookieJar(PAL::SessionID sessionID, const Vector<Cookie>& cookies, CompletionHandler<void()>&& callbackFunction)
+{
+    auto& networkProcess = processPool()->ensureNetworkProcess();
+    networkProcess.sendWithAsyncReply(Messages::WebCookieManager::SetCookieJar(sessionID, cookies), [callbackFunction = WTFMove(callbackFunction), activity = networkProcess.throttler().backgroundActivity("WebCookieManagerProxy::setCookieJar"_s)]() mutable {
+        callbackFunction();
+    });
+}
+
+void WebCookieManagerProxy::getCookieJar(PAL::SessionID sessionID, CompletionHandler<void(Vector<Cookie>&&)>&& callbackFunction)
+{
+    auto& networkProcess = processPool()->ensureNetworkProcess();
+    networkProcess.sendWithAsyncReply(Messages::WebCookieManager::GetCookieJar(sessionID), [callbackFunction = WTFMove(callbackFunction), activity = networkProcess.throttler().backgroundActivity("WebCookieManagerProxy::getCookieJar"_s)](Vector<Cookie>&& cookies) mutable {
+        callbackFunction(WTFMove(cookies));
+    });
+}
+
 } // namespace WebKit

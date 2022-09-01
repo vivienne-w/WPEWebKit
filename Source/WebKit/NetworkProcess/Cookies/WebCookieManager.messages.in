@@ -44,4 +44,7 @@ messages -> WebCookieManager NotRefCounted {
 #if USE(SOUP)
     void SetCookiePersistentStorage(PAL::SessionID sessionID, String storagePath, enum:bool WebKit::SoupCookiePersistentStorageType storageType)
 #endif
+
+    void SetCookieJar(PAL::SessionID sessionID, Vector<WebCore::Cookie> cookies) -> () Async
+    void GetCookieJar(PAL::SessionID sessionID) -> (Vector<WebCore::Cookie> cookies) Async
 }

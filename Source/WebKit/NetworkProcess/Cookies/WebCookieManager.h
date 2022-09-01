@@ -85,6 +85,9 @@ private:
     void startObservingCookieChanges(PAL::SessionID);
     void stopObservingCookieChanges(PAL::SessionID);
 
+    void setCookieJar(PAL::SessionID, const Vector<WebCore::Cookie>&, CompletionHandler<void()>&&);
+    void getCookieJar(PAL::SessionID, CompletionHandler<void(Vector<WebCore::Cookie>&&)>&&);
+
     NetworkProcess& m_process;
 };
 

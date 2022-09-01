@@ -145,6 +145,28 @@ webkit_cookie_manager_delete_cookie_finish            (WebKitCookieManager      
                                                        GAsyncResult                 *result,
                                                        GError                      **error);
 
+WEBKIT_API void
+webkit_cookie_manager_set_cookie_jar                  (WebKitCookieManager          *cookie_manager,
+                                                       GList                        *cookies,
+                                                       GCancellable                 *cancellable,
+                                                       GAsyncReadyCallback           callback,
+                                                       gpointer                      user_data);
+
+WEBKIT_API gboolean
+webkit_cookie_manager_set_cookie_jar_finish           (WebKitCookieManager          *cookie_manager,
+                                                       GAsyncResult                 *result,
+                                                       GError                      **error);
+
+WEBKIT_API void
+webkit_cookie_manager_get_cookie_jar                  (WebKitCookieManager          *cookie_manager,
+                                                       GCancellable                 *cancellable,
+                                                       GAsyncReadyCallback           callback,
+                                                       gpointer                      user_data);
+
+WEBKIT_API GList *
+webkit_cookie_manager_get_cookie_jar_finish           (WebKitCookieManager          *cookie_manager,
+                                                       GAsyncResult                 *result,
+                                                       GError                      **error);
 G_END_DECLS
 
 #endif

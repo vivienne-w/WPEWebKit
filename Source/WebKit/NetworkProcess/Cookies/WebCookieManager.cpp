@@ -154,4 +154,20 @@ void WebCookieManager::getHTTPCookieAcceptPolicy(CompletionHandler<void(HTTPCook
     completionHandler(m_process.defaultStorageSession().cookieAcceptPolicy());
 }
 
+void WebCookieManager::setCookieJar(PAL::SessionID sessionID, const Vector<WebCore::Cookie>& cookies, CompletionHandler<void()>&& completionHandler)
+{
+    if (auto* storageSession = m_process.storageSession(sessionID))
+        storageSession->setCookieJar(cookies);
+    completionHandler();
+}
+
+void WebCookieManager::getCookieJar(PAL::SessionID sessionID, CompletionHandler<void(Vector<WebCore::Cookie>&&)>&& completionHandler)
+{
+    Vector<Cookie> cookies;
+    if (auto* storageSession = m_process.storageSession(sessionID))
+        cookies = storageSession->getCookieJar();
+    completionHandler(WTFMove(cookies));
+}
+
+
 } // namespace WebKit
