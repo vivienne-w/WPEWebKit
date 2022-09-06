@@ -502,3 +502,59 @@ void webkit_cookie_manager_delete_all_cookies(WebKitCookieManager* manager)
     webkit_website_data_manager_clear(manager->priv->dataManager, WEBKIT_WEBSITE_DATA_COOKIES, 0, nullptr, nullptr, nullptr);
 }
 #endif
+
+void webkit_cookie_manager_set_cookie_jar(WebKitCookieManager* manager, GList* cookies, GCancellable* cancellable, GAsyncReadyCallback callback, gpointer userData)
+{
+    g_return_if_fail(WEBKIT_IS_COOKIE_MANAGER(manager));
+    g_return_if_fail(cookies);
+
+    size_t cookiesLen = (size_t)g_list_length(cookies);
+    g_return_if_fail(cookiesLen != 0);
+
+    GRefPtr<GTask> task = adoptGRef(g_task_new(manager, cancellable, callback, userData));
+
+    Vector<WebCore::Cookie> webCookies;
+    webCookies.reserveInitialCapacity(cookiesLen);
+    for (GList* it = cookies; it != NULL; it = g_list_next(it)) {
+        webCookies.append(WebCore::Cookie((SoupCookie*)it->data));
+    }
+
+    const auto& processPools = webkitWebsiteDataManagerGetProcessPools(manager->priv->dataManager);
+    processPools[0]->supplement<WebCookieManagerProxy>()->setCookieJar(manager->priv->sessionID(), webCookies, [task = WTFMove(task)]() {
+        g_task_return_boolean(task.get(), TRUE);
+    });
+}
+
+gboolean webkit_cookie_manager_set_cookie_jar_finish(WebKitCookieManager* manager, GAsyncResult* result, GError** error)
+{
+    g_return_val_if_fail(WEBKIT_IS_COOKIE_MANAGER(manager), FALSE);
+    g_return_val_if_fail(g_task_is_valid(result, manager), FALSE);
+
+    return g_task_propagate_boolean(G_TASK(result), error);
+}
+
+void webkit_cookie_manager_get_cookie_jar(WebKitCookieManager* manager, GCancellable* cancellable, GAsyncReadyCallback callback, gpointer userData)
+{
+    g_return_if_fail(WEBKIT_IS_COOKIE_MANAGER(manager));
+
+    GRefPtr<GTask> task = adoptGRef(g_task_new(manager, cancellable, callback, userData));
+
+    const auto& processPools = webkitWebsiteDataManagerGetProcessPools(manager->priv->dataManager);
+    processPools[0]->supplement<WebCookieManagerProxy>()->getCookieJar(manager->priv->sessionID(), [task = WTFMove(task)](const Vector<WebCore::Cookie>& cookies) {
+        GList* cookiesList = nullptr;
+        for (auto& cookie : cookies)
+            cookiesList = g_list_prepend(cookiesList, cookie.toSoupCookie());
+
+        g_task_return_pointer(task.get(), g_list_reverse(cookiesList), [](gpointer data) {
+            g_list_free_full(static_cast<GList*>(data), reinterpret_cast<GDestroyNotify>(soup_cookie_free));
+        });
+    });
+}
+
+GList* webkit_cookie_manager_get_cookie_jar_finish(WebKitCookieManager* manager, GAsyncResult* result, GError** error)
+{
+    g_return_val_if_fail(WEBKIT_IS_COOKIE_MANAGER(manager), nullptr);
+    g_return_val_if_fail(g_task_is_valid(result, manager), nullptr);
+
+    return reinterpret_cast<GList*>(g_task_propagate_pointer(G_TASK(result), error));
+}

@@ -563,6 +563,53 @@ void NetworkStorageSession::flushCookieStore()
     // FIXME: Implement for WK2 to use.
 }
 
+void NetworkStorageSession::setCookieJar(const Vector<Cookie>& cookies)
+{
+    SoupCookieJar* jar = cookieStorage();
+
+    // in order to preserve cookie change callback existing cookies are deleted
+    // and then setting the cookies.
+    // To prevent from calling cookie change handlers during it
+    // blocking all the handlers and then unblocking after the cookies are set
+    guint signal_id = g_signal_lookup("changed", soup_cookie_jar_get_type());
+    GArray* blocked_handler_id_array = g_array_new(FALSE, FALSE, sizeof(gulong));
+    gulong handler_id;
+    while ((handler_id = g_signal_handler_find(jar, (GSignalMatchType)(G_SIGNAL_MATCH_ID | G_SIGNAL_MATCH_UNBLOCKED), signal_id, 0, NULL, NULL, NULL))) {
+        g_array_append_val(blocked_handler_id_array, handler_id);
+        g_signal_handler_block(jar, handler_id);
+    }
+    deleteAllCookies();
+    for (const auto& cookie : cookies)
+        soup_cookie_jar_add_cookie(jar, cookie.toSoupCookie());
+
+    for (guint i = 0; i < blocked_handler_id_array->len; ++i)
+    {
+        handler_id = g_array_index(blocked_handler_id_array, gulong, i);
+        g_signal_handler_unblock(jar, handler_id);
+    }
+    g_array_unref(blocked_handler_id_array);
+}
+
+Vector<Cookie> NetworkStorageSession::getCookieJar()
+{
+    SoupCookieJar* jar = cookieStorage();
+    if (!jar)
+        return {};
+
+    GUniquePtr<GSList> cookies(soup_cookie_jar_all_cookies(jar));
+    if (!cookies)
+        return {};
+
+    Vector<Cookie> returnCookies;
+    returnCookies.reserveInitialCapacity(g_slist_length(cookies.get()));
+    for (GSList* iter = cookies.get(); iter; iter = g_slist_next(iter)) {
+        SoupCookie* cookie = static_cast<SoupCookie*>(iter->data);
+        returnCookies.append(Cookie { cookie });
+        soup_cookie_free(cookie);
+    }
+    return returnCookies;
+}
+
 } // namespace WebCore
 
 #endif // USE(SOUP)
