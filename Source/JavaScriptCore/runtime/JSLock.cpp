@@ -201,10 +201,9 @@ void JSLock::unlock(intptr_t unlockCount)
 }
 
 void JSLock::willReleaseLock()
-{   
+{
     RefPtr<VM> vm = m_vm;
     if (vm) {
-        RELEASE_ASSERT_WITH_MESSAGE(!vm->hasCheckpointOSRSideState(), "Releasing JSLock but pending checkpoint side state still available");
         vm->drainMicrotasks();
 
         if (!vm->topCallFrame)
@@ -212,7 +211,7 @@ void JSLock::willReleaseLock()
 
         vm->heap.releaseDelayedReleasedObjects();
         vm->setStackPointerAtVMEntry(nullptr);
-        
+
         if (m_shouldReleaseHeapAccess)
             vm->heap.releaseAccess();
     }
