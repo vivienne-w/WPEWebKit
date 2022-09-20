@@ -185,7 +185,7 @@ void MediaPlayerPrivateGStreamerMSE::seek(const MediaTime& time)
         return;
     }
 
-    if (m_isLiveStream)
+    if (m_isLiveStream.value_or(false))
         return;
 
     if (m_isSeeking && m_isSeekPending) {
