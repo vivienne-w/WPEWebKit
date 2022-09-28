@@ -454,6 +454,7 @@ void SourceBuffer::seekToTime(const MediaTime& time)
         TrackBuffer& trackBuffer = trackBufferPair.value;
         const auto& trackID = trackBufferPair.key;
 
+        printf("### %s: Setting needsReenqueuing to true for trackId %s because of seek\n", __PRETTY_FUNCTION__, trackID.string().utf8().data()); fflush(stdout);
         trackBuffer.needsReenqueueing = true;
         reenqueueMediaForTime(trackBuffer, trackID, time);
     }
@@ -809,7 +810,9 @@ void SourceBuffer::removeCodedFrames(const MediaTime& start, const MediaTime& en
 
     // 2. Let end be the end presentation timestamp for the removal range.
     // 3. For each track buffer in this source buffer, run the following steps:
-    for (auto& trackBuffer : m_trackBufferMap.values()) {
+    for (auto& trackBufferPair : m_trackBufferMap) {
+        TrackBuffer& trackBuffer = trackBufferPair.value;
+        const auto& trackID = trackBufferPair.key;
         // 3.1. Let remove end timestamp be the current value of duration
         // 3.2 If this track buffer has a random access point timestamp that is greater than or equal to end, then update
         // remove end timestamp to that random access point timestamp.
@@ -891,8 +894,10 @@ void SourceBuffer::removeCodedFrames(const MediaTime& start, const MediaTime& en
             ) {
             PlatformTimeRanges possiblyEnqueuedRanges(currentMediaTime, trackBuffer.lastEnqueuedPresentationTime);
             possiblyEnqueuedRanges.intersectWith(erasedRanges);
-            if (possiblyEnqueuedRanges.length())
+            if (possiblyEnqueuedRanges.length()) {
+                printf("### %s: Setting needsReenqueuing to true for trackId %s because of removal\n", __PRETTY_FUNCTION__, trackID.string().utf8().data()); fflush(stdout);
                 trackBuffer.needsReenqueueing = true;
+            }
         }
 
         erasedRanges.invert();
@@ -1843,8 +1848,10 @@ void SourceBuffer::sourceBufferPrivateDidReceiveSample(MediaSample& sample)
                 ) {
                 PlatformTimeRanges possiblyEnqueuedRanges(currentMediaTime, trackBuffer.lastEnqueuedPresentationTime);
                 possiblyEnqueuedRanges.intersectWith(erasedRanges);
-                if (possiblyEnqueuedRanges.length())
+                if (possiblyEnqueuedRanges.length()) {
+                    printf("### %s: Setting needsReenqueuing to true for trackId %s because of overwriting\n", __PRETTY_FUNCTION__, trackID.string().utf8().data()); fflush(stdout);
                     trackBuffer.needsReenqueueing = true;
+                }
             }
 
             erasedRanges.invert();
@@ -2076,6 +2083,7 @@ void SourceBuffer::sourceBufferPrivateReenqueSamples(const AtomicString& trackID
         return;
 
     auto& trackBuffer = it->value;
+    printf("### %s: Setting needsReenqueuing to true for trackId %s because of explicit reenqueue\n", __PRETTY_FUNCTION__, trackID.string().utf8().data()); fflush(stdout);
     trackBuffer.needsReenqueueing = true;
     reenqueueMediaForTime(trackBuffer, trackID, m_source->currentTime());
 }
