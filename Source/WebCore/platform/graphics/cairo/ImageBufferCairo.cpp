@@ -183,6 +183,9 @@ void ImageBufferData::swapBuffersIfNeeded()
     cairo_set_operator(m_compositorCr.get(), CAIRO_OPERATOR_SOURCE);
     cairo_paint(m_compositorCr.get());
 
+    // Flush all pending drawing operations as compositor uses GL texture directly, outside of Cairo
+    cairo_surface_flush(m_compositorSurface.get());
+
     if (previousActiveContext)
         previousActiveContext->makeContextCurrent();
 }
