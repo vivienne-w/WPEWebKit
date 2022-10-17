@@ -2923,25 +2923,9 @@ void MediaPlayerPrivateGStreamer::createGSTPlayBin(const URL& url, const String&
 
     g_object_set(m_pipeline.get(), "mute", m_player->muted(), nullptr);
 
-    g_signal_connect(GST_BIN_CAST(m_pipeline.get()), "deep-element-added", G_CALLBACK(+[](GstBin*, GstBin* subBin, GstElement* element, MediaPlayerPrivateGStreamer* player) {
-        GUniquePtr<char> binName(gst_element_get_name(GST_ELEMENT_CAST(subBin)));
-        if (!g_str_has_prefix(binName.get(), "decodebin"))
-            return;
-
-        GUniquePtr<char> elementName(gst_element_get_name(element));
-        if (g_str_has_prefix(elementName.get(), "v4l2"))
-            player->m_videoDecoderPlatform = GstVideoDecoderPlatform::Video4Linux;
-        else if (g_str_has_prefix(elementName.get(), "imxvpudec"))
-            player->m_videoDecoderPlatform = GstVideoDecoderPlatform::ImxVPU;
-        else if (g_str_has_prefix(elementName.get(), "omx"))
-            player->m_videoDecoderPlatform = GstVideoDecoderPlatform::OpenMAX;
-
-#if USE(TEXTURE_MAPPER_GL)
-        player->updateTextureMapperFlags();
-#endif
+    g_signal_connect(GST_BIN_CAST(m_pipeline.get()), "element-setup", G_CALLBACK(+[](GstBin*, GstElement* element, MediaPlayerPrivateGStreamer* player) {
+        player->configureElement(element);
     }), this);
-
-    g_signal_connect_swapped(m_pipeline.get(), "element-setup", G_CALLBACK(elementSetupCallback), this);
     g_signal_connect_swapped(m_pipeline.get(), "source-setup", G_CALLBACK(sourceSetupCallback), this);
     if (m_isLegacyPlaybin) {
         g_signal_connect_swapped(m_pipeline.get(), "video-changed", G_CALLBACK(videoChangedCallback), this);
@@ -3863,15 +3847,30 @@ WTFLogChannel& MediaPlayerPrivateGStreamer::logChannel() const
 }
 #endif
 
-void MediaPlayerPrivateGStreamer::elementSetupCallback(MediaPlayerPrivateGStreamer* player, GstElement* element, GstElement* /*pipeline*/)
+void MediaPlayerPrivateGStreamer::configureElement(GstElement* element)
 {
+    GUniquePtr<char> binName(gst_element_get_name(GST_ELEMENT_PARENT(element)));
+    if (g_str_has_prefix(binName.get(), "decodebin")) {
+        GUniquePtr<char> elementName(gst_element_get_name(element));
+        if (g_str_has_prefix(elementName.get(), "v4l2"))
+            m_videoDecoderPlatform = GstVideoDecoderPlatform::Video4Linux;
+        else if (g_str_has_prefix(elementName.get(), "imxvpudec"))
+            m_videoDecoderPlatform = GstVideoDecoderPlatform::ImxVPU;
+        else if (g_str_has_prefix(elementName.get(), "omx"))
+            m_videoDecoderPlatform = GstVideoDecoderPlatform::OpenMAX;
+
+    #if USE(TEXTURE_MAPPER_GL)
+        updateTextureMapperFlags();
+    #endif
+    }
+
     GST_DEBUG("Element set-up for %s", GST_ELEMENT_NAME(element));
 
 #if PLATFORM(AMLOGIC)
     if(!g_strcmp0(G_OBJECT_TYPE_NAME(G_OBJECT(element)), "GstAmlHalAsink")) {
         GST_INFO("Set property disable-xrun to TRUE");
         g_object_set(element, "disable-xrun", TRUE, nullptr);
-        if (player->hasVideo())
+        if (hasVideo())
             g_object_set(G_OBJECT(element), "wait-video", TRUE, nullptr);
     }
 #endif
@@ -3904,14 +3903,14 @@ void MediaPlayerPrivateGStreamer::elementSetupCallback(MediaPlayerPrivateGStream
     });
     if (G_TYPE_CHECK_INSTANCE_TYPE(G_OBJECT(element), westerosSinkType)) {
 #if ENABLE(MEDIA_STREAM)
-        if (player->m_streamPrivate != nullptr && g_object_class_find_property(G_OBJECT_GET_CLASS(element), "immediate-output")) {
+        if (m_streamPrivate != nullptr && g_object_class_find_property(G_OBJECT_GET_CLASS(element), "immediate-output")) {
             GST_DEBUG("Enable 'immediate-output' in WesterosSink");
             g_object_set (G_OBJECT(element), "immediate-output", TRUE, nullptr);
         }
 #endif
     }
     // FIXME: Following is a hack needed to get westeros-sink autoplug correctly with playbin3.
-    if (!player->m_isLegacyPlaybin && westerosSinkCaps && g_str_has_prefix(GST_ELEMENT_NAME(element), "uridecodebin3")) {
+    if (!m_isLegacyPlaybin && westerosSinkCaps && g_str_has_prefix(GST_ELEMENT_NAME(element), "uridecodebin3")) {
         GstCaps* defaultCaps = nullptr;
         g_object_get (element, "caps", &defaultCaps, NULL);
         defaultCaps = gst_caps_merge(gst_caps_ref(westerosSinkCaps), defaultCaps);
@@ -3920,6 +3919,9 @@ void MediaPlayerPrivateGStreamer::elementSetupCallback(MediaPlayerPrivateGStream
         gst_caps_unref(defaultCaps);
     }
 #endif
+
+    if (!g_strcmp0(G_OBJECT_TYPE_NAME(G_OBJECT(element)), "GstQueue2"))
+        g_object_set(G_OBJECT(element), "high-watermark", 0.10, nullptr);
 }
 
 void MediaPlayerPrivateGStreamer::checkPlayingConsitency()

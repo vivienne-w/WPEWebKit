@@ -467,6 +467,7 @@ private:
     void purgeOldDownloadFiles(const char*);
     static void uriDecodeBinElementAddedCallback(GstBin*, GstElement*, MediaPlayerPrivateGStreamer*);
     static void downloadBufferFileCreatedCallback(MediaPlayerPrivateGStreamer*);
+    void configureElement(GstElement*);
 
     void setPlaybinURL(const URL& urlString);
     void loadFull(const String& url, const String& pipelineName);
