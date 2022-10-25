@@ -42,10 +42,10 @@ class WebProcessMain final : public ChildProcessMainBase {
 public:
     bool platformInitialize() override
     {
-//#if ENABLE(DEVELOPER_MODE)
+#if ENABLE(DEVELOPER_MODE)
         if (g_getenv("WEBKIT2_PAUSE_WEB_PROCESS_ON_LAUNCH"))
             WTF::sleep(30_s);
-//#endif
+#endif
 
         // Required for GStreamer initialization.
         // FIXME: This should be probably called in other processes as well.
