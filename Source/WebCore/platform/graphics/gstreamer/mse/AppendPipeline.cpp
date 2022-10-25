@@ -684,8 +684,10 @@ createOptionalParserForFormat(GstPad* demuxerSrcPad)
     }
     if (!g_strcmp0(mediaType, "video/x-h264")) {
         GstElement* h264parse = gst_element_factory_make("h264parse", parserName.get());
-        ASSERT(h264parse);
-        g_return_val_if_fail(h264parse, nullptr);
+        // It's better if we create the h264parse, but it's not fatal if it's not available on some platforms where the decoder understands both avc and byte-stream.
+        if (!h264parse)
+            GST_WARNING("Couldn't create h264parse, there might be problems processing some MSE streams. "
+                "Continue at your own risk and consider adding h264parse to your build.");
         return GRefPtr<GstElement>(h264parse);
     }
 
