@@ -3066,6 +3066,105 @@ bool MediaPlayerPrivateGStreamer::canSaveMediaData() const
     return false;
 }
 
+void MediaPlayerPrivateGStreamer::multiqueuePadAddedCallback(GstElement* mq, GstPad* pad, gpointer) {
+    gulong ret = gst_pad_add_probe(
+        pad,
+        (GstPadProbeType) (
+            GST_PAD_PROBE_TYPE_BUFFER | GST_PAD_PROBE_TYPE_BUFFER_LIST |
+            GST_PAD_PROBE_TYPE_QUERY_BOTH | GST_PAD_PROBE_TYPE_EVENT_BOTH |
+            GST_PAD_PROBE_TYPE_EVENT_FLUSH),
+        [](GstPad* pad, GstPadProbeInfo* info, gpointer data) -> GstPadProbeReturn {
+            GstElement* mq = GST_ELEMENT(data);
+            char* mqName = GST_ELEMENT_NAME(mq);
+            char* padName = GST_PAD_NAME(pad);
+
+            if (info->type & GST_PAD_PROBE_TYPE_BUFFER) {
+                GstBuffer* buf = gst_pad_probe_info_get_buffer(info);
+                GST_TRACE(
+                    "probe %11s %6s BUFFER: dts %" GST_TIME_FORMAT
+                        ", pts %" GST_TIME_FORMAT ", duration %" GST_TIME_FORMAT,
+                    mqName, padName,
+                    GST_TIME_ARGS(GST_BUFFER_DTS(buf)),
+                    GST_TIME_ARGS(GST_BUFFER_PTS(buf)),
+                    GST_TIME_ARGS(GST_BUFFER_DURATION(buf))
+                );
+            }
+            if (info->type & GST_PAD_PROBE_TYPE_BUFFER_LIST) {
+                GST_TRACE("probe %11s %6s BUFFER_LIST", mqName, padName);
+            }
+            if (info->type & (GST_PAD_PROBE_TYPE_QUERY_DOWNSTREAM | GST_PAD_PROBE_TYPE_QUERY_UPSTREAM)) {
+                GstQuery* query = gst_pad_probe_info_get_query(info);
+                const char* queryKind;
+                if (info->type & GST_PAD_PROBE_TYPE_QUERY_DOWNSTREAM) {
+                    queryKind = "QUERY_DOWNSTREAM";
+                } else {
+                    queryKind = "QUERY_UPSTREAM";
+                }
+
+                GST_TRACE(
+                    "probe %11s %6s %s: %s",
+                    mqName, padName, queryKind, GST_QUERY_TYPE_NAME(query)
+                );
+            }
+            if (info->type & (GST_PAD_PROBE_TYPE_EVENT_BOTH | GST_PAD_PROBE_TYPE_EVENT_FLUSH)) {
+                GstEvent* event = gst_pad_probe_info_get_event(info);
+                const char* eventKind;
+                if (info->type & GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM) {
+                    eventKind = "EVENT_DOWNSTREAM";
+                } else if (info->type & GST_PAD_PROBE_TYPE_EVENT_UPSTREAM) {
+                    eventKind = "EVENT_UPSTREAM";
+                } else {
+                    eventKind = "EVENT_FLUSH";
+                }
+
+                switch (GST_EVENT_TYPE(event)) {
+                    case GST_EVENT_QOS: {
+                        GstQOSType qosType;
+                        const char* qosTypeName;
+                        double proportion;
+                        GstClockTimeDiff diff;
+
+                        gst_event_parse_qos(event, &qosType, &proportion, &diff, nullptr);
+                        switch (qosType) {
+                            case GST_QOS_TYPE_OVERFLOW:
+                                qosTypeName = "OVERFLOW";
+                                break;
+                            case GST_QOS_TYPE_UNDERFLOW:
+                                qosTypeName = "UNDERFLOW";
+                                break;
+                            case GST_QOS_TYPE_THROTTLE:
+                                qosTypeName = "THROTTLE";
+                                break;
+                        }
+
+                        GST_TRACE(
+                            "probe %11s %6s %s: %s, type %s, proportion %f, diff %" GST_STIME_FORMAT,
+                            mqName, padName, eventKind, GST_EVENT_TYPE_NAME(event),
+                            qosTypeName, proportion, GST_STIME_ARGS(diff)
+                        );
+                        break;
+                    }
+                    default:
+                        GST_TRACE(
+                            "probe %11s %6s %s: %s",
+                            mqName, padName, eventKind, GST_EVENT_TYPE_NAME(event)
+                        );
+                }
+            }
+
+            return GST_PAD_PROBE_OK;
+        },
+        mq,
+        nullptr
+    );
+
+    if (ret) {
+        GST_TRACE("added probe: %s %s (%lu)", GST_ELEMENT_NAME(mq), GST_PAD_NAME(pad), ret);
+    } else {
+        GST_TRACE("failed to add probe: %s %s", GST_ELEMENT_NAME(mq), GST_PAD_NAME(pad));
+    }
+}
+
 void MediaPlayerPrivateGStreamer::elementSetupCallback(MediaPlayerPrivateGStreamer* player, GstElement* element, GstElement* /*pipeline*/)
 {
     GST_DEBUG("Element set-up for %s", GST_ELEMENT_NAME(element));
@@ -3074,6 +3173,11 @@ void MediaPlayerPrivateGStreamer::elementSetupCallback(MediaPlayerPrivateGStream
         g_object_set(G_OBJECT(element), "async", TRUE, nullptr);
     }
 #endif
+
+    const char* typeName = G_OBJECT_TYPE_NAME(G_OBJECT(element));
+    if (!g_strcmp0(typeName, "GstMultiQueue")) {
+        g_signal_connect(element, "pad-added", G_CALLBACK(multiqueuePadAddedCallback), nullptr);
+    }
 
 #if USE(WESTEROS_SINK)
     static GstCaps *westerosSinkCaps = nullptr;
