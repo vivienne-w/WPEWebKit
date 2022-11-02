@@ -58,6 +58,7 @@
 #include <limits>
 #include <wtf/CheckedArithmetic.h>
 #include <wtf/IsoMallocInlines.h>
+#include <wtf/StringPrintStream.h>
 #include <wtf/WeakPtr.h>
 
 namespace WebCore {
@@ -595,6 +596,10 @@ ExceptionOr<void> SourceBuffer::appendBufferInternal(const unsigned char* data, 
     if (isRemoved() || m_updating)
         return Exception { InvalidStateError };
 
+    StringPrintStream message;
+    message.printf("SourceBuffer::appendBufferInternal(%p) - append size = %u, buffered = %s\n", this, size, toString(m_private->buffered()->ranges()).utf8().data());
+    DEBUG_LOG(LOGIDENTIFIER, message.toString());
+
     // 3. If the readyState attribute of the parent media source is in the "ended" state then run the following steps:
     // 3.1. Set the readyState attribute of the parent media source to "open"
     // 3.2. Queue a task to fire a simple event named sourceopen at the parent media source .
@@ -718,7 +723,9 @@ void SourceBuffer::sourceBufferPrivateAppendComplete(AppendResult result)
     if (extraMemoryCost() > this->maximumBufferSize())
         m_bufferFull = true;
 
-    DEBUG_LOG(LOGIDENTIFIER);
+    StringPrintStream message;
+    message.printf("SourceBuffer::sourceBufferPrivateAppendComplete(%p) - buffered = %s", this, toString(m_private->buffered()->ranges()).utf8().data());
+    DEBUG_LOG(LOGIDENTIFIER, message.toString());
 }
 
 void SourceBuffer::sourceBufferPrivateDidReceiveRenderingError(int error)
