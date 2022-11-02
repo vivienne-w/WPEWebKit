@@ -683,10 +683,12 @@ createOptionalParserForFormat(GstPad* demuxerSrcPad)
         return GRefPtr<GstElement>(opusparse);
     }
     if (!g_strcmp0(mediaType, "video/x-h264")) {
-        GstElement* h264parse = gst_element_factory_make("h264parse", parserName.get());
-        ASSERT(h264parse);
-        g_return_val_if_fail(h264parse, nullptr);
-        return GRefPtr<GstElement>(h264parse);
+        GRefPtr<GstElement> result = gst_element_factory_make("h264parse", parserName.get());
+        if (!result) {
+            GST_WARNING("Couldn't create h264parse, there might be problems processing some MSE streams. "
+                "Continue at your own risk and consider adding h264parse to your build.");
+        }
+        return result;
     }
 
     return nullptr;
