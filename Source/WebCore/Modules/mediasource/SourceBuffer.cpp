@@ -597,7 +597,7 @@ ExceptionOr<void> SourceBuffer::appendBufferInternal(const unsigned char* data, 
         return Exception { InvalidStateError };
 
     StringPrintStream message;
-    message.printf("SourceBuffer::appendBufferInternal(%p) - append size = %u, buffered = %s\n", this, size, toString(m_private->buffered()->ranges()).utf8().data());
+    message.printf("SourceBuffer::appendBufferInternal(%p) - append size = %u, buffered = %s\n", this, size, toString(m_buffered->ranges()).utf8().data());
     DEBUG_LOG(LOGIDENTIFIER, message.toString());
 
     // 3. If the readyState attribute of the parent media source is in the "ended" state then run the following steps:
@@ -724,7 +724,7 @@ void SourceBuffer::sourceBufferPrivateAppendComplete(AppendResult result)
         m_bufferFull = true;
 
     StringPrintStream message;
-    message.printf("SourceBuffer::sourceBufferPrivateAppendComplete(%p) - buffered = %s", this, toString(m_private->buffered()->ranges()).utf8().data());
+    message.printf("SourceBuffer::sourceBufferPrivateAppendComplete(%p) - buffered = %s", this, toString(m_buffered->ranges()).utf8().data());
     DEBUG_LOG(LOGIDENTIFIER, message.toString());
 }
 
