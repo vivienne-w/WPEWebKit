@@ -596,9 +596,7 @@ ExceptionOr<void> SourceBuffer::appendBufferInternal(const unsigned char* data, 
     if (isRemoved() || m_updating)
         return Exception { InvalidStateError };
 
-    StringPrintStream message;
-    message.printf("SourceBuffer::appendBufferInternal(%p) - append size = %u, buffered = %s\n", this, size, toString(m_buffered->ranges()).utf8().data());
-    DEBUG_LOG(LOGIDENTIFIER, message.toString());
+    DEBUG_LOG(LOGIDENTIFIER, "size = ", size, ", buffered = ", m_buffered->ranges());
 
     // 3. If the readyState attribute of the parent media source is in the "ended" state then run the following steps:
     // 3.1. Set the readyState attribute of the parent media source to "open"
@@ -723,9 +721,7 @@ void SourceBuffer::sourceBufferPrivateAppendComplete(AppendResult result)
     if (extraMemoryCost() > this->maximumBufferSize())
         m_bufferFull = true;
 
-    StringPrintStream message;
-    message.printf("SourceBuffer::sourceBufferPrivateAppendComplete(%p) - buffered = %s", this, toString(m_buffered->ranges()).utf8().data());
-    DEBUG_LOG(LOGIDENTIFIER, message.toString());
+    DEBUG_LOG(LOGIDENTIFIER, "buffered = ", m_buffered->ranges());
 }
 
 void SourceBuffer::sourceBufferPrivateDidReceiveRenderingError(int error)

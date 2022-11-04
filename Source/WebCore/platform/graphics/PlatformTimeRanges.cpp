@@ -28,6 +28,7 @@
 
 #include <math.h>
 #include <wtf/PrintStream.h>
+#include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
     
@@ -250,6 +251,16 @@ void PlatformTimeRanges::dump(PrintStream& out) const
 
     for (size_t i = 0; i < length(); ++i)
         out.print("[", start(i), "..", end(i), "] ");
+}
+
+String PlatformTimeRanges::toString() const
+{
+    StringBuilder result;
+
+    for (size_t i = 0; i < length(); ++i)
+        result.append("[", start(i).toString(), "..", end(i).toString(), "] ");
+
+    return result.toString();
 }
 
 }
