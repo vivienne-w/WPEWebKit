@@ -1264,6 +1264,41 @@ void MediaPlayerPrivateGStreamer::setPreservesPitch(bool preservesPitch)
     m_preservesPitch = preservesPitch;
 }
 
+GRefPtr<GstElement> findAdaptiveDemux(GstBin* bin) {
+    GST_TRACE("searching for an adaptive demuxer...");
+
+    GstIterator *iter = gst_bin_iterate_recurse(bin);
+    GValue item = G_VALUE_INIT;
+    GstElement *element;
+    const char *name;
+
+    while (true) {
+        switch (gst_iterator_next(iter, &item)) {
+            case GST_ITERATOR_OK:
+                element = (GstElement*) g_value_get_object(&item);
+                name = G_OBJECT_TYPE_NAME(G_OBJECT(element));
+
+                if (!g_strcmp0(name, "GstDashDemux") ||
+                    !g_strcmp0(name, "GstHLSDemux") ||
+                    !g_strcmp0(name, "GstMssDemux")) {
+                    GST_LOG("found adaptive demuxer: %s", GST_ELEMENT_NAME(element));
+                    return adoptGRef(element);
+                }
+                break;
+            case GST_ITERATOR_DONE:
+                GST_LOG("did not find an adaptive demuxer");
+                return nullptr;
+            case GST_ITERATOR_RESYNC:
+                item = G_VALUE_INIT;
+                gst_iterator_resync(iter);
+                break;
+            case GST_ITERATOR_ERROR:
+                GST_ERROR("failed to search for adaptive demuxer");
+                break;
+        }
+    }
+}
+
 std::unique_ptr<PlatformTimeRanges> MediaPlayerPrivateGStreamer::buffered() const
 {
     auto timeRanges = std::make_unique<PlatformTimeRanges>();
@@ -1293,7 +1328,7 @@ std::unique_ptr<PlatformTimeRanges> MediaPlayerPrivateGStreamer::buffered() cons
 
     // Fallback to the more general maxTimeLoaded() if no range has
     // been found.
-    if (!timeRanges->length()) {
+    if (!timeRanges->length() && !m_adaptiveDemux) {
         MediaTime loaded = maxTimeLoaded();
         if (loaded.isValid() && loaded)
             timeRanges->add(MediaTime::zeroTime(), loaded);
@@ -1451,11 +1486,14 @@ void MediaPlayerPrivateGStreamer::handleMessage(GstMessage* message)
 
         if (!messageSourceIsPlaybin || m_delayingLoad)
             break;
+        gst_message_parse_state_changed(message, &currentState, &newState, nullptr);
+        if (currentState == GST_STATE_READY && newState == GST_STATE_PAUSED)
+            m_adaptiveDemux = findAdaptiveDemux(GST_BIN(m_pipeline.get()));
+        else if (currentState == GST_STATE_PAUSED && newState == GST_STATE_READY)
+            m_adaptiveDemux = nullptr;
         updateStates();
 
         // Construct a filename for the graphviz dot file output.
-        GstState newState;
-        gst_message_parse_state_changed(message, &currentState, &newState, nullptr);
         CString dotFileName = String::format("%s.%s_%s", GST_OBJECT_NAME(m_pipeline.get()),
             gst_element_state_get_name(currentState), gst_element_state_get_name(newState)).utf8();
         GST_DEBUG_BIN_TO_DOT_FILE_WITH_TS(GST_BIN(m_pipeline.get()), GST_DEBUG_GRAPH_SHOW_ALL, dotFileName.data());
@@ -1550,7 +1588,8 @@ void MediaPlayerPrivateGStreamer::handleMessage(GstMessage* message)
                 GstClockTime time;
                 gst_structure_get(structure, "uri", G_TYPE_STRING, &uri.outPtr(), "fragment-download-time", GST_TYPE_CLOCK_TIME, &time, nullptr);
                 GST_TRACE("Fragment %s download time %" GST_TIME_FORMAT, uri.get(), GST_TIME_ARGS(time));
-            } else if (isMediaDiskCacheDisabled() && gst_structure_has_name(structure, "webkit-network-statistics")) {
+            // ignore if using adaptive media, as these statistics would just be referring to the manifest file, not the actual media streams
+            } else if (isMediaDiskCacheDisabled() && gst_structure_has_name(structure, "webkit-network-statistics") && !m_adaptiveDemux) {
                 guint64 networkReadPosition = 0;
                 guint64 httpResponseTotalSize = 0;
 
@@ -1562,6 +1601,7 @@ void MediaPlayerPrivateGStreamer::handleMessage(GstMessage* message)
                     // available. Otherwise we can't compute it.
                     if (httpResponseTotalSize) {
                         m_dataReadProgress = static_cast<double>(networkReadPosition) / static_cast<double>(httpResponseTotalSize);
+                        GST_LOG("updating m_dataReadProgress = %f (networkReadPosition = %llu, httpResponseTotalSize = %llu", m_dataReadProgress, networkReadPosition, httpResponseTotalSize);
                         if (mediaDuration) {
                             m_maxTimeLoaded = MediaTime(m_dataReadProgress * static_cast<double>(toGstUnsigned64Time(mediaDuration)), GST_SECOND);
                             GST_DEBUG("Updated maxTimeLoaded base on network read position: %s", toString(m_maxTimeLoaded).utf8().data());
@@ -1723,11 +1763,14 @@ void MediaPlayerPrivateGStreamer::processBufferingStats(GstMessage* message)
 #endif
 
     GST_TRACE("[Buffering] max loaded time: %s, current playback position: %s",
-              toString(m_maxTimeLoaded).utf8().data(),
+              m_adaptiveDemux ? "unknown" : toString(m_maxTimeLoaded).utf8().data(),
               toString(playbackPosition()).utf8().data());
 
+    // ignore maxTimeLoaded when playing adaptive media, it will not be correct
     if (m_bufferingPercentage == 100 ||
-        (m_bufferingPercentage == 0 && (m_maxTimeLoaded - playbackPosition() < MediaTime::createWithDouble(2, GST_SECOND))))
+        (m_bufferingPercentage == 0 &&
+        (m_adaptiveDemux ||
+        (m_maxTimeLoaded - playbackPosition() < MediaTime::createWithDouble(2, GST_SECOND)))))
         updateStates();
 }
 
@@ -1953,7 +1996,8 @@ MediaTime MediaPlayerPrivateGStreamer::maxMediaTimeSeekable() const
 
 MediaTime MediaPlayerPrivateGStreamer::maxTimeLoaded() const
 {
-    if (m_errorOccured)
+    // cannot calculate maxTimeLoaded if adaptive media is being played
+    if (m_errorOccured || m_adaptiveDemux)
         return MediaTime::zeroTime();
 
     MediaTime loaded = m_maxTimeLoaded;
@@ -1961,7 +2005,7 @@ MediaTime MediaPlayerPrivateGStreamer::maxTimeLoaded() const
       MediaTime mediaDuration = durationMediaTime();
       if (mediaDuration) {
         loaded = MediaTime(m_dataReadProgress * static_cast<double>(toGstUnsigned64Time(mediaDuration)), GST_SECOND);
-        GST_DEBUG("maxTimeLoaded based on dataReadProgress=%d", (int)(m_dataReadProgress*100));
+        GST_DEBUG("maxTimeLoaded based on dataReadProgress=%d (mediaDuration=%s)", (int)(m_dataReadProgress*100), mediaDuration.toString().utf8().data());
       }
     }
     if (!loaded && !m_fillTimer.isActive()){

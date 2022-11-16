@@ -298,6 +298,7 @@ private:
     GRefPtr<GstElement> m_vidfilter;
     GRefPtr<GstElement> m_multiqueue;
 #endif
+    GRefPtr<GstElement> m_adaptiveDemux;
     virtual bool isMediaSource() const { return false; }
 
     String m_errorMessage;
