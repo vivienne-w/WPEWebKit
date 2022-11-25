@@ -3485,18 +3485,27 @@ GstElement* MediaPlayerPrivateGStreamer::createVideoSinkGL()
 #endif // USE(GSTREAMER_GL)
 
 #if USE(GSTREAMER_HOLEPUNCH)
+
+#define VISIBILITY_DATA_VISIBLE     1
+#define VISIBILITY_DATA_HIDDEN      2
+
 static void setRectangleToVideoSink(GstElement* videoSink, const IntRect& rect, bool changeVisibleState = false, bool newVisibility = false)
 {
     static Lock mutex;
-    static bool isVisible = true;
-
-    LockHolder holder(mutex);
-    isVisible = changeVisibleState ? newVisibility : isVisible;
-
-    if (!isVisible && !changeVisibleState)
+    
+    if (!videoSink)
         return;
 
-    if (!videoSink)
+    LockHolder holder(mutex);
+
+    // Get the visibility state for the sink. If the data field is not initialized (nullptr / zero returned), we'll assume it is visible
+    auto isVisible = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(videoSink), "wpe-video-visibility")) != VISIBILITY_DATA_HIDDEN;
+
+    isVisible = changeVisibleState ? newVisibility : isVisible;
+
+    g_object_set_data(G_OBJECT(videoSink), "wpe-video-visibility", GINT_TO_POINTER(isVisible ? VISIBILITY_DATA_VISIBLE : VISIBILITY_DATA_HIDDEN));
+
+    if (!isVisible && !changeVisibleState)
         return;
 
 #if USE(WESTEROS_SINK) || USE(WPEWEBKIT_PLATFORM_BCM_NEXUS)
