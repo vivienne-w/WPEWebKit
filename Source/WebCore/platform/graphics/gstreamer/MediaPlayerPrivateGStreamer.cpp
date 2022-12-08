@@ -3940,6 +3940,7 @@ void MediaPlayerPrivateGStreamer::configureElement(GstElement* element)
         GST_INFO("Enable 'immediate-output' in rtkaudiosink");
         g_object_set (G_OBJECT(element), "media-tunnel", FALSE, nullptr);
         g_object_set (G_OBJECT(element), "audio-service", TRUE, nullptr);
+        g_object_set (G_OBJECT(element), "lowdelay-sync-mode", TRUE, nullptr);
     }
 #endif
 }
