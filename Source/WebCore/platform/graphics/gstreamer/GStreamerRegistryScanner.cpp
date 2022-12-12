@@ -112,6 +112,16 @@ GStreamerRegistryScanner::RegistryLookupResult GStreamerRegistryScanner::hasElem
                 isUsingHardware = true;
                 break;
             }
+#elif PLATFORM(REALTEK)
+            if (g_str_has_prefix(GST_OBJECT_NAME(factory), "omx")) {
+                isUsingHardware = true;
+                break;
+            }
+#elif USE(WESTEROS_SINK)
+            if (g_str_has_prefix(GST_OBJECT_NAME(factory), "westeros")) {
+                isUsingHardware = true;
+                break;
+            }
 #endif
             String metadata = gst_element_factory_get_metadata(factory, GST_ELEMENT_METADATA_KLASS);
             auto components = metadata.split('/');

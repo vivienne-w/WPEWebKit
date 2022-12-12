@@ -3934,6 +3934,15 @@ void MediaPlayerPrivateGStreamer::configureElement(GstElement* element)
 
     if (!g_strcmp0(G_OBJECT_TYPE_NAME(G_OBJECT(element)), "GstQueue2"))
         g_object_set(G_OBJECT(element), "high-watermark", 0.10, nullptr);
+
+#if ENABLE(MEDIA_STREAM) && PLATFORM(REALTEK)
+    if (m_streamPrivate != nullptr && g_object_class_find_property (G_OBJECT_GET_CLASS (element), "media-tunnel")) {
+        GST_INFO("Enable 'immediate-output' in rtkaudiosink");
+        g_object_set (G_OBJECT(element), "media-tunnel", FALSE, nullptr);
+        g_object_set (G_OBJECT(element), "audio-service", TRUE, nullptr);
+        g_object_set (G_OBJECT(element), "lowdelay-sync-mode", TRUE, nullptr);
+    }
+#endif
 }
 
 void MediaPlayerPrivateGStreamer::checkPlayingConsitency()
