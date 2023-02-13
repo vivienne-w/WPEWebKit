@@ -261,7 +261,7 @@
 }
 
 .highlight .selection-area {
-    animation: "dom-tree-outline-highlight-fadeout" 2s;
+    animation: dom-tree-outline-highlight-fadeout 2s;
 }
 
 .tree-outline.dom li .highlight {
