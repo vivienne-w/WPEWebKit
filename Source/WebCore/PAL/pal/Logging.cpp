@@ -31,9 +31,27 @@
 #if PLATFORM(COCOA)
 #include <notify.h>
 #include <wtf/BlockPtr.h>
+#elif PLATFORM(WPE)
+#include <glib.h>
+#include <wtf/FileSystem.h>
+#include <wtf/glib/GRefPtr.h>
+#include <WebCore/PlatformExportMacros.h>
+#include <WebCore/FileMonitor.h>
 #endif
 
 namespace PAL {
+
+#if PLATFORM(WPE)
+class CallbackWrapper
+{
+public:
+    CallbackWrapper(WTF::Function<void()>&& callback) : m_callback(WTFMove(callback)) {}
+
+    void call() const  { m_callback(); }
+private:
+    WTF::Function<void()> m_callback;
+};
+#endif // PLATFORM(WPE)
 
 void registerNotifyCallback(const String& notifyID, WTF::Function<void()>&& callback)
 {
@@ -42,6 +60,20 @@ void registerNotifyCallback(const String& notifyID, WTF::Function<void()>&& call
     notify_register_dispatch(notifyID.utf8().data(), &token, dispatch_get_main_queue(), makeBlockPtr([callback = WTFMove(callback)](int) {
         callback();
     }).get());
+#elif PLATFORM(WPE)
+    using namespace FileSystem;
+
+    // Triggers callback with "touch <user config dir>/notify/<notifyID>".
+    CString notifyFilePath = fileSystemRepresentation(pathByAppendingComponents(g_get_user_config_dir(), {"notify", notifyID}));
+    GRefPtr<GFile> notifyFile = adoptGRef(g_file_new_for_path(notifyFilePath.data()));
+    GFileMonitor* monitor = g_file_monitor_file(notifyFile.get(), G_FILE_MONITOR_NONE, nullptr, nullptr);
+
+    g_signal_connect(monitor, "changed", G_CALLBACK(+[](GFileMonitor*, GFile*, GFile*, GFileMonitorEvent event, CallbackWrapper *wrappedCallback) {
+        if ((G_FILE_MONITOR_EVENT_CREATED == event) || (G_FILE_MONITOR_EVENT_ATTRIBUTE_CHANGED == event)) {
+            wrappedCallback->call();
+        }
+        // Do not release wrappedCallback, as this code will get called each time the signal is raised
+    }), new CallbackWrapper(WTFMove(callback)));
 #else
     UNUSED_PARAM(notifyID);
     UNUSED_PARAM(callback);
