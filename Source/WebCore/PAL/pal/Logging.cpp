@@ -41,6 +41,18 @@
 
 namespace PAL {
 
+#if PLATFORM(WPE)
+class CallbackWrapper
+{
+public:
+    CallbackWrapper(WTF::Function<void()>&& callback) : m_callback(WTFMove(callback)) {}
+
+    void call() const  { m_callback(); }
+private:
+    WTF::Function<void()> m_callback;
+};
+#endif // PLATFORM(WPE)
+
 void registerNotifyCallback(const String& notifyID, WTF::Function<void()>&& callback)
 {
 #if PLATFORM(COCOA)
