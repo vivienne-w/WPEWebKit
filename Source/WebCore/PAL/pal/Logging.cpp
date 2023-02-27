@@ -33,10 +33,9 @@
 #include <wtf/BlockPtr.h>
 #elif PLATFORM(WPE)
 #include <glib.h>
+#include <gio/gio.h>
 #include <wtf/FileSystem.h>
 #include <wtf/glib/GRefPtr.h>
-#include <WebCore/PlatformExportMacros.h>
-#include <WebCore/FileMonitor.h>
 #endif
 
 namespace PAL {
