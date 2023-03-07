@@ -139,7 +139,7 @@ SourceBuffer::SourceBuffer(Ref<SourceBufferPrivate>&& sourceBufferPrivate, Media
     , m_groupEndTimestamp(MediaTime::zeroTime())
     , m_buffered(TimeRanges::create())
     , m_appendState(WaitingForSegment)
-    , m_timeOfBufferingMonitor(MonotonicTime::now())
+    , m_timeOfBufferingMonitor(MonotonicTime::fromRawSeconds(0))
     , m_pendingRemoveStart(MediaTime::invalidTime())
     , m_pendingRemoveEnd(MediaTime::invalidTime())
     , m_removeTimer(*this, &SourceBuffer::removeTimerFired)
@@ -274,6 +274,7 @@ ExceptionOr<void> SourceBuffer::setAppendWindowEnd(double newValue)
 
 ExceptionOr<void> SourceBuffer::appendBuffer(const BufferSource& data)
 {
+    monitorBufferingRate();
     return appendBufferInternal(static_cast<const unsigned char*>(data.data()), data.length());
 }
 
@@ -704,6 +705,7 @@ void SourceBuffer::sourceBufferPrivateAppendComplete(AppendResult result)
 
     if (m_source)
         m_source->monitorSourceBuffers();
+    monitorBufferingRate();
 
     MediaTime currentMediaTime = m_source->currentTime();
     for (auto& trackBufferPair : m_trackBufferMap) {
@@ -2272,6 +2274,12 @@ void SourceBuffer::didDropSample()
 
 void SourceBuffer::monitorBufferingRate()
 {
+    // We avoid the first update of m_averageBufferRate on purpose, but in exchange we get a more accurate m_timeOfBufferingMonitor initial time.
+    if (!m_timeOfBufferingMonitor) {
+        m_timeOfBufferingMonitor = MonotonicTime::now();
+        return;
+    }
+
     MonotonicTime now = MonotonicTime::now();
     Seconds interval = now - m_timeOfBufferingMonitor;
     double rateSinceLastMonitor = m_bufferedSinceLastMonitor / interval.seconds();
