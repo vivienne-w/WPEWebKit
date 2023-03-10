@@ -22,18 +22,38 @@
         return bufferedRanges;
     }
 
-    async function appendPtsRange(firstPts, lastPts) {
+    function doBufferedRangesContain(time) {
+        var timeRanges = sourceBuffer.buffered;
+        for (var i = 0 ; i < timeRanges.length ; i++) {
+            if (timeRanges.start(i) <= time && time <= timeRanges.end(i))
+                return true;
+        }
+        return false;
+    }
+
+    async function appendSample(dts, pts) {
+         const flag = dts % 5 == 0 ? SAMPLE_FLAG.SYNC : SAMPLE_FLAG.NONE;
+         consoleWrite('Appending PTS=' + pts + ', DTS=' + dts + (flag == SAMPLE_FLAG.SYNC ? ', sync' : ''));
+         sourceBuffer.appendBuffer(makeASample(pts, dts, 1, 1, 1, flag, 1));
+         await waitFor(sourceBuffer, 'updateend', true);
+    }
+
+    async function appendDtsRange(firstDts, lastDts) {
+        if (firstDts >= lastDts)
+            return null;
+
         var resultException = null;
-        for (var pts = firstPts; pts <= lastPts; pts++) {
-            try {
-                consoleWrite('Appending PTS='+pts);
-                sourceBuffer.appendBuffer(makeASample(pts, pts, 1, 1, 1, SAMPLE_FLAG.SYNC, 1));
-                await waitFor(sourceBuffer, 'updateend');
-            } catch (e) {
-                resultException = e;
-                sourceBuffer.abort();
-                break;
+        try {
+            for (var dts = firstDts; dts <= lastDts; dts += 5) {
+                await appendSample(dts + 0, dts + 0);
+                await appendSample(dts + 1, dts + 3);
+                await appendSample(dts + 2, dts + 1);
+                await appendSample(dts + 3, dts + 2);
+                await appendSample(dts + 4, dts + 4);
             }
+        } catch (e) {
+            resultException = e;
+            sourceBuffer.abort();
         }
         return resultException;
     }
@@ -57,29 +77,17 @@
         await waitFor(sourceBuffer, 'updateend');
         waitFor(sourceBuffer, 'error');
 
-        video.currentTime = 120;
-        testExpected('video.currentTime', 120, '==');
+        internals.settings.setMaximumSourceBufferSize(500);
 
-        // This should allow bufering up to 175 (empirically tested).
-        internals.settings.setMaximumSourceBufferSize(4000);
-
-        // Append data from 120..176. The SourceBuffer will be filled after 175, so the last iteration should throw QuotaExceededError.
-        exception = await appendPtsRange(120, 176);
-
-        testExpected('exception', 'QuotaExceededError: The quota has been exceeded.', '==');
-        testExpected('bufferedRanges()', '[ 120...176 ]', '==');
-
-        video.currentTime = 115;
-        testExpected('video.currentTime', 115, '==');
-
-        // Now try to append from 115..118. Should free samples from the end and therefore succeed. Should never throw QuotaExceededError.
-        exception = await appendPtsRange(115, 118);
+        video.currentTime = 18;
+        testExpected('video.currentTime', 18, '==');
+        exception = await appendDtsRange(0, 14);
 
         testExpected('exception', 'QuotaExceededError: The quota has been exceeded.', '!=');
-        testExpected('bufferedRanges()', '[ 115...119, 120...146 ]', '==');
+        testExpected('bufferedRanges()', '[ 10...15 ]', '==');
 
         endTest();
-    });
+        });
     </script>
 </head>
 <body>

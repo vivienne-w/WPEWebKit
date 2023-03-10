@@ -88,6 +88,7 @@
 #include <wtf/MathExtras.h>
 #include <wtf/MediaTime.h>
 #include <wtf/NeverDestroyed.h>
+#include <wtf/Scope.h>
 #include <wtf/StringPrintStream.h>
 #include <wtf/text/AtomString.h>
 #include <wtf/text/CString.h>
@@ -3575,6 +3576,25 @@ GstElement* MediaPlayerPrivateGStreamer::createVideoSink()
 {
     acceleratedRenderingStateChanged();
 
+    // Ensure the sink has the max-lateness property set.
+    auto exit = makeScopeExit([this] {
+        ASSERT(m_videoSink);
+        // FIXME: We would not enable this for MediaStream.
+
+        GstElement* sink = m_videoSink.get();
+        while (GST_IS_BIN(sink)) {
+            GUniquePtr<GstIterator> iter(gst_bin_iterate_sinks(GST_BIN_CAST(sink)));
+            GValue value = G_VALUE_INIT;
+            auto result = gst_iterator_next(iter.get(), &value);
+            ASSERT_UNUSED(result, result == GST_ITERATOR_OK);
+            sink = GST_ELEMENT(g_value_get_object(&value));
+            g_value_unset(&value);
+        }
+
+        uint64_t maxLateness = 100 * GST_MSECOND;
+        g_object_set(sink, "max-lateness", maxLateness, nullptr);
+    });
+
 #if USE(GSTREAMER_HOLEPUNCH)
     m_videoSink = createHolePunchVideoSink();
     pushNextHolePunchBuffer();
@@ -3694,7 +3714,7 @@ InitData MediaPlayerPrivateGStreamer::parseInitDataFromProtectionMessage(GstMess
             GstBuffer* data = nullptr;
             gst_event_parse_protection(event.get(), &eventKeySystemId, &data, nullptr);
 
-            initData.append({eventKeySystemId, data});
+            initData.append({GStreamerEMEUtilities::uuidToKeySystem(eventKeySystemId), data});
             m_handledProtectionEvents.add(GST_EVENT_SEQNUM(event.get()));
         }
     }
@@ -3809,7 +3829,7 @@ void MediaPlayerPrivateGStreamer::handleProtectionEvent(GstEvent* event)
     const char* eventKeySystemUUID = nullptr;
     GstBuffer* initData = nullptr;
     gst_event_parse_protection(event, &eventKeySystemUUID, &initData, nullptr);
-    initializationDataEncountered({eventKeySystemUUID, initData});
+    initializationDataEncountered({ GStreamerEMEUtilities::uuidToKeySystem(eventKeySystemUUID), initData });
 }
 
 bool MediaPlayerPrivateGStreamer::waitingForKey() const
