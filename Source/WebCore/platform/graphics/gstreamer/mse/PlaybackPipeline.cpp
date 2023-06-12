@@ -362,6 +362,8 @@ void PlaybackPipeline::flush(AtomString trackId)
 
 #if ENABLE(INSTANT_RATE_CHANGE)
     rate = m_webKitMediaSrc->priv->mediaPlayerPrivate->rate();
+    if (!rate)
+        rate = 1.0;
 #endif
 
     GST_DEBUG_OBJECT(appsrc, "segment: [%" GST_TIME_FORMAT ", %" GST_TIME_FORMAT "], rate: %f",
