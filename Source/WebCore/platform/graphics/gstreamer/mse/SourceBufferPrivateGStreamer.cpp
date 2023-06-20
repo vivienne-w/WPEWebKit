@@ -46,6 +46,7 @@
 #include "NotImplemented.h"
 #include "PlaybackPipeline.h"
 #include "WebKitMediaSourceGStreamer.h"
+#include <wtf/text/StringToIntegerConversion.h>
 
 namespace WebCore {
 
@@ -208,6 +209,25 @@ WTFLogChannel& SourceBufferPrivateGStreamer::logChannel() const
     return LogMediaSource;
 }
 #endif
+
+size_t SourceBufferPrivateGStreamer::platformEvictionThreshold() const
+{
+    static size_t evictionThreshold = 0;
+    static std::once_flag once;
+    std::call_once(once, []() {
+        const char* characters = std::getenv("MSE_BUFFER_SAMPLES_EVICTION_THRESHOLD");
+        if (!characters)
+            return;
+        StringView stringView(characters);
+        if (stringView.isEmpty())
+            return;
+        bool ok = false;
+        size_t size = toIntegralType<size_t>(stringView, &ok);
+        if (ok)
+            evictionThreshold = size;
+    });
+    return evictionThreshold;
+}
 
 }
 #endif
