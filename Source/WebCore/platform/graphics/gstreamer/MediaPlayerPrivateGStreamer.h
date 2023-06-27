@@ -333,6 +333,7 @@ protected:
     static void videoChangedCallback(MediaPlayerPrivateGStreamer*);
     static void videoSinkCapsChangedCallback(MediaPlayerPrivateGStreamer*);
     static void audioChangedCallback(MediaPlayerPrivateGStreamer*);
+    static GstPadProbeReturn streamStartProbeCallback(GstPad*, GstPadProbeInfo*, gpointer);
 #if ENABLE(VIDEO_TRACK)
     static void textChangedCallback(MediaPlayerPrivateGStreamer*);
     static GstFlowReturn newTextSampleCallback(MediaPlayerPrivateGStreamer*);

@@ -93,6 +93,7 @@
 #include <wtf/text/AtomString.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/StringConcatenateNumbers.h>
+#include <wtf/ThreadSafeRefCounted.h>
 #include <wtf/URL.h>
 #include <wtf/WallTime.h>
 
@@ -1128,6 +1129,65 @@ void MediaPlayerPrivateGStreamer::notifyPlayerOfVideoCaps()
     m_player->mediaEngineUpdated();
 }
 
+String audioTrackIdFromStreamStart(GstEvent* streamStart) {
+    const gchar* streamIdAsCharacters;
+    gst_event_parse_stream_start(streamStart, &streamIdAsCharacters);
+
+    String streamId;
+    if (streamIdAsCharacters) {
+        StringView streamIdView(streamIdAsCharacters);
+        size_t position = streamIdView.find('/');
+
+        if (position != notFound && position + 1 < streamIdView.length())
+            streamId = streamIdView.substring(position + 1).toString();
+    }
+
+    return streamId;
+}
+
+class StreamStartProbeData : public ThreadSafeRefCounted<StreamStartProbeData> {
+public:
+    StreamStartProbeData(MediaPlayerPrivateGStreamer* player, int trackIndex)
+        : player(player)
+        , trackIndex(trackIndex)
+    { }
+
+    MediaPlayerPrivateGStreamer* player;
+    int trackIndex;
+    bool probeWasRemoved { false };
+    Lock lock;
+};
+
+GstPadProbeReturn MediaPlayerPrivateGStreamer::streamStartProbeCallback(GstPad*, GstPadProbeInfo* info, gpointer data)
+{
+    Ref<StreamStartProbeData> probeData(*static_cast<StreamStartProbeData*>(data));
+    LockHolder locker(probeData->lock);
+    GstEvent* event = GST_PAD_PROBE_INFO_EVENT(info);
+
+    if (UNLIKELY(probeData->probeWasRemoved) || GST_EVENT_TYPE(event) != GST_EVENT_STREAM_START)
+        return GST_PAD_PROBE_OK;
+
+    String streamId = audioTrackIdFromStreamStart(event);
+    bool ok = false;
+    auto audioTracks = probeData->player->m_audioTracks;
+
+    for (auto& track : audioTracks.values()) {
+        if (track->trackIndex() == probeData->trackIndex) {
+            GST_DEBUG_OBJECT(probeData->player->pipeline(), "Updated stream ID, old: %s, new: %s", track->id().string().utf8().data(), streamId.utf8().data());
+
+            track->setId(streamId);
+            ok = true;
+            break;
+        }
+    }
+
+    if (!ok)
+        GST_WARNING_OBJECT(probeData->player->pipeline(), "Failed to find audio track %d, cannot update stream ID", probeData->trackIndex);
+
+    probeData->probeWasRemoved = true;
+    return GST_PAD_PROBE_REMOVE;
+}
+
 void MediaPlayerPrivateGStreamer::audioChangedCallback(MediaPlayerPrivateGStreamer* player)
 {
     player->m_notifier->notify(MainThreadNotification::AudioChanged, [player] {
@@ -1166,14 +1226,47 @@ void MediaPlayerPrivateGStreamer::notifyPlayerOfAudio()
         g_signal_emit_by_name(m_pipeline.get(), "get-audio-pad", i, &pad.outPtr(), nullptr);
         ASSERT(pad);
 
-        String streamId = "A" + String::number(i);
+        auto probeData = adoptRef(*new StreamStartProbeData(this, static_cast<int>(i)));
+
+        // Lock before even adding the probe, to ensure it cannot run until
+        // after the track object is created.
+        LockHolder locker(probeData->lock);
+
+        // Since stream-start is not always available at this point, we attach
+        // a probe that can update stream ID once it arrives on this pad.
+        auto bumpedProbeData = probeData.copyRef();
+        auto probe = gst_pad_add_probe(pad.get(), static_cast<GstPadProbeType>(GST_PAD_PROBE_TYPE_EVENT_BOTH | GST_PAD_PROBE_TYPE_PUSH),
+            streamStartProbeCallback, &bumpedProbeData.leakRef(),
+            [](gpointer data) { auto probeData = adoptRef(static_cast<StreamStartProbeData*>(data)); });
+
+        // Check for stream-start *after* attaching the probe,
+        // to avoid creating a race condition where stream-start would arrive
+        // between checking here and creating the probe.
+        String streamId = nullString();
+
+        auto streamStart = adoptGRef(gst_pad_get_sticky_event(pad.get(), GST_EVENT_STREAM_START, 0));
+        if (streamStart) {
+            streamId = audioTrackIdFromStreamStart(streamStart.get());
+            probeData->probeWasRemoved = true;
+            gst_pad_remove_probe(pad.get(), probe);
+        }
+
+        // Set dummy ID to be updated by the probe.
+        if (streamId.isNull())
+            streamId = "A" + String::number(i);
+
+        GST_DEBUG_OBJECT(pipeline(), "Got stream ID %s for audio track %u", streamId.utf8().data(), i);
+
         validAudioStreams.append(streamId);
         if (i < m_audioTracks.size()) {
             RefPtr<AudioTrackPrivateGStreamer> existingTrack = m_audioTracks.get(streamId);
             if (existingTrack) {
                 existingTrack->setIndex(i);
-                if (existingTrack->pad() == pad)
+                if (existingTrack->pad() == pad) {
+                    probeData->probeWasRemoved = true;
+                    gst_pad_remove_probe(pad.get(), probe);
                     continue;
+                }
             }
         }
 
