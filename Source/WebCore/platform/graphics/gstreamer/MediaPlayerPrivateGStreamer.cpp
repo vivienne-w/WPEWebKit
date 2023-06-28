@@ -3925,10 +3925,15 @@ void MediaPlayerPrivateGStreamer::configureElement(GstElement* element)
 #endif
 
 #if PLATFORM(BROADCOM)
-    if (g_str_has_prefix(GST_ELEMENT_NAME(element), "brcmaudiosink")) {
+    if (g_str_has_prefix(GST_ELEMENT_NAME(element), "brcmaudiosink"))
         g_object_set(G_OBJECT(element), "async", TRUE, nullptr);
+    else if (g_str_has_prefix(GST_ELEMENT_NAME(element), "brcmaudiodecoder")) {
+        if (m_isLiveStream.value_or(false)) {
+            // Limit BCM audio decoder buffering to 1sec so live progressive playback can start faster.
+            g_object_set(G_OBJECT(element), "limit_buffering_ms", 1000, nullptr);
+        }
     }
-    if(!g_strcmp0(G_OBJECT_TYPE_NAME(G_OBJECT(element)), "GstBrcmPCMSink")) {
+    if (!g_strcmp0(G_OBJECT_TYPE_NAME(G_OBJECT(element)), "GstBrcmPCMSink")) {
 #if ENABLE(MEDIA_STREAM)
         if (m_streamPrivate != nullptr && g_object_class_find_property(G_OBJECT_GET_CLASS(element), "low_latency")) {
             GST_DEBUG("Set 'low_latency' in brcmpcmsink");
